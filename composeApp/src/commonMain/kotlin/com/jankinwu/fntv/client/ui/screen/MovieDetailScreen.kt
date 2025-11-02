@@ -360,7 +360,7 @@ fun MediaInfo(
 ) {
     var mediaGuid by remember { mutableStateOf(playInfoResponse.mediaGuid) }
     var selectedVideoStreamIndex by remember { mutableIntStateOf(0) }
-    val selectedAudioStreamIndexMap = remember { mutableMapOf<String, String>() }
+    val mediaGuidAudioGuidMap = remember { mutableMapOf<String, String>() }
     var currentAudioStreamGuid: String? by remember { mutableStateOf("") }
     var currentAudioStream: AudioStream? by remember { mutableStateOf(null) }
     var currentAudioStreamList by remember { mutableStateOf<List<AudioStream>>(emptyList()) }
@@ -379,18 +379,18 @@ fun MediaInfo(
             .filter {
                 it.mediaGuid == mediaGuid
             }.sortedByDescending { it.index }
-        currentAudioStreamGuid = selectedAudioStreamIndexMap[mediaGuid]
+        currentAudioStreamGuid = mediaGuidAudioGuidMap[mediaGuid]
     }
     LaunchedEffect(selectedVideoStreamIndex) {
         mediaGuid = streamData.videoStreams[selectedVideoStreamIndex].mediaGuid
     }
     LaunchedEffect(playInfoResponse, streamData) {
-        // 如果和playInfo的audioGuid相等，则使用，否则使用默认
+        // 如果和 playInfo 的 audioGuid 相等，则使用，否则使用默认
         streamData.audioStreams.forEach { audioStream ->
             if (audioStream.guid == playInfoResponse.audioGuid) {
-                selectedAudioStreamIndexMap[audioStream.mediaGuid] = audioStream.guid
+                mediaGuidAudioGuidMap[audioStream.mediaGuid] = audioStream.guid
             } else if (audioStream.isDefault == 1) {
-                selectedAudioStreamIndexMap[audioStream.mediaGuid] = audioStream.guid
+                mediaGuidAudioGuidMap[audioStream.mediaGuid] = audioStream.guid
             }
         }
     }
@@ -429,6 +429,7 @@ fun MediaInfo(
             currentAudioStreamList,
             onAudioSelected = {
                 currentAudioStreamGuid = it
+                mediaGuidAudioGuidMap[mediaGuid] = it
             },
         )
 
