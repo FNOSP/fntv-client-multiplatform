@@ -64,6 +64,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Precision
 import coil3.size.Size
+import com.jankinwu.fntv.client.LocalRefreshState
 import com.jankinwu.fntv.client.LocalStore
 import com.jankinwu.fntv.client.LocalTypography
 import com.jankinwu.fntv.client.data.constants.Colors
@@ -77,6 +78,7 @@ import com.jankinwu.fntv.client.data.model.response.PersonListResponse
 import com.jankinwu.fntv.client.data.model.response.PlayInfoResponse
 import com.jankinwu.fntv.client.data.model.response.QueryTagResponse
 import com.jankinwu.fntv.client.data.model.response.StreamListResponse
+import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.data.store.AccountDataCache
 import com.jankinwu.fntv.client.enums.MediaQualityTagEnums
 import com.jankinwu.fntv.client.icons.ArrowLeft
@@ -90,6 +92,7 @@ import com.jankinwu.fntv.client.ui.component.ToastHost
 import com.jankinwu.fntv.client.ui.component.ToastManager
 import com.jankinwu.fntv.client.ui.component.detail.StreamOptionItem
 import com.jankinwu.fntv.client.ui.component.detail.StreamSelector
+import com.jankinwu.fntv.client.ui.component.detail.noDisplayStream
 import com.jankinwu.fntv.client.ui.component.rememberToastManager
 import com.jankinwu.fntv.client.viewmodel.FavoriteViewModel
 import com.jankinwu.fntv.client.viewmodel.GenresViewModel
@@ -138,6 +141,9 @@ fun MovieDetailScreen(
     val tagViewModel: TagViewModel = koinViewModel<TagViewModel>()
     val iso6392State by tagViewModel.iso6392State.collectAsState()
     val iso3166State by tagViewModel.iso3166State.collectAsState()
+    val genresViewModel: GenresViewModel = koinViewModel<GenresViewModel>()
+    val refreshState = LocalRefreshState.current
+
     LaunchedEffect(Unit) {
         itemViewModel.loadData(guid)
         streamListViewModel.loadData(guid)
@@ -148,6 +154,21 @@ fun MovieDetailScreen(
         }
         if (iso3166State !is UiState.Success) {
             tagViewModel.loadIso3166Tags()
+        }
+    }
+    // 监听刷新状态变化
+    LaunchedEffect(refreshState.refreshKey) {
+        // 当刷新状态变化时执行刷新逻辑
+        if (refreshState.refreshKey.isNotEmpty()) {
+//            refreshState.onRefresh()
+            // 执行当前页面的特定刷新逻辑
+            itemViewModel.loadData(guid)
+            streamListViewModel.loadData(guid)
+            personListViewModel.loadData(guid)
+            playInfoViewModel.loadData(guid)
+            tagViewModel.loadIso6392Tags()
+            tagViewModel.loadIso3166Tags()
+            genresViewModel.loadGenres()
         }
     }
     LaunchedEffect(itemUiState) {
@@ -388,10 +409,46 @@ fun MediaInfo(
     var currentAudioStreamGuid: String? by remember { mutableStateOf("") }
     var currentAudioStream: AudioStream? by remember { mutableStateOf(null) }
     var currentAudioStreamList by remember { mutableStateOf<List<AudioStream>>(emptyList()) }
+    val mediaGuidSubTitleGuidMap = remember { mutableMapOf<String, String>() }
+    var currentSubtitleStreamGuid: String? by remember { mutableStateOf("") }
+    var currentSubtitleStream: SubtitleStream? by remember { mutableStateOf(null) }
+    var currentSubtitleStreamList by remember { mutableStateOf<List<SubtitleStream>>(emptyList()) }
     var totalDuration by remember { mutableIntStateOf(0) }
     val reminingDuration = totalDuration.minus(itemData.watchedTs)
     val formatReminingDuration = formatSeconds(reminingDuration)
     val formatTotalDuration = formatSeconds(totalDuration)
+    
+    LaunchedEffect(guid, streamData, playInfoResponse) {
+        currentMediaGuid = playInfoResponse.mediaGuid
+        mediaGuidAudioGuidMap.clear()
+        mediaGuidSubTitleGuidMap.clear()
+//        currentAudioStreamGuid = null // 重置音频流GUID
+//        currentAudioStream = null // 重置音频流对象
+//        currentSubtitleStreamGuid = null
+//        currentSubtitleStream = null
+
+        // 如果和 playInfo 的 audioGuid 相等，则使用，否则使用默认
+        streamData.audioStreams.forEach { audioStream ->
+            if (audioStream.guid == playInfoResponse.audioGuid) {
+                mediaGuidAudioGuidMap[audioStream.mediaGuid] = audioStream.guid
+                currentAudioStreamGuid = audioStream.guid
+            } else if (audioStream.isDefault == 1) {
+                mediaGuidAudioGuidMap[audioStream.mediaGuid] = audioStream.guid
+            }
+        }
+        streamData.subtitleStreams.forEach { subtitleStream ->
+            if (playInfoResponse.subtitleGuid == "_no_display_") {
+                mediaGuidSubTitleGuidMap[subtitleStream.mediaGuid] = "_no_display_"
+                currentSubtitleStreamGuid = "_no_display_"
+            } else if (subtitleStream.guid == playInfoResponse.subtitleGuid) {
+                mediaGuidSubTitleGuidMap[subtitleStream.mediaGuid] = subtitleStream.guid
+                currentSubtitleStreamGuid = subtitleStream.guid
+            } else if (subtitleStream.isDefault == 1) {
+                mediaGuidSubTitleGuidMap[subtitleStream.mediaGuid] = subtitleStream.guid
+            }
+        }
+    }
+    
     LaunchedEffect(currentMediaGuid, guid) {
         streamData.videoStreams.forEach {
             if (it.mediaGuid == currentMediaGuid) {
@@ -402,32 +459,37 @@ fun MediaInfo(
         currentAudioStreamList = streamData.audioStreams
             .filter {
                 it.mediaGuid == currentMediaGuid
-            }.sortedByDescending { it.index }
+            }
+//            .sortedByDescending { it.index }
         currentAudioStreamGuid = mediaGuidAudioGuidMap[currentMediaGuid]
+        currentSubtitleStreamList = streamData.subtitleStreams
+            .filter {
+                it.mediaGuid == currentMediaGuid
+            }
+//            .sortedByDescending { it.index }
+        currentSubtitleStreamList = currentSubtitleStreamList + noDisplayStream
+        currentSubtitleStreamGuid = mediaGuidSubTitleGuidMap[currentMediaGuid]
     }
+    
     LaunchedEffect(selectedVideoStreamIndex, guid) {
         currentMediaGuid = streamData.videoStreams[selectedVideoStreamIndex].mediaGuid
     }
-    LaunchedEffect(guid, streamData) {
-        currentMediaGuid = playInfoResponse.mediaGuid
-        mediaGuidAudioGuidMap.clear()
-        currentAudioStreamGuid = null // 重置音频流GUID
-        currentAudioStream = null // 重置音频流对象
-        // 如果和 playInfo 的 audioGuid 相等，则使用，否则使用默认
-        streamData.audioStreams.forEach { audioStream ->
-            if (audioStream.guid == playInfoResponse.audioGuid) {
-                mediaGuidAudioGuidMap[audioStream.mediaGuid] = audioStream.guid
-                currentAudioStreamGuid = audioStream.guid
-            } else if (audioStream.isDefault == 1) {
-                mediaGuidAudioGuidMap[audioStream.mediaGuid] = audioStream.guid
-            }
-        }
-    }
+    
     LaunchedEffect(currentAudioStreamGuid, guid) {
         currentAudioStream = streamData.audioStreams.firstOrNull {
             it.guid == currentAudioStreamGuid
         }
     }
+    LaunchedEffect(currentSubtitleStreamGuid, guid) {
+        currentSubtitleStream = if (currentSubtitleStreamGuid == "_no_display_") {
+            noDisplayStream
+        } else {
+            streamData.subtitleStreams.firstOrNull {
+                it.guid == currentSubtitleStreamGuid
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -456,12 +518,18 @@ fun MediaInfo(
             streamData,
             currentAudioStream,
             currentAudioStreamList,
+            currentSubtitleStream,
+            currentSubtitleStreamList,
             iso6392State,
             iso3166State,
             onAudioSelected = {
                 currentAudioStreamGuid = it
                 mediaGuidAudioGuidMap[currentMediaGuid] = it
             },
+            onSubtitleSelected = {
+                currentSubtitleStreamGuid = it
+                mediaGuidSubTitleGuidMap[currentMediaGuid] = it
+            }
         )
 
         if (streamData.videoStreams.size > 1) {
@@ -556,16 +624,20 @@ fun MiddleControls(
     streamData: StreamListResponse,
     currentAudioStream: AudioStream?,
     currentAudioStreamList: List<AudioStream>,
+    currentSubtitleStream: SubtitleStream?,
+    currentSubtitleStreamList: List<SubtitleStream>,
     iso6392State: UiState<List<QueryTagResponse>>,
     iso3166State: UiState<List<QueryTagResponse>>,
-    onAudioSelected: (audioGuid: String) -> Unit
+    onAudioSelected: (audioGuid: String) -> Unit,
+    onSubtitleSelected: (subtitleGuid: String) -> Unit
 ) {
     val player = LocalMediaPlayer.current
     val playMedia = rememberPlayMediaFunction(
         guid = guid,
         player = player,
         mediaGuid = mediaGuid,
-        currentAudioGuid = currentAudioStream?.guid
+        currentAudioGuid = currentAudioStream?.guid,
+        currentSubtitleGuid = currentSubtitleStream?.guid
     )
     val favoriteViewModel: FavoriteViewModel = koinViewModel<FavoriteViewModel>()
     val favoriteUiState by favoriteViewModel.uiState.collectAsState()
@@ -791,13 +863,20 @@ fun MiddleControls(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.height(24.dp)
             ) {
-                InfoIconText("中文字幕")
+//                InfoIconText("中文字幕")
+                SubtitleSelector(
+                    currentSubtitleStreamList,
+                    currentSubtitleStream,
+                    onSubtitleSelected,
+                    iso6392State
+                )
                 AudioSelector(
                     currentAudioStreamList,
                     currentAudioStream,
                     onAudioSelected,
                     iso6392State
                 )
+
 
 //                MediaQualityTag(streamData.videoStreams[selectedVideoStreamIndex].resolutionType)
 //                MediaQualityTag(streamData.videoStreams[selectedVideoStreamIndex].colorRangeType)
@@ -827,7 +906,7 @@ fun MiddleControls(
 
 @Composable
 fun AudioSelector(
-    audioStreams: List<AudioStream>,
+    currentAudioStreamList: List<AudioStream>,
     currentAudioStream: AudioStream?,
     onAudioSelected: (String) -> Unit,
     iso6392State: UiState<List<QueryTagResponse>>
@@ -838,16 +917,17 @@ fun AudioSelector(
         iso6392Map = iso6392State.data.associateBy { it.key }
     }
 
-    val selectorOptions by remember(audioStreams, iso6392Map, currentAudioStream) {
+    val selectorOptions by remember(currentAudioStreamList, iso6392Map, currentAudioStream) {
         derivedStateOf {
-            audioStreams.map { audioStream ->
-                val language: String = if (audioStream.language in listOf("", "und", "zxx", "qaa-qtz")) {
-                    "未知"
-                } else {
-                    iso6392Map[audioStream.language]?.value ?: audioStream.language
-                }
+            currentAudioStreamList.map { audioStream ->
+                val language: String =
+                    if (audioStream.language in listOf("", "und", "zxx", "qaa-qtz")) {
+                        "未知"
+                    } else {
+                        iso6392Map[audioStream.language]?.value ?: audioStream.language
+                    }
                 StreamOptionItem(
-                    audioGuid = audioStream.guid,
+                    optionGuid = audioStream.guid,
                     title = language,
                     subtitle1 = audioStream.codecName,
                     subtitle3 = audioStream.title,
@@ -858,12 +938,66 @@ fun AudioSelector(
             }
         }
     }
-    val selectedLanguage: String = if (currentAudioStream?.language in listOf("", "und", "zxx", "qaa-qtz")) {
-        "未知音频"
-    } else {
-        (iso6392Map[currentAudioStream?.language]?.value ?: currentAudioStream?.language) + "音频"
-    }
+    val selectedLanguage: String =
+        if (currentAudioStream?.language in listOf("", "und", "zxx", "qaa-qtz")) {
+            "未知音频"
+        } else if (currentAudioStream?.language == null) {
+            "未知音频"
+        } else {
+            (iso6392Map[currentAudioStream.language]?.value
+                ?: currentAudioStream.language) + "音频"
+        }
     StreamSelector(selectorOptions, selectedLanguage, onAudioSelected)
+}
+
+@Composable
+fun SubtitleSelector(
+    currentSubtitleStreamList: List<SubtitleStream>,
+    currentSubtitleStream: SubtitleStream?,
+    onSubtitleSelected: (String) -> Unit,
+    iso6392State: UiState<List<QueryTagResponse>>
+) {
+    var iso6392Map: Map<String, QueryTagResponse> by remember { mutableStateOf(mapOf()) }
+
+    if (iso6392State is UiState.Success<List<QueryTagResponse>>) {
+        iso6392Map = iso6392State.data.associateBy { it.key }
+    }
+
+    val selectorOptions by remember(currentSubtitleStreamList, iso6392Map, currentSubtitleStream) {
+        derivedStateOf {
+            currentSubtitleStreamList.map { subtitleStream ->
+                val language: String =
+                    if (subtitleStream.language in listOf("", "und", "zxx", "qaa-qtz")) {
+                        "未知"
+                    } else {
+                        iso6392Map[subtitleStream.language]?.value ?: subtitleStream.language
+                    }
+                StreamOptionItem(
+                    optionGuid = subtitleStream.guid,
+                    title = language,
+                    subtitle1 = subtitleStream.format.uppercase(),
+                    subtitle3 = subtitleStream.title,
+//                    subtitle2 = "",
+                    isDefault = subtitleStream.isDefault == 1,
+                    isSelected = subtitleStream.guid == currentSubtitleStream?.guid
+                )
+            }
+        }
+    }
+    val selectedLanguage: String =
+        when (currentSubtitleStream?.language) {
+            in listOf("", "und", "zxx", "qaa-qtz") -> {
+                "未知字幕"
+            }
+            null -> {
+                "未知字幕"
+            }
+            else -> {
+                (iso6392Map[currentSubtitleStream.language]?.value
+                    ?: currentSubtitleStream.language) + "字幕"
+            }
+        }
+    StreamSelector(selectorOptions, selectedLanguage, onSubtitleSelected, true)
 }
 
 @Composable

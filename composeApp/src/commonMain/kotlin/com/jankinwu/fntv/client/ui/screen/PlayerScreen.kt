@@ -575,7 +575,8 @@ fun rememberPlayMediaFunction(
     guid: String,
     player: MediampPlayer,
     mediaGuid: String? = null,
-    currentAudioGuid: String? = null
+    currentAudioGuid: String? = null,
+    currentSubtitleGuid: String? = null
 ): () -> Unit {
     val streamViewModel: StreamViewModel = koinInject()
     val playPlayViewModel: PlayPlayViewModel = koinInject()
@@ -584,7 +585,7 @@ fun rememberPlayMediaFunction(
     val playRecordViewModel: PlayRecordViewModel = koinInject()
     val scope = rememberCoroutineScope()
     val playerManager = LocalPlayerManager.current
-    return remember(streamViewModel, playPlayViewModel, guid, player, playerManager, mediaGuid, currentAudioGuid) {
+    return remember(streamViewModel, playPlayViewModel, guid, player, playerManager, mediaGuid, currentAudioGuid, currentSubtitleGuid) {
         {
             scope.launch {
                 playMedia(
@@ -597,7 +598,8 @@ fun rememberPlayMediaFunction(
                     playRecordViewModel = playRecordViewModel,
                     playerManager = playerManager,
                     mediaGuid = mediaGuid,
-                    currentAudioGuid = currentAudioGuid
+                    currentAudioGuid = currentAudioGuid,
+                    currentSubtitleGuid = currentSubtitleGuid
                 )
             }
         }
@@ -614,7 +616,8 @@ private suspend fun playMedia(
     playRecordViewModel: PlayRecordViewModel,
     playerManager: PlayerManager,
     mediaGuid: String?,
-    currentAudioGuid: String?
+    currentAudioGuid: String?,
+    currentSubtitleGuid: String?
 ) {
     try {
         // 获取播放信息
@@ -626,7 +629,8 @@ private suspend fun playMedia(
         val videoStream = streamInfo.videoStream
         val audioStream = streamInfo.audioStreams.first { audioStream -> audioStream.guid == playInfoResponse.audioGuid }
         val audioGuid = currentAudioGuid ?: audioStream.guid
-        val subtitleStream = streamInfo.subtitleStreams?.firstOrNull()
+        val subtitleStream = streamInfo.subtitleStreams?.first{ it.guid == playInfoResponse.subtitleGuid}
+        val subtitleGuid = currentSubtitleGuid ?: subtitleStream?.guid
         val fileStream = streamInfo.fileStream
         // 显示播放器
         val videoDuration = videoStream.duration * 1000L
@@ -652,7 +656,7 @@ private suspend fun playMedia(
         }
 
         // 构造播放请求
-        val playRequest = createPlayRequest(videoStream, fileStream, audioGuid, subtitleStream)
+        val playRequest = createPlayRequest(videoStream, fileStream, audioGuid, subtitleGuid)
 
         var playLink = ""
         // 获取播放链接
@@ -719,7 +723,7 @@ private fun createPlayRequest(
     videoStream: VideoStream,
     fileStream: FileInfo,
     audioGuid: String,
-    subtitleStream: SubtitleStream?
+    subtitleGuid: String?
 ): PlayPlayRequest {
     return PlayPlayRequest(
         videoGuid = videoStream.guid,
@@ -731,7 +735,7 @@ private fun createPlayRequest(
         forcedSdr = 0,
         resolution = videoStream.resolutionType,
         startTimestamp = 0,
-        subtitleGuid = subtitleStream?.guid ?: "",
+        subtitleGuid = subtitleGuid?: "",
         videoEncoder = videoStream.codecName,
     )
 }
@@ -753,6 +757,7 @@ private suspend fun startPlayback(
         player.playUri("${AccountDataCache.getFnOfficialBaseUrl()}$playLink")
     }
     delay(1000) // 等待播放器初始化
+    player.features[PlaybackSpeed]?.set(1.0f)
     println("startPlayback startPosition: $startPosition")
     player.seekTo(startPosition)
 }

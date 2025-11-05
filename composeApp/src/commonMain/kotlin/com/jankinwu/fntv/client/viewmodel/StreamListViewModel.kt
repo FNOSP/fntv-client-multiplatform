@@ -24,7 +24,7 @@ class StreamListViewModel : BaseViewModel() {
         }
     }
 
-    fun refresh(guid: String, beforePlay: Int) {
+    fun refresh(guid: String, beforePlay: Int? = null) {
         loadData(guid, beforePlay)
     }
 

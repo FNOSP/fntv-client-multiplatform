@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jankinwu.fntv.client.data.constants.Colors
+import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.icons.ArrowUp
 import io.github.composefluent.FluentTheme
 import io.github.composefluent.component.FlyoutPlacement
@@ -36,68 +37,64 @@ import io.github.composefluent.icons.Icons
 import io.github.composefluent.icons.regular.Checkmark
 import kotlinx.coroutines.delay
 
-
 @Composable
 fun StreamSelector(
-    audioOptions: List<StreamOptionItem>,
+    streamOptions: List<StreamOptionItem>,
     selectedItemLabel: String,
-    onSelected: (String) -> Unit
+    onSelected: (String) -> Unit,
+    isSubtitle: Boolean = false
 ) {
-    if (audioOptions.isNotEmpty() && audioOptions.size > 1) {
+    println("selectedItemLabel: $selectedItemLabel")
+    if (streamOptions.isNotEmpty() && streamOptions.size > 1) {
         val interactionSource = remember { MutableInteractionSource() }
         val isHovered by interactionSource.collectIsHoveredAsState()
         MenuFlyoutContainer(
             flyout = {
-                audioOptions.forEach { audioOption ->
+                // 检查是否有 "_no_display_" 选项
+                val noDisplayItem = streamOptions.find { it.optionGuid == "_no_display_" }
+                val otherItems = streamOptions.filter { it.optionGuid != "_no_display_" }
+                
+                // 如果有 "_no_display_" 选项，则先显示它
+                noDisplayItem?.let { streamOptionItem ->
                     MenuFlyoutItem(
                         text = {
-                            Row(
-                                horizontalArrangement = Arrangement.Start,
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-//                                    .background(if (audioOption.isSelected) FluentTheme.colors.subtleFill.tertiary else Color.Transparent)
-                                    .padding(vertical = 8.dp)
-                                    .hoverable(interactionSource)
-                                    .pointerHoverIcon(PointerIcon.Hand)
-                            ) {
-                                Column(
-                                    verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.weight(5f)
-                                ) {
-                                    Text(
-                                        text = audioOption.title + if (audioOption.isDefault) " - 默认" else "",
-                                        color = if (audioOption.isSelected) Colors.PrimaryColor else FluentTheme.colors.text.text.primary,
-                                        fontWeight = FontWeight.Normal,
-                                        fontSize = 15.sp,
-                                        modifier = Modifier
-                                            .width(120.dp)
-                                    )
-                                    Text(
-                                        text = "${audioOption.subtitle1} ${audioOption.subtitle2}  ${audioOption.subtitle3}",
-                                        color = if (audioOption.isSelected) Colors.PrimaryColor else FluentTheme.colors.text.text.secondary,
-                                        fontWeight = FontWeight.Normal,
-                                        fontSize = 12.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier
-//                                            .width(170.dp)
-                                    )
-                                }
-                                if (audioOption.isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Regular.Checkmark,
-                                        contentDescription = "",
-                                        tint = Colors.PrimaryColor,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .size(18.dp)
-                                    )
-                                }
-                            }
+                            NoDisplayRow(
+                                modifier = Modifier.hoverable(interactionSource),
+                                title = streamOptionItem.title,
+                                isDefault = streamOptionItem.isDefault,
+                                isSelected = streamOptionItem.isSelected,
+                            )
                         },
                         onClick = {
-                            onSelected(audioOption.audioGuid)
+                            onSelected(streamOptionItem.optionGuid)
+//                            currentAudioStream = audioStreams.first { it.guid == audioOption.audioGuid }
+                            isFlyoutVisible = false
+                        },
+                        modifier = Modifier
+                            .width(240.dp)
+                            .hoverable(interactionSource)
+//                            .padding(vertical = 4.dp)
+//                            .background(if (audioOption.isSelected) FluentTheme.colors.subtleFill.tertiary else Color.Transparent, RoundedCornerShape(4.dp))
+//                        colors = mediaDetailsSelectedListItemColors()
+                    )
+                }
+                
+                // 显示其他项目
+                otherItems.forEach { streamOptionItem ->
+                    MenuFlyoutItem(
+                        text = {
+                            StreamSelectorRow(
+                                modifier = Modifier.hoverable(interactionSource),
+                                title = streamOptionItem.title,
+                                isDefault = streamOptionItem.isDefault,
+                                isSelected = streamOptionItem.isSelected,
+                                subtitle1 = streamOptionItem.subtitle1,
+                                subtitle2 = streamOptionItem.subtitle2,
+                                subtitle3 = streamOptionItem.subtitle3
+                            )
+                        },
+                        onClick = {
+                            onSelected(streamOptionItem.optionGuid)
 //                            currentAudioStream = audioStreams.first { it.guid == audioOption.audioGuid }
                             isFlyoutVisible = false
                         },
@@ -127,6 +124,103 @@ fun StreamSelector(
             color = FluentTheme.colors.text.text.secondary,
             fontSize = 14.sp
         )
+    }
+}
+
+@Composable
+fun StreamSelectorRow(
+    modifier: Modifier = Modifier,
+    title: String,
+    isDefault: Boolean,
+    isSelected: Boolean,
+    subtitle1: String = "",
+    subtitle2: String = "",
+    subtitle3: String = "",
+) {
+    Row(
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+//            .hoverable(interactionSource)
+            .pointerHoverIcon(PointerIcon.Hand)
+    ) {
+        Column(
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.weight(5f)
+        ) {
+            Text(
+                text = title + if (isDefault) " - 默认" else "",
+                color = if (isSelected) Colors.PrimaryColor else FluentTheme.colors.text.text.primary,
+                fontWeight = FontWeight.Normal,
+                fontSize = 15.sp,
+                modifier = Modifier
+                    .width(120.dp)
+            )
+            Text(
+                text = "$subtitle1 $subtitle2  $subtitle3",
+                color = if (isSelected) Colors.PrimaryColor else FluentTheme.colors.text.text.secondary,
+                fontWeight = FontWeight.Normal,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+//                                            .width(170.dp)
+            )
+        }
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Regular.Checkmark,
+                contentDescription = "",
+                tint = Colors.PrimaryColor,
+                modifier = Modifier
+                    .weight(1f)
+                    .size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun NoDisplayRow(
+    modifier: Modifier = Modifier,
+    title: String,
+    isDefault: Boolean,
+    isSelected: Boolean,
+) {
+    Row(
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+//            .hoverable(interactionSource)
+            .pointerHoverIcon(PointerIcon.Hand)
+    ) {
+        Column(
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.weight(5f)
+        ) {
+            Text(
+                text = title + if (isDefault) " - 默认" else "",
+                color = if (isSelected) Colors.PrimaryColor else FluentTheme.colors.text.text.primary,
+                fontWeight = FontWeight.Normal,
+                fontSize = 15.sp,
+                modifier = Modifier
+                    .width(120.dp)
+            )
+        }
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Regular.Checkmark,
+                contentDescription = "",
+                tint = Colors.PrimaryColor,
+                modifier = Modifier
+                    .weight(1f)
+                    .size(18.dp)
+            )
+        }
     }
 }
 
@@ -174,11 +268,33 @@ fun StreamSelectorLabel(
 }
 
 data class StreamOptionItem(
-    val audioGuid: String,
+    val optionGuid: String,
     val title: String,
-    val subtitle1: String,
-    val subtitle2: String,
-    val subtitle3: String,
+    val subtitle1: String = "",
+    val subtitle2: String = "",
+    val subtitle3: String = "",
     val isDefault: Boolean = false,
     val isSelected: Boolean = false
+)
+
+val noDisplayStream = SubtitleStream(
+    mediaGuid = "",
+    title = "",
+    guid = "_no_display_",
+    codecName = "",
+    codecType = "",
+    language = "关闭",
+    forced = 0,
+    index = 0,
+    isDefault = 0,
+    isExternal = 0,
+    format = "",
+    trimId = "",
+    sourceId = "",
+    source = "",
+    createTime = 0,
+    updateTime = 0,
+    extraFile = 0,
+    isBitmap = 0,
+    fileSize = 0
 )
