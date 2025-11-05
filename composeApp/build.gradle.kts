@@ -85,8 +85,9 @@ compose.desktop {
 //        }
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "com.jankinwu.fntv"
+            packageName = "fntv-client"
             packageVersion = "1.0.0"
+            modules("jdk.unsupported")
             windows {
                 iconFile.set(project.file("icons/favicon.ico"))
             }
