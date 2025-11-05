@@ -46,7 +46,8 @@ fun NumberInput(
     maxValue: Int = Int.MAX_VALUE,
     placeholder: String = "",
     label: String = "",
-    textColor: Color = Color.White
+    textColor: Color = Color.White,
+    defaultValue: Int = 0
 ) {
     Column(
         modifier = modifier
@@ -97,8 +98,8 @@ fun NumberInput(
                         // 将合法数字通过回调传出去，并限制在最大最小值范围内
                         onValueChange(newInt.coerceIn(minValue, maxValue))
                     } else if (filteredText.isEmpty()) {
-                        // 如果输入框为空，可以视为0或其他默认值
-                        onValueChange(0)
+                        // 如果输入框为空，使用默认值
+                        onValueChange(defaultValue)
                     }
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

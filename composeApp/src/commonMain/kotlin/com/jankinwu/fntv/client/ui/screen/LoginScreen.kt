@@ -279,8 +279,9 @@ fun LoginScreen(navigator: ComponentNavigator) {
                         modifier = Modifier.weight(1.0f),
                         placeholder = "请输入端口",
                         minValue = 0,
-                        label = "0为默认端口",
-                        textColor = Colors.TextSecondaryColor
+                        label = "",
+                        textColor = Colors.TextSecondaryColor,
+                        defaultValue = 5666
                     )
                 }
 
