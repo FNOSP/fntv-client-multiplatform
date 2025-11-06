@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.icons.ArrowUp
+import com.jankinwu.fntv.client.ui.subtitleItemColors
 import io.github.composefluent.FluentTheme
 import io.github.composefluent.component.FlyoutPlacement
 import io.github.composefluent.component.Icon
@@ -41,7 +42,8 @@ import kotlinx.coroutines.delay
 fun StreamSelector(
     streamOptions: List<StreamOptionItem>,
     selectedItemLabel: String,
-    onSelected: (String) -> Unit
+    onSelected: (String) -> Unit,
+    isSubtitle: Boolean = false
 ) {
     if (streamOptions.isNotEmpty() && streamOptions.size > 1) {
         val interactionSource = remember { MutableInteractionSource() }
@@ -51,7 +53,38 @@ fun StreamSelector(
                 // 检查是否有 "_no_display_" 选项
                 val noDisplayItem = streamOptions.find { it.optionGuid == "_no_display_" }
                 val otherItems = streamOptions.filter { it.optionGuid != "_no_display_" }
-                
+                if (isSubtitle) {
+                    MenuFlyoutItem(
+                        text = {
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "字幕",
+                                    color = FluentTheme.colors.text.text.primary,
+                                    fontWeight = FontWeight.Normal,
+                                    fontSize = 16.sp,
+                                    modifier = Modifier
+                                        .width(120.dp)
+                                )
+//                                SortFlyout(
+//                                    onSortTypeSelected = { sortType ->
+////                                        sortColumnState = sortType
+//                                    },
+//                                    onSortOrderSelected = { sortOrder ->
+////                                        sortOrderState = sortOrder
+//                                    },
+//                                )
+                            }
+                        },
+                        onClick = {},
+                        modifier = Modifier
+                            .width(240.dp)
+                            .hoverable(interactionSource),
+                        colors = subtitleItemColors()
+                    )
+                }
                 // 如果有 "_no_display_" 选项，则先显示它
                 noDisplayItem?.let { streamOptionItem ->
                     MenuFlyoutItem(
@@ -76,7 +109,7 @@ fun StreamSelector(
 //                        colors = mediaDetailsSelectedListItemColors()
                     )
                 }
-                
+
                 // 显示其他项目
                 otherItems.forEach { streamOptionItem ->
                     MenuFlyoutItem(

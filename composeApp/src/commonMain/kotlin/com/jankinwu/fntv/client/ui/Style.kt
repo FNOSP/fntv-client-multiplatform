@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.dp
 import com.jankinwu.fntv.client.data.constants.Colors
 import io.github.composefluent.FluentTheme
 import io.github.composefluent.component.CheckBoxColor
+import io.github.composefluent.component.ListItemColor
 import io.github.composefluent.component.SwitcherStyle
 import io.github.composefluent.scheme.PentaVisualScheme
 
@@ -75,3 +76,33 @@ fun selectedCheckBoxColors(
 )
 
 typealias CheckBoxColorScheme = PentaVisualScheme<CheckBoxColor>
+
+@Composable
+@Stable
+fun subtitleItemColors(
+    default: ListItemColor = ListItemColor(
+        fillColor = FluentTheme.colors.subtleFill.transparent,
+        contentColor = FluentTheme.colors.text.text.primary,
+        trailingColor = FluentTheme.colors.text.text.secondary,
+        borderBrush = SolidColor(Color.Transparent)
+    ),
+    hovered: ListItemColor = default.copy(
+        fillColor = FluentTheme.colors.subtleFill.transparent
+    ),
+    pressed: ListItemColor = default.copy(
+        fillColor = FluentTheme.colors.subtleFill.tertiary,
+        contentColor = FluentTheme.colors.text.text.secondary
+    ),
+    disabled: ListItemColor = default.copy(
+        fillColor = FluentTheme.colors.subtleFill.disabled,
+        contentColor = FluentTheme.colors.text.text.disabled,
+        trailingColor = FluentTheme.colors.text.text.disabled,
+    )
+) = ListItemColorScheme(
+    default = default,
+    hovered = hovered,
+    pressed = pressed,
+    disabled = disabled
+)
+
+typealias ListItemColorScheme = PentaVisualScheme<ListItemColor>
