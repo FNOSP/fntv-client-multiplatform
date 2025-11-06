@@ -166,7 +166,7 @@ fun CoilSetting() {
 class RequestHeaderInterceptor() : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val headers = Headers.Builder()
-            .set("cookie", AccountDataCache.getCookie())
+            .set("cookie", AccountDataCache.cookieState)
             .build()
         val request = chain.request().newBuilder()
             .headers(headers)

@@ -50,7 +50,6 @@ import com.jankinwu.fntv.client.data.model.request.StreamRequest
 import com.jankinwu.fntv.client.data.model.response.FileInfo
 import com.jankinwu.fntv.client.data.model.response.PlayInfoResponse
 import com.jankinwu.fntv.client.data.model.response.StreamResponse
-import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.data.model.response.VideoStream
 import com.jankinwu.fntv.client.data.store.AccountDataCache
 import com.jankinwu.fntv.client.defaultVariableFamily
@@ -745,9 +744,9 @@ private suspend fun startPlayback(
     playLink: String,
     startPosition: Long
 ) {
-    if (AccountDataCache.getCookie().isNotBlank()) {
+    if (AccountDataCache.cookieState.isNotBlank()) {
         val headers = mapOf(
-            "cookie" to AccountDataCache.getCookie(),
+            "cookie" to AccountDataCache.cookieState,
             "Authorization" to AccountDataCache.authorization
         )
 //        headers["Authorization"] = AccountDataCache.authorization

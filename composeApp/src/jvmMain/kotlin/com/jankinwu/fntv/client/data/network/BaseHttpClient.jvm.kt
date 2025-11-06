@@ -66,8 +66,8 @@ actual val fnOfficialClient = HttpClient(OkHttp) {
     defaultRequest {
         header(HttpHeaders.Authorization, AccountDataCache.authorization)
         header(HttpHeaders.Accept, "application/json")
-        if (AccountDataCache.getCookie().isNotBlank()) {
-            header(HttpHeaders.Cookie, AccountDataCache.getCookie())
+        if (AccountDataCache.cookieState.isNotBlank()) {
+            header(HttpHeaders.Cookie, AccountDataCache.cookieState)
         }
     }
 }

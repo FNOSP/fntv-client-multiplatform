@@ -59,6 +59,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jankinwu.fntv.client.LocalStore
 import com.jankinwu.fntv.client.components
 import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.model.LoginHistory
@@ -119,6 +120,8 @@ fun LoginScreen(navigator: ComponentNavigator) {
     var showHistorySidebar by remember { mutableStateOf(false) }
     // 登录历史记录列表
     var loginHistoryList by remember { mutableStateOf<List<LoginHistory>>(emptyList()) }
+    val store = LocalStore.current
+    store.darkMode = true
 
     // 初始化时加载保存的账号信息
     remember {
@@ -143,7 +146,7 @@ fun LoginScreen(navigator: ComponentNavigator) {
                 // 保存token到SystemAccountData
                 AccountDataCache.authorization = state.data.token
                 AccountDataCache.isLoggedIn = true
-                AccountDataCache.cookieMap["Trim-MC-token"] = state.data.token
+                AccountDataCache.updateCookie("Trim-MC-token" to state.data.token)
                 println("登录成功，cookieMap: ${AccountDataCache.cookieMap}")
                 val preferencesManager = PreferencesManager.getInstance()
                 preferencesManager.saveToken(state.data.token)

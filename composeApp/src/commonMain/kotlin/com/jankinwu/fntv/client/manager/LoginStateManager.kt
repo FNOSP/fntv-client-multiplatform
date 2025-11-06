@@ -29,7 +29,8 @@ object LoginStateManager {
             AccountDataCache.authorization = ""
 //            AccountDataCache.userName = ""
 //            AccountDataCache.password = ""
-            AccountDataCache.cookieMap = mutableMapOf()
+//            AccountDataCache.cookieMap = mutableMapOf()
+            AccountDataCache.clearCookie()
         }
 
         // 持久化登录状态

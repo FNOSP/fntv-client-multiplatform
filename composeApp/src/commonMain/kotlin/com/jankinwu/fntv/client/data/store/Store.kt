@@ -15,7 +15,6 @@ class Store(
     compactMode: Boolean,
     windowWidth: Dp,
     windowHeight: Dp,
-    cookie: String
 ) {
     var darkMode by mutableStateOf(systemDarkMode)
 
@@ -28,9 +27,11 @@ class Store(
     // 缩放因子，用于调整组件大小
     var scaleFactor by mutableFloatStateOf((windowWidth / 1280.dp))
 
-    val fnImgHeaders by mutableStateOf(NetworkHeaders.Builder()
-        .set("cookie", cookie)
-        .build())
+    val fnImgHeaders: NetworkHeaders
+        get() = NetworkHeaders.Builder()
+            .set("cookie", AccountDataCache.cookieState)
+            .build()
+
     var windowWidthState by mutableStateOf(windowWidth)
 
     var windowHeightState by mutableStateOf(windowHeight)
