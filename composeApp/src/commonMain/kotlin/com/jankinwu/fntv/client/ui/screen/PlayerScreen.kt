@@ -628,8 +628,11 @@ private suspend fun playMedia(
         val videoStream = streamInfo.videoStream
         val audioStream = streamInfo.audioStreams.first { audioStream -> audioStream.guid == playInfoResponse.audioGuid }
         val audioGuid = currentAudioGuid ?: audioStream.guid
-        val subtitleStream = streamInfo.subtitleStreams?.first{ it.guid == playInfoResponse.subtitleGuid}
-        val subtitleGuid = currentSubtitleGuid ?: subtitleStream?.guid
+//        val subtitleStream = streamInfo.subtitleStreams?.first{ it.guid == playInfoResponse.subtitleGuid}
+        val subtitleStream = streamInfo.subtitleStreams?.find {
+            it.guid == playInfoResponse.subtitleGuid
+        }
+        val subtitleGuid = currentSubtitleGuid?: subtitleStream?.guid
         val fileStream = streamInfo.fileStream
         // 显示播放器
         val videoDuration = videoStream.duration * 1000L
