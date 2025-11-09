@@ -68,14 +68,9 @@ fun StreamSelector(
                                     modifier = Modifier
                                         .width(120.dp)
                                 )
-//                                SortFlyout(
-//                                    onSortTypeSelected = { sortType ->
-////                                        sortColumnState = sortType
-//                                    },
-//                                    onSortOrderSelected = { sortOrder ->
-////                                        sortOrderState = sortOrder
-//                                    },
-//                                )
+                                MediaDetailAddSubtitleFlyout(
+                                    modifier = Modifier.hoverable(interactionSource),
+                                )
                             }
                         },
                         onClick = {},

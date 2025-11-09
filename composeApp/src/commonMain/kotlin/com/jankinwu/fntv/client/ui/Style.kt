@@ -90,7 +90,7 @@ fun subtitleItemColors(
         fillColor = FluentTheme.colors.subtleFill.transparent
     ),
     pressed: ListItemColor = default.copy(
-        fillColor = FluentTheme.colors.subtleFill.tertiary,
+        fillColor = FluentTheme.colors.subtleFill.transparent,
         contentColor = FluentTheme.colors.text.text.secondary
     ),
     disabled: ListItemColor = default.copy(
