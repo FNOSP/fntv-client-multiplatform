@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -61,16 +62,20 @@ fun MediaDetailAddSubtitleFlyout(
     val subtitleUploadViewModel: SubtitleUploadViewModel = koinViewModel()
     val subtitleUploadState by subtitleUploadViewModel.uiState.collectAsState()
     val streamListViewModel: StreamListViewModel = koinViewModel()
-    
+
     fun handleFileSelection(file: File?) {
         file?.let { selectedFile ->
             // 将文件转换为ByteArray并上传
             val byteArray = selectedFile.readBytes()
             subtitleUploadViewModel.uploadSubtitle(mediaGuid, byteArray, selectedFile.name)
-            if (subtitleUploadState is UiState.Success) {
-                streamListViewModel.loadData(guid)
-                subtitleUploadViewModel.clearError()
-            }
+        }
+    }
+    
+    LaunchedEffect(subtitleUploadState) {
+        // 当字幕上传成功后，刷新stream列表
+        if (subtitleUploadState is UiState.Success) {
+            streamListViewModel.loadData(guid)
+            subtitleUploadViewModel.clearError()
         }
     }
     

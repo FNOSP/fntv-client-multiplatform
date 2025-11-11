@@ -868,7 +868,8 @@ fun MiddleControls(
                     currentSubtitleStreamList,
                     currentSubtitleStream,
                     onSubtitleSelected,
-                    iso6392State
+                    iso6392State,
+                    guid
                 )
                 AudioSelector(
                     currentAudioStreamList,
@@ -959,7 +960,8 @@ fun SubtitleSelector(
     currentSubtitleStreamList: List<SubtitleStream>,
     currentSubtitleStream: SubtitleStream?,
     onSubtitleSelected: (String) -> Unit,
-    iso6392State: UiState<List<QueryTagResponse>>
+    iso6392State: UiState<List<QueryTagResponse>>,
+    guid: String =  ""
 ) {
     var iso6392Map: Map<String, QueryTagResponse> by remember { mutableStateOf(mapOf()) }
 
@@ -1002,7 +1004,7 @@ fun SubtitleSelector(
             }
         }
     StreamSelector(selectorOptions, selectedLanguage, onSubtitleSelected, true,
-        currentSubtitleStream?.mediaGuid ?: "", currentSubtitleStream?.guid ?: ""
+        currentSubtitleStream?.mediaGuid ?: "", guid
     )
 }
 

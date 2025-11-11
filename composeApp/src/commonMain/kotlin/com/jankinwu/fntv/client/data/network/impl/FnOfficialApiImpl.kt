@@ -242,20 +242,10 @@ class FnOfficialApiImpl() : FnOfficialApi {
             println("whole url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, body: $body")
 
             val response = fnOfficialClient.post("${AccountDataCache.getFnOfficialBaseUrl()}$url") {
-                if (isFormData) {
-                    header("Authx", authx)
-                    header(HttpHeaders.ContentType, "multipart/form-data; charset=utf-8")
-                    formData.forEach { (key, value) ->
-                        if (value != null) {
-                            parameter(key, value)
-                        }
-                    }
-                } else {
-                    header(HttpHeaders.ContentType, "application/json; charset=utf-8")
-                    header("Authx", authx)
-                    if (body != null) {
-                        setBody(body)
-                    }
+                header(HttpHeaders.ContentType, "application/json; charset=utf-8")
+                header("Authx", authx)
+                if (body != null) {
+                    setBody(body)
                 }
                 block?.invoke(this)
             }
