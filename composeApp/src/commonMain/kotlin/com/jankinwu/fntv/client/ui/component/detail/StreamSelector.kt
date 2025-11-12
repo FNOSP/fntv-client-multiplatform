@@ -8,9 +8,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +50,7 @@ fun StreamSelector(
     mediaGuid: String = "",
     guid: String = "",
 ) {
+    val lazyListState = rememberScrollState()
     if (streamOptions.isNotEmpty() && streamOptions.size > 1) {
         val interactionSource = remember { MutableInteractionSource() }
         val isHovered by interactionSource.collectIsHoveredAsState()
@@ -85,57 +89,57 @@ fun StreamSelector(
                         colors = subtitleItemColors()
                     )
                 }
-                // 如果有 "_no_display_" 选项，则先显示它
-                noDisplayItem?.let { streamOptionItem ->
-                    MenuFlyoutItem(
-                        text = {
-                            NoDisplayRow(
-                                modifier = Modifier.hoverable(interactionSource),
-                                title = streamOptionItem.title,
-                                isDefault = streamOptionItem.isDefault,
-                                isSelected = streamOptionItem.isSelected,
-                            )
-                        },
-                        onClick = {
-                            onSelected(streamOptionItem.optionGuid)
-//                            currentAudioStream = audioStreams.first { it.guid == audioOption.audioGuid }
-                            isFlyoutVisible = false
-                        },
-                        modifier = Modifier
-                            .width(240.dp)
-                            .hoverable(interactionSource)
-//                            .padding(vertical = 4.dp)
-//                            .background(if (audioOption.isSelected) FluentTheme.colors.subtleFill.tertiary else Color.Transparent, RoundedCornerShape(4.dp))
-//                        colors = mediaDetailsSelectedListItemColors()
-                    )
-                }
 
-                // 显示其他项目
-                otherItems.forEach { streamOptionItem ->
-                    MenuFlyoutItem(
-                        text = {
-                            StreamSelectorRow(
-                                modifier = Modifier.hoverable(interactionSource),
-                                title = streamOptionItem.title,
-                                isDefault = streamOptionItem.isDefault,
-                                isSelected = streamOptionItem.isSelected,
-                                subtitle1 = streamOptionItem.subtitle1,
-                                subtitle2 = streamOptionItem.subtitle2,
-                                subtitle3 = streamOptionItem.subtitle3
-                            )
-                        },
-                        onClick = {
-                            onSelected(streamOptionItem.optionGuid)
-//                            currentAudioStream = audioStreams.first { it.guid == audioOption.audioGuid }
-                            isFlyoutVisible = false
-                        },
-                        modifier = Modifier
-                            .width(240.dp)
-                            .hoverable(interactionSource)
-//                            .padding(vertical = 4.dp)
-//                            .background(if (audioOption.isSelected) FluentTheme.colors.subtleFill.tertiary else Color.Transparent, RoundedCornerShape(4.dp))
-//                        colors = mediaDetailsSelectedListItemColors()
-                    )
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 300.dp)
+                        .fillMaxWidth()
+                        .verticalScroll(lazyListState)
+                ) {
+                    // 如果有 "_no_display_" 选项，则先显示它
+                    noDisplayItem?.let { streamOptionItem ->
+                        MenuFlyoutItem(
+                            text = {
+                                NoDisplayRow(
+                                    modifier = Modifier.hoverable(interactionSource),
+                                    title = streamOptionItem.title,
+                                    isDefault = streamOptionItem.isDefault,
+                                    isSelected = streamOptionItem.isSelected,
+                                )
+                            },
+                            onClick = {
+                                onSelected(streamOptionItem.optionGuid)
+                                isFlyoutVisible = false
+                            },
+                            modifier = Modifier
+                                .width(240.dp)
+                                .hoverable(interactionSource)
+                        )
+                    }
+                    // 显示其他项目
+                    otherItems.forEach { streamOptionItem ->
+                        MenuFlyoutItem(
+                            text = {
+                                StreamSelectorRow(
+                                    modifier = Modifier.hoverable(interactionSource),
+                                    title = streamOptionItem.title,
+                                    isDefault = streamOptionItem.isDefault,
+                                    isSelected = streamOptionItem.isSelected,
+                                    subtitle1 = streamOptionItem.subtitle1,
+                                    subtitle2 = streamOptionItem.subtitle2,
+                                    subtitle3 = streamOptionItem.subtitle3
+                                )
+                            },
+                            onClick = {
+                                onSelected(streamOptionItem.optionGuid)
+                                isFlyoutVisible = false
+                            },
+                            modifier = Modifier
+                                .width(240.dp)
+                                .hoverable(interactionSource)
+                        )
+
+                    }
                 }
             },
             content = {
@@ -148,6 +152,7 @@ fun StreamSelector(
             },
 //            placement = FlyoutPlacement.BottomAlignedStart,
             placement = FlyoutPlacement.Auto,
+            modifier = Modifier
         )
     } else {
         Text(
