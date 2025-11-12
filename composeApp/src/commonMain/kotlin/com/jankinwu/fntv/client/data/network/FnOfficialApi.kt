@@ -67,4 +67,6 @@ interface FnOfficialApi {
     suspend fun personList(guid: String): PersonListResponse
 
     suspend fun uploadSubtitle(guid: String, file: ByteArray, fileName: String): SubtitleUploadResponse
+
+    suspend fun deleteSubtitle(subtitleGuid: String): Boolean
 }

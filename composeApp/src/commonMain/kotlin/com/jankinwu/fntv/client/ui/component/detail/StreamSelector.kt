@@ -92,7 +92,7 @@ fun StreamSelector(
 
                 Column(
                     modifier = Modifier
-                        .heightIn(max = 300.dp)
+                        .heightIn(max = 310.dp)
                         .fillMaxWidth()
                         .verticalScroll(lazyListState)
                 ) {

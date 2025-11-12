@@ -183,6 +183,10 @@ class FnOfficialApiImpl() : FnOfficialApi {
         return postMultipartFile("/v/api/v1/subtitle/upload/$guid", "file", file, fileName)
     }
 
+    override suspend fun deleteSubtitle(subtitleGuid: String): Boolean {
+        return delete("/v/api/v1/subtitle/del", mapOf("subtitle_guid" to subtitleGuid))
+    }
+
     private suspend inline fun <reified T> get(
         url: String,
         parameters: Map<String, Any?>? = null,
