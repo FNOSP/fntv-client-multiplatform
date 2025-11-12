@@ -55,12 +55,12 @@
 
 ## 🌟 Star History
 
-<a href="https://github.com/openfnnas/fntv-client-multiplatform/stargazers" target="_blank" style="display: block" align="center">
+<a href="https://github.com/FNOSP/fntv-client-multiplatform/stargazers" target="_blank" style="display: block" align="center">
 
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=openfnnas/fntv-client-multiplatform&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=openfnnas/fntv-client-multiplatform&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=openfnnas/fntv-client-multiplatform&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=FNOSP/fntv-client-multiplatform&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=FNOSP/fntv-client-multiplatform&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=FNOSP/fntv-client-multiplatform&type=Date" />
   </picture>
 </a>
 
