@@ -1,5 +1,12 @@
 # fntv-client-multiplatform
 
+[![GitHub stars](https://img.shields.io/github/stars/FNOSP/fntv-client-multiplatform)](https://github.com/FNOSP/fntv-client-multiplatform/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/FNOSP/fntv-client-multiplatform)](https://github.com/FNOSP/fntv-client-multiplatform/network)
+[![GitHub issues](https://img.shields.io/github/issues/FNOSP/fntv-client-multiplatform)](https://github.com/FNOSP/fntv-client-multiplatform/issues)
+[![GitHub license](https://img.shields.io/github/license/FNOSP/fntv-client-multiplatform)](https://github.com/FNOSP/fntv-client-multiplatform/blob/master/LICENSE)
+[![Kotlin Version](https://img.shields.io/badge/Kotlin-2.2.21-%237F52FF.svg)](https://kotlinlang.org/)
+[![Compose Multiplatform Version](https://img.shields.io/badge/ComposeMultiplatform-1.9.3-%237f52ff.svg)](https://www.jetbrains.com/compose-multiplatform/)
+
 基于 Compose Multiplatform 框架开发的跨平台飞牛影视客户端
 
 
