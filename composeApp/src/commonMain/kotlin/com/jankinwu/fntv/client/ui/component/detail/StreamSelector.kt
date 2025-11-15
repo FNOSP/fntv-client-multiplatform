@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,10 +40,15 @@ import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.icons.ArrowUp
 import com.jankinwu.fntv.client.icons.Delete
-import com.jankinwu.fntv.client.ui.component.common.CustomConfirmDialog
+import com.jankinwu.fntv.client.ui.component.common.CustomContentDialog
 import com.jankinwu.fntv.client.ui.subtitleItemColors
+import com.jankinwu.fntv.client.viewmodel.StreamListViewModel
 import com.jankinwu.fntv.client.viewmodel.SubtitleDeleteViewModel
+import com.jankinwu.fntv.client.viewmodel.UiState
 import io.github.composefluent.FluentTheme
+import io.github.composefluent.component.ContentDialogButton
+import io.github.composefluent.component.DialogSize
+import io.github.composefluent.component.FlyoutContainerScope
 import io.github.composefluent.component.FlyoutPlacement
 import io.github.composefluent.component.Icon
 import io.github.composefluent.component.MenuFlyoutContainer
@@ -62,6 +68,19 @@ fun StreamSelector(
     guid: String = "",
 ) {
     val lazyListState = rememberScrollState()
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var deletedItemTitle by remember { mutableStateOf("") }
+    var deletedItemGuid by remember { mutableStateOf("") }
+    val subtitleDeleteViewModel: SubtitleDeleteViewModel = koinViewModel()
+    val subtitleDeleteState by subtitleDeleteViewModel.uiState.collectAsState()
+    val streamListViewModel: StreamListViewModel = koinViewModel()
+    LaunchedEffect(subtitleDeleteState) {
+        // 当字幕上传成功后，刷新stream列表
+        if (subtitleDeleteState is UiState.Success) {
+            streamListViewModel.loadData(guid)
+            subtitleDeleteViewModel.clearError()
+        }
+    }
     if (streamOptions.isNotEmpty() && streamOptions.size > 1) {
         val interactionSource = remember { MutableInteractionSource() }
         val isHovered by interactionSource.collectIsHoveredAsState()
@@ -128,29 +147,34 @@ fun StreamSelector(
                         )
                     }
                     // 显示其他项目
-                    otherItems.forEach { streamOptionItem ->
-                        MenuFlyoutItem(
-                            text = {
-                                StreamSelectorRow(
-                                    modifier = Modifier.hoverable(interactionSource),
-                                    title = streamOptionItem.title,
-                                    isDefault = streamOptionItem.isDefault,
-                                    isSelected = streamOptionItem.isSelected,
-                                    isExternal = streamOptionItem.isExternal,
-                                    subtitle1 = streamOptionItem.subtitle1,
-                                    subtitle2 = streamOptionItem.subtitle2,
-                                    subtitle3 = streamOptionItem.subtitle3,
-                                    guid = streamOptionItem.optionGuid,
-                                )
-                            },
-                            onClick = {
-                                onSelected(streamOptionItem.optionGuid)
-                                isFlyoutVisible = false
-                            },
-                            modifier = Modifier
-                                .width(240.dp)
-                                .hoverable(interactionSource)
-                        )
+                    otherItems.forEach  { streamOptionItem ->
+                            MenuFlyoutItem(
+                                text = {
+                                    StreamSelectorRow(
+                                        modifier = Modifier.hoverable(interactionSource),
+                                        title = streamOptionItem.title,
+                                        isDefault = streamOptionItem.isDefault,
+                                        isSelected = streamOptionItem.isSelected,
+                                        isExternal = streamOptionItem.isExternal,
+                                        subtitle1 = streamOptionItem.subtitle1,
+                                        subtitle2 = streamOptionItem.subtitle2,
+                                        subtitle3 = streamOptionItem.subtitle3,
+                                        guid = streamOptionItem.optionGuid,
+                                        onDelete = {
+                                            deletedItemTitle = streamOptionItem.title
+                                            deletedItemGuid = streamOptionItem.optionGuid
+                                            showDeleteDialog = true
+                                        },
+                                    )
+                                },
+                                onClick = {
+                                    onSelected(streamOptionItem.optionGuid)
+                                    isFlyoutVisible = false
+                                },
+                                modifier = Modifier
+                                    .width(240.dp)
+                                    .hoverable(interactionSource)
+                            )
 
                     }
                 }
@@ -174,10 +198,37 @@ fun StreamSelector(
             fontSize = 14.sp
         )
     }
+    CustomContentDialog(
+        title = "删除外挂字幕",
+        visible = showDeleteDialog,
+        size = DialogSize.Standard,
+        primaryButtonText = "删除",
+        secondaryButtonText = "取消",
+        onButtonClick = { contentDialogButton ->
+            when (contentDialogButton) {
+                ContentDialogButton.Secondary -> {
+                }
+
+                ContentDialogButton.Primary -> {
+                    // 删除外挂字幕
+                    subtitleDeleteViewModel.deleteSubtitle(deletedItemGuid)
+                    streamListViewModel.loadData(guid)
+                }
+
+                ContentDialogButton.Close -> {}
+            }
+            showDeleteDialog = false
+        },
+        content = {
+            io.github.composefluent.component.Text(
+                "确定要删除 $deletedItemTitle - 外挂 外挂字幕吗？"
+            )
+        }
+    )
 }
 
 @Composable
-fun StreamSelectorRow(
+fun FlyoutContainerScope.StreamSelectorRow(
     modifier: Modifier = Modifier,
     title: String,
     isDefault: Boolean,
@@ -187,11 +238,12 @@ fun StreamSelectorRow(
     subtitle2: String = "",
     subtitle3: String = "",
     guid: String,
+    onDelete: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isItemHovered by interactionSource.collectIsHoveredAsState()
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    val subtitleDeleteViewModel: SubtitleDeleteViewModel = koinViewModel()
+//    var showDeleteDialog by remember { mutableStateOf(false) }
+//    val subtitleDeleteViewModel: SubtitleDeleteViewModel = koinViewModel()
     Row(
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically,
@@ -232,7 +284,13 @@ fun StreamSelectorRow(
                     .hoverable(iconInteractionSource)
                     .size(28.dp)
                     .clickable(
-                        onClick = { showDeleteDialog = true }
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = {
+                            onDelete()
+//                            showDeleteDialog = true
+                            isFlyoutVisible = false
+                        }
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -256,18 +314,17 @@ fun StreamSelectorRow(
                         .size(14.dp)
                 )
             }
-            
-            if (showDeleteDialog) {
-                CustomConfirmDialog(
-                    onDismissRequest = { showDeleteDialog = false },
-                    title = "确认删除",
-                    contentText = "确定要删除此外挂字幕吗？此操作不可撤销。",
-                    confirmButtonText = "删除",
-                    onConfirmClick = {
-                        subtitleDeleteViewModel.deleteSubtitle(guid)
-                    }
-                )
-            }
+//            if (showDeleteDialog) {
+//                CustomConfirmDialog(
+//                    onDismissRequest = { showDeleteDialog = false },
+//                    title = "确认删除",
+//                    contentText = "确定要删除此外挂字幕吗？此操作不可撤销。",
+//                    confirmButtonText = "删除",
+//                    onConfirmClick = {
+//                        subtitleDeleteViewModel.deleteSubtitle(guid)
+//                    }
+//                )
+//            }
         } else if (isSelected) {
             Icon(
                 imageVector = Icons.Regular.Checkmark,

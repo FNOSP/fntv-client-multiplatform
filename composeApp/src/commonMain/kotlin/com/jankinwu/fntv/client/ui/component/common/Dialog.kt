@@ -1,6 +1,7 @@
 package com.jankinwu.fntv.client.ui.component.common
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,8 +35,15 @@ import androidx.compose.ui.window.Dialog
 import com.jankinwu.fntv.client.LocalStore
 import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.ui.screen.HintColor
+import io.github.composefluent.FluentTheme
+import io.github.composefluent.LocalContentColor
+import io.github.composefluent.LocalTextStyle
+import io.github.composefluent.component.AccentButton
+import io.github.composefluent.component.Button
 import io.github.composefluent.component.ContentDialog
+import io.github.composefluent.component.ContentDialogButton
 import io.github.composefluent.component.DialogSize
+import io.github.composefluent.component.FluentDialog
 import io.github.composefluent.component.Text
 
 @Composable
@@ -164,6 +173,66 @@ fun CustomConfirmDialog(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(confirmButtonText, color = primaryTextColor)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CustomContentDialog(
+    title: String,
+    visible: Boolean,
+    content: @Composable () -> Unit,
+    primaryButtonText: String,
+    secondaryButtonText: String? = null,
+    closeButtonText: String? = null,
+    onButtonClick: (ContentDialogButton) -> Unit,
+    size: DialogSize = DialogSize.Standard
+) {
+    FluentDialog(visible, size) {
+        Column {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+//                    .background(FluentTheme.colors.background.layer.alt)
+                    .padding(24.dp)
+            ) {
+                Text(
+                    style = FluentTheme.typography.subtitle,
+                    text = title,
+                )
+                Spacer(Modifier.height(12.dp))
+                CompositionLocalProvider(
+                    LocalTextStyle provides FluentTheme.typography.body,
+                    LocalContentColor provides FluentTheme.colors.text.text.primary
+                ) {
+                    content()
+                }
+            }
+            // Divider
+//            Box(Modifier.height(1.dp).background(FluentTheme.colors.stroke.surface.default))
+            // Button Grid
+            Box(Modifier.height(80.dp).padding(horizontal = 25.dp), Alignment.CenterEnd) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AccentButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = { onButtonClick(ContentDialogButton.Primary) }
+                    ) {
+                        Text(primaryButtonText)
+                    }
+                    if (secondaryButtonText != null) Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = { onButtonClick(ContentDialogButton.Secondary) }
+                    ) {
+                        Text(secondaryButtonText)
+                    }
+                    if (closeButtonText != null) Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = { onButtonClick(ContentDialogButton.Close) }
+                    ) {
+                        Text(closeButtonText)
                     }
                 }
             }
