@@ -73,6 +73,7 @@ fun StreamSelector(
 ) {
     val lazyListState = rememberScrollState(0)
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showAddNasSubtitleDialog by remember { mutableStateOf(false) }
     var deletedItemTitle by remember { mutableStateOf("") }
     var deletedItemGuid by remember { mutableStateOf("") }
     val subtitleDeleteViewModel: SubtitleDeleteViewModel = koinViewModel()
@@ -126,7 +127,10 @@ fun StreamSelector(
                                 MediaDetailAddSubtitleFlyout(
                                     mediaGuid,
                                     modifier = Modifier.hoverable(interactionSource),
-                                    guid
+                                    guid,
+                                    onAddNasSubtitleSelected = {
+
+                                    }
                                 )
                             }
                         },
@@ -260,6 +264,27 @@ fun StreamSelector(
             io.github.composefluent.component.Text(
                 "确定要删除 $deletedItemTitle 外挂字幕吗？"
             )
+        }
+    )
+    AddNasSubtitleDialog(
+        title = "添加 NAS 字幕文件",
+        visible = showAddNasSubtitleDialog,
+        size = DialogSize.Standard,
+        primaryButtonText = "选择",
+        secondaryButtonText = "取消",
+        onButtonClick = { contentDialogButton ->
+            when (contentDialogButton) {
+                ContentDialogButton.Secondary -> {
+                }
+
+                ContentDialogButton.Primary -> {
+                    // 添加 NAS 字幕
+
+                }
+
+                ContentDialogButton.Close -> {}
+            }
+            showDeleteDialog = false
         }
     )
 }

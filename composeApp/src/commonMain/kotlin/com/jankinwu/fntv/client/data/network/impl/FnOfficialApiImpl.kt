@@ -11,7 +11,9 @@ import com.jankinwu.fntv.client.data.model.request.PlayInfoRequest
 import com.jankinwu.fntv.client.data.model.request.PlayPlayRequest
 import com.jankinwu.fntv.client.data.model.request.PlayRecordRequest
 import com.jankinwu.fntv.client.data.model.request.StreamRequest
+import com.jankinwu.fntv.client.data.model.request.SubtitleMarkRequest
 import com.jankinwu.fntv.client.data.model.request.WatchedRequest
+import com.jankinwu.fntv.client.data.model.response.AuthDirResponse
 import com.jankinwu.fntv.client.data.model.response.EpisodeListResponse
 import com.jankinwu.fntv.client.data.model.response.FnBaseResponse
 import com.jankinwu.fntv.client.data.model.response.GenresResponse
@@ -24,8 +26,10 @@ import com.jankinwu.fntv.client.data.model.response.PlayDetailResponse
 import com.jankinwu.fntv.client.data.model.response.PlayInfoResponse
 import com.jankinwu.fntv.client.data.model.response.PlayPlayResponse
 import com.jankinwu.fntv.client.data.model.response.QueryTagResponse
+import com.jankinwu.fntv.client.data.model.response.ServerPathResponse
 import com.jankinwu.fntv.client.data.model.response.StreamListResponse
 import com.jankinwu.fntv.client.data.model.response.StreamResponse
+import com.jankinwu.fntv.client.data.model.response.SubtitleMarkResponse
 import com.jankinwu.fntv.client.data.model.response.SubtitleUploadResponse
 import com.jankinwu.fntv.client.data.model.response.TagListResponse
 import com.jankinwu.fntv.client.data.model.response.UserInfoResponse
@@ -185,6 +189,18 @@ class FnOfficialApiImpl() : FnOfficialApi {
 
     override suspend fun deleteSubtitle(subtitleGuid: String): Boolean {
         return delete("/v/api/v1/subtitle/del", mapOf("subtitle_guid" to subtitleGuid))
+    }
+
+    override suspend fun getAppAuthorizedDir(withoutCache: Int): AuthDirResponse {
+        return get("/v/api/v1/server/getAppAuthorizedDir", mapOf("without_cache" to withoutCache))
+    }
+
+    override suspend fun getFilesByServerPath(path: String): List<ServerPathResponse> {
+        return post("/v/api/v1/server/path", mapOf("path" to path))
+    }
+
+    override suspend fun subtitleMark(request: SubtitleMarkRequest): List<SubtitleMarkResponse> {
+        return put("/v/api/v1/subtitle/mark", request)
     }
 
     private suspend inline fun <reified T> get(

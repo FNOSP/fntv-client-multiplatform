@@ -61,4 +61,7 @@ val viewModelModule = module {
     viewModelOf (::PersonListViewModel)
     viewModelOf (::SubtitleUploadViewModel)
     viewModelOf (::SubtitleDeleteViewModel)
+    viewModelOf (::AppAuthorizedDirViewModel)
+    viewModelOf (::ServerPathViewModel)
+    viewModelOf (::SubtitleMarkViewModel)
 }
