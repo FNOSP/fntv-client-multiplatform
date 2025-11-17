@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -30,10 +32,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jankinwu.fntv.client.data.model.response.AuthDir
+import com.jankinwu.fntv.client.data.model.response.ServerPathResponse
 import com.jankinwu.fntv.client.ui.component.common.FileTreeSelector
 import com.jankinwu.fntv.client.ui.component.common.SelectionMode
 import com.jankinwu.fntv.client.ui.screen.LocalFileInfo
 import com.jankinwu.fntv.client.viewmodel.AppAuthorizedDirViewModel
+import com.jankinwu.fntv.client.viewmodel.ServerPathViewModel
 import com.jankinwu.fntv.client.viewmodel.UiState
 import io.github.composefluent.FluentTheme
 import io.github.composefluent.LocalContentColor
@@ -123,7 +127,7 @@ fun AddNasSubtitleBox(
     Box(
         modifier = Modifier
             .height(400.dp)
-            .width(600.dp),
+            .width(800.dp),
     ) {
         Column(
             modifier = Modifier
@@ -143,13 +147,20 @@ fun AddNasSubtitleBox(
             )
             // 2. 主内容区域 (侧边栏 + 文件树)
             // **修改：使用 weight(1f) 占据剩余空间，而不是 fillMaxSize()**
-            Row(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier
+                    .weight(
+                        1f
+                    )
+            ) {
 
                 // 2a. 侧边栏
                 Sidebar(
                     selectedItem = selectedSidebarItem,
                     onItemSelected = { selectedSidebarItem = it },
-                    modifier = Modifier.fillMaxHeight().width(200.dp)
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(200.dp)
                 )
 
                 // 2b. 垂直分割线
@@ -196,7 +207,8 @@ fun Sidebar(
     modifier: Modifier = Modifier
 ) {
     val fileInfo = LocalFileInfo.current
-    val authorizedDirViewModel: AppAuthorizedDirViewModel = koinViewModel<AppAuthorizedDirViewModel>()
+    val authorizedDirViewModel: AppAuthorizedDirViewModel =
+        koinViewModel<AppAuthorizedDirViewModel>()
     val authorizedDirState by authorizedDirViewModel.uiState.collectAsState()
     var authDirList by remember { mutableStateOf<List<AuthDir>?>(null) }
     LaunchedEffect(Unit) {
@@ -207,6 +219,7 @@ fun Sidebar(
             is UiState.Success -> {
                 authDirList = (authorizedDirState as UiState.Success).data.authDirList
             }
+
             else -> {
                 // 处理其他状态，如加载中、错误等
             }
@@ -312,6 +325,16 @@ fun MainContent(
     onSelectionChanged: (Set<String>) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val serverPathViewModel: ServerPathViewModel = koinViewModel()
+    val serverPathUiState by serverPathViewModel.uiState.collectAsState()
+
+    // 当选中的侧边栏项改变时，加载对应的文件列表
+    LaunchedEffect(selectedSidebarItem) {
+        if (selectedSidebarItem?.title == "视频所在位置" && selectedSidebarItem.path.isNotEmpty()) {
+            serverPathViewModel.loadFilesByServerPath(selectedSidebarItem.path.first())
+        }
+    }
+
     Box(
         modifier = modifier
 //            .background(Color(0xFF2B2B2B)) // 主内容区域背景
@@ -319,11 +342,54 @@ fun MainContent(
         // ---
         // --- 这是您所要求的文件选择器的 "调用代码" ---
         // ---
-        FileTreeSelector(
-            rootPath = "root", // 初始加载路径
-            selectionMode = SelectionMode.FilesOnly, // 选择模式
-            allowedExtensions = listOf("ass", "mkv", "mp4", "jpg", "nfo"), // 允许的后缀
-            onSelectionChanged = onSelectionChanged // 状态回调
-        )
+        if (selectedSidebarItem?.title == "视频所在位置") {
+            // 对于"视频所在位置"，使用ServerPathViewModel获取的数据
+            when (serverPathUiState) {
+                is UiState.Loading -> {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Loading...", color = Color.White)
+                    }
+                }
+
+                is UiState.Success -> {
+                    FileTreeSelector(
+                        rootPath = selectedSidebarItem.path.firstOrNull() ?: "root",
+                        selectionMode = SelectionMode.FilesOnly,
+                        allowedExtensions = listOf("ass", "srt", "vtt"),
+                        onSelectionChanged = onSelectionChanged
+                    )
+                }
+
+                is UiState.Error -> {
+                    Text(
+                        text = "Error: ${(serverPathUiState as UiState.Error).message}",
+                        color = Color.Red,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+
+                else -> {
+                    FileTreeSelector(
+                        rootPath = selectedSidebarItem.path.firstOrNull() ?: "root",
+                        selectionMode = SelectionMode.FilesOnly,
+                        allowedExtensions = listOf("ass", "srt", "vtt"),
+                        onSelectionChanged = onSelectionChanged
+                    )
+                }
+            }
+        } else {
+            // 对于其他存储空间，显示所有根目录
+            FileTreeSelector(
+                rootPaths = selectedSidebarItem?.path ?: listOf("root"),
+                selectionMode = SelectionMode.FilesOnly,
+                allowedExtensions = listOf("ass", "srt", "vtt"),
+                onSelectionChanged = onSelectionChanged
+            )
+        }
     }
 }
