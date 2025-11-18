@@ -349,7 +349,7 @@ fun MoviePoster(
                     }
                 },
                 scaleFactor = scaleFactor,
-                iconTint = if (isAlreadyWatched) Colors.PrimaryColor else Color.White
+                iconTint = if (isAlreadyWatched) Colors.AccentColorDefault else Color.White
             )
 
             // 收藏按钮

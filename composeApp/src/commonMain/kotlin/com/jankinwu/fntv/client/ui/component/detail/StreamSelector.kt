@@ -41,7 +41,7 @@ import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.icons.ArrowUp
 import com.jankinwu.fntv.client.icons.Delete
-import com.jankinwu.fntv.client.ui.FlyoutTitleItemColors
+import com.jankinwu.fntv.client.ui.flyoutTitleItemColors
 import com.jankinwu.fntv.client.ui.component.common.CustomContentDialog
 import com.jankinwu.fntv.client.viewmodel.StreamListViewModel
 import com.jankinwu.fntv.client.viewmodel.SubtitleDeleteViewModel
@@ -141,7 +141,7 @@ fun StreamSelector(
                             .width(240.dp)
                             .padding(bottom = 4.dp, top = 6.dp)
                             .hoverable(interactionSource),
-                        colors = FlyoutTitleItemColors()
+                        colors = flyoutTitleItemColors()
                     )
                 }
                 ScrollbarContainer(
@@ -324,7 +324,7 @@ fun FlyoutContainerScope.StreamSelectorRow(
         ) {
             Text(
                 text = title + if (isDefault) " - 默认" else "",
-                color = if (isSelected) Colors.PrimaryColor else FluentTheme.colors.text.text.primary,
+                color = if (isSelected) Colors.AccentColorDefault else FluentTheme.colors.text.text.primary,
                 fontWeight = FontWeight.Normal,
                 fontSize = 15.sp,
                 modifier = Modifier
@@ -332,7 +332,7 @@ fun FlyoutContainerScope.StreamSelectorRow(
             )
             Text(
                 text = "$subtitle1 $subtitle2  $subtitle3",
-                color = if (isSelected) Colors.PrimaryColor else FluentTheme.colors.text.text.secondary,
+                color = if (isSelected) Colors.AccentColorDefault else FluentTheme.colors.text.text.secondary,
                 fontWeight = FontWeight.Normal,
                 fontSize = 12.sp,
                 maxLines = 1,
@@ -394,7 +394,7 @@ fun FlyoutContainerScope.StreamSelectorRow(
             Icon(
                 imageVector = Icons.Regular.Checkmark,
                 contentDescription = "已选择",
-                tint = Colors.PrimaryColor,
+                tint = Colors.AccentColorDefault,
                 modifier = Modifier
                     .weight(1f)
                     .size(18.dp)
@@ -425,7 +425,7 @@ fun NoDisplayRow(
         ) {
             Text(
                 text = title + if (isDefault) " - 默认" else "",
-                color = if (isSelected) Colors.PrimaryColor else FluentTheme.colors.text.text.primary,
+                color = if (isSelected) Colors.AccentColorDefault else FluentTheme.colors.text.text.primary,
                 fontWeight = FontWeight.Normal,
                 fontSize = 15.sp,
                 modifier = Modifier
@@ -436,7 +436,7 @@ fun NoDisplayRow(
             Icon(
                 imageVector = Icons.Regular.Checkmark,
                 contentDescription = "",
-                tint = Colors.PrimaryColor,
+                tint = Colors.AccentColorDefault,
                 modifier = Modifier
                     .weight(1f)
                     .size(18.dp)

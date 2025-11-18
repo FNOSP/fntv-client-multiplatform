@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,8 +35,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jankinwu.fntv.client.data.model.response.AuthDir
-import com.jankinwu.fntv.client.ui.component.common.FileTreeSelector
+import com.jankinwu.fntv.client.ui.component.common.FileTreePicker
 import com.jankinwu.fntv.client.ui.component.common.SelectionMode
+import com.jankinwu.fntv.client.ui.customAccentButtonColors
 import com.jankinwu.fntv.client.ui.screen.LocalFileInfo
 import com.jankinwu.fntv.client.viewmodel.AppAuthorizedDirViewModel
 import com.jankinwu.fntv.client.viewmodel.ServerPathViewModel
@@ -46,7 +50,9 @@ import io.github.composefluent.component.Button
 import io.github.composefluent.component.ContentDialogButton
 import io.github.composefluent.component.DialogSize
 import io.github.composefluent.component.FluentDialog
+import io.github.composefluent.component.ScrollbarContainer
 import io.github.composefluent.component.Text
+import io.github.composefluent.component.rememberScrollbarAdapter
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -84,10 +90,8 @@ fun AddNasSubtitleDialog(
                     )
                 }
             }
-            // Divider
-//            Box(Modifier.height(1.dp).background(FluentTheme.colors.stroke.surface.default))
             // Button Grid
-            Box(Modifier.height(80.dp).padding(horizontal = 25.dp), Alignment.CenterEnd) {
+            Box(Modifier.height(40.dp).padding(horizontal = 25.dp), Alignment.CenterEnd) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AccentButton(
                         modifier = Modifier.weight(1f),
@@ -95,6 +99,7 @@ fun AddNasSubtitleDialog(
                             onButtonClick(ContentDialogButton.Primary, selectedFilePaths)
                         },
                         disabled = selectedFilePaths.isEmpty(),
+                        buttonColors = customAccentButtonColors()
                     ) {
                         Text(primaryButtonText)
                     }
@@ -148,7 +153,7 @@ fun AddNasSubtitleBox(
                     .background(Color.Gray.copy(alpha = 0.5f))
             )
             // 2. 主内容区域 (侧边栏 + 文件树)
-            // **修改：使用 weight(1f) 占据剩余空间，而不是 fillMaxSize()**
+            // 使用 weight(1f) 占据剩余空间
             Row(
                 modifier = Modifier
                     .weight(
@@ -159,7 +164,7 @@ fun AddNasSubtitleBox(
                 // 2a. 侧边栏
                 Sidebar(
                     selectedItem = selectedSidebarItem,
-                    onItemSelected = { 
+                    onItemSelected = {
                         selectedSidebarItem = it
                         onSelectedSidebarItemChanged() // 当侧边栏选项改变时调用回调
                     },
@@ -288,18 +293,23 @@ fun Sidebar(
         }
     }
 
-    Column(
-        modifier = modifier
-//            .background(Color(0xFF2B2B2B)) // 侧边栏背景
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+    val lazyListState = rememberLazyListState()
+    ScrollbarContainer(
+        adapter = rememberScrollbarAdapter(lazyListState)
     ) {
-        items.forEach { item ->
-            SidebarItem(
-                text = item.title,
-                isSelected = (item == selectedItem),
-                onClick = { onItemSelected(item) }
-            )
+        LazyColumn(
+            state = lazyListState,
+            modifier = modifier
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            items(items) { item ->
+                SidebarItem(
+                    text = item.title,
+                    isSelected = (item == selectedItem),
+                    onClick = { onItemSelected(item) }
+                )
+            }
         }
     }
 }
@@ -367,7 +377,7 @@ fun MainContent(
                 }
 
                 is UiState.Success -> {
-                    FileTreeSelector(
+                    FileTreePicker(
                         rootPaths = selectedSidebarItem.path,
                         selectionMode = SelectionMode.FilesOnly,
                         allowedExtensions = listOf("ass", "srt", "vtt"),
@@ -385,7 +395,7 @@ fun MainContent(
                 }
 
                 else -> {
-                    FileTreeSelector(
+                    FileTreePicker(
                         rootPaths = selectedSidebarItem.path,
                         selectionMode = SelectionMode.FilesOnly,
                         allowedExtensions = listOf("ass", "srt", "vtt"),
@@ -396,7 +406,7 @@ fun MainContent(
             }
         } else {
             // 对于其他存储空间，显示所有根目录，但采用懒加载方式
-            FileTreeSelector(
+            FileTreePicker(
                 rootPaths = selectedSidebarItem.path,
                 selectionMode = SelectionMode.FilesOnly,
                 allowedExtensions = listOf("ass", "srt", "vtt"),

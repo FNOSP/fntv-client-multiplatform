@@ -1,6 +1,9 @@
 package com.jankinwu.fntv.client.ui.component.common
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -14,10 +17,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -93,7 +98,7 @@ data class TreeNode(
  */
 object DirectoryContentFetcher : KoinComponent {
     private val fnOfficialApi: FnOfficialApiImpl by inject()
-    
+
     suspend fun fetchDirectoryContents(path: String): List<ApiFileItem> {
         return try {
             // 使用 withContext 确保在正确的上下文中执行
@@ -130,7 +135,7 @@ object DirectoryContentFetcher : KoinComponent {
  * @param hideRoot 是否隐藏根目录（对于"视频所在位置"使用）
  */
 @Composable
-fun FileTreeSelector(
+fun FileTreePicker(
     rootPaths: List<String>,
     selectionMode: SelectionMode,
     allowedExtensions: List<String>,
@@ -255,7 +260,7 @@ fun FileTreeSelector(
         }
     }
 
-    // **[修改点]** 处理选择状态切换的逻辑
+    // 处理选择状态切换的逻辑
     val onToggleSelection = { path: String ->
         val newPaths = if (path in selectedPaths) {
             selectedPaths - path // 从 Set 中移除
@@ -439,6 +444,7 @@ private fun LazyListScope.fileTreeItems(
 /**
  * 渲染单个文件/目录行
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FileNodeItem(
     node: TreeNode,
@@ -448,68 +454,98 @@ private fun FileNodeItem(
     onNodeClick: () -> Unit,
     onCheckboxChange: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onNodeClick
-            )
-            .padding(vertical = 4.dp)
-            .padding(start = (depth * 24 + 8).dp),
-        verticalAlignment = Alignment.CenterVertically
+    TooltipArea(
+        tooltip = {
+            Surface(
+                modifier = Modifier.padding(4.dp),
+                color = FluentTheme.colors.background.smoke.default.copy(alpha = 0.8f),
+                shape = RoundedCornerShape(4.dp),
+                border = BorderStroke(1.dp, FluentTheme.colors.text.text.primary),
+            ) {
+                Text(
+                    text = node.path,
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .width(500.dp),
+                    color = FluentTheme.colors.text.text.primary,
+                    style = FluentTheme.typography.caption
+                )
+            }
+        },
+        delayMillis = 800,
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onNodeClick
+                )
+                .padding(vertical = 4.dp)
+                .padding(start = (depth * 24 + 8).dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
 
-        // 1. 展开/折叠箭头 (或加载指示器)
-        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-            if (node.isDirectory) {
-                if (node.isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                } else {
-                    val arrowIcon = if (node.isExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight
-                    Icon(imageVector = arrowIcon, contentDescription = "Expand", tint = Color.LightGray)
+            // 1. 展开/折叠箭头 (或加载指示器)
+            Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                if (node.isDirectory) {
+                    if (node.isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                    } else {
+                        val arrowIcon =
+                            if (node.isExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight
+                        Icon(
+                            imageVector = arrowIcon,
+                            contentDescription = "Expand",
+                            tint = Color.LightGray
+                        )
+                    }
                 }
             }
-        }
 
 //        Spacer(Modifier.width(8.dp))
 
-        // 2. 复选框 (如果可选择)
-        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-            CheckBox(
-                isSelected && isSelectable,
-                enabled = isSelectable,
-                onCheckStateChange = { onCheckboxChange() },
-                colors = if(isSelected && isSelectable) {
-                    customSelectedCheckBoxColors()
-                } else {
-                    CheckBoxDefaults.defaultCheckBoxColors()
-                },
+            // 2. 复选框
+            Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                CheckBox(
+                    isSelected && isSelectable,
+                    enabled = isSelectable,
+                    onCheckStateChange = {
+                        if (isSelectable) {
+                            onCheckboxChange()
+                        }
+                    },
+                    colors = if (isSelected && isSelectable) {
+                        customSelectedCheckBoxColors()
+                    } else {
+                        CheckBoxDefaults.defaultCheckBoxColors()
+                    },
+                    modifier = Modifier
+                        .pointerHoverIcon(if (isSelectable) PointerIcon.Hand else PointerIcon.Default)
+                        .size(15.dp)
+                )
+            }
+
+            Spacer(Modifier.width(8.dp))
+
+            // 3. 文件/目录图标
+            Image(
+                painterResource(if (node.isDirectory) Res.drawable.folder else Res.drawable.text),
+                contentDescription = "文件夹 logo",
                 modifier = Modifier
-                    .pointerHoverIcon(if (isSelectable) PointerIcon.Hand else PointerIcon.Default)
-                    .size(15.dp)
+                    .size(24.dp)
+            )
+
+            Spacer(Modifier.width(8.dp))
+
+            // 4. 文件名
+            Text(
+                text = node.name,
+                color = FluentTheme.colors.text.text.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
-
-        Spacer(Modifier.width(8.dp))
-
-        // 3. 文件/目录图标
-        Image(
-            painterResource(if (node.isDirectory) Res.drawable.folder else Res.drawable.text),
-            contentDescription = "文件夹 logo",
-            modifier = Modifier
-                .size(24.dp)
-        )
-
-        Spacer(Modifier.width(8.dp))
-
-        // 4. 文件名
-        Text(
-            text = node.name,
-            color = FluentTheme.colors.text.text.primary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
     }
 }

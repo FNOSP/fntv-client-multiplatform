@@ -618,7 +618,7 @@ fun ProgressBar(
                 (watchedTs.toFloat() / totalDuration.toFloat())
             },
             modifier = Modifier.width(300.dp),
-            color = Colors.PrimaryColor, // 蓝色
+            color = Colors.AccentColorDefault, // 蓝色
             trackColor = Color.DarkGray.copy(alpha = 0.4f),
             strokeCap = ProgressIndicatorDefaults.CircularDeterminateStrokeCap,
             gapSize = 0.dp,
@@ -732,7 +732,7 @@ fun MiddleControls(
                 onClick = {
                     playMedia()
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Colors.PrimaryColor), // 蓝色背景
+                colors = ButtonDefaults.buttonColors(containerColor = Colors.AccentColorDefault), // 蓝色背景
                 shape = CircleShape, // 圆角
                 modifier = Modifier.height(56.dp).width(160.dp).pointerHoverIcon(PointerIcon.Hand)
             ) {
@@ -769,7 +769,7 @@ fun MiddleControls(
             // 是否已观看按钮
             CircleIconButton(
                 icon = Icons.Regular.Checkmark, description = "已观看",
-                iconColor = if (isWatched) Colors.PrimaryColor else FluentTheme.colors.text.text.primary,
+                iconColor = if (isWatched) Colors.AccentColorDefault else FluentTheme.colors.text.text.primary,
                 onClick = {
                     watchedViewModel.toggleWatched(
                         guid,
@@ -1256,13 +1256,13 @@ fun CircleIconButton(
 @Composable
 fun VideoSelectionBox(text: String, onClick: () -> Unit, isSelected: Boolean) {
     var isHovered by remember { mutableStateOf(false) }
-    val textColor = if (isSelected) Colors.PrimaryColor else FluentTheme.colors.text.text.primary
+    val textColor = if (isSelected) Colors.AccentColorDefault else FluentTheme.colors.text.text.primary
     val backgroundColor by animateColorAsState(
         targetValue = if (isHovered) FluentTheme.colors.stroke.control.default.copy(alpha = 0.02f) else Color.Transparent
     )
     val borderColor by animateColorAsState(
         targetValue = if (isSelected) {
-            Colors.PrimaryColor
+            Colors.AccentColorDefault
         } else if (isHovered) FluentTheme.colors.stroke.control.default.copy(alpha = 0.3f) else FluentTheme.colors.stroke.control.default.copy(
             alpha = 0.1f
         )
