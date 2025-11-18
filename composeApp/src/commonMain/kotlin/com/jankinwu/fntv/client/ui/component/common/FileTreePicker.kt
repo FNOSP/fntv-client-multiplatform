@@ -6,7 +6,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,10 +38,12 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.jankinwu.fntv.client.data.network.impl.FnOfficialApiImpl
 import com.jankinwu.fntv.client.ui.component.common.DirectoryContentFetcher.fetchDirectoryContents
 import com.jankinwu.fntv.client.ui.customSelectedCheckBoxColors
 import fntv_client_multiplatform.composeapp.generated.resources.Res
+import fntv_client_multiplatform.composeapp.generated.resources.empty_folder
 import fntv_client_multiplatform.composeapp.generated.resources.folder
 import fntv_client_multiplatform.composeapp.generated.resources.text
 import io.github.composefluent.FluentTheme
@@ -270,7 +273,10 @@ fun FileTreePicker(
         selectedPaths = newPaths // 更新内部状态
         onSelectionChanged(newPaths) // 调用外部回调
     }
-
+    var isEmpty by remember(rootPaths) { mutableStateOf(false) }
+    if (isEmpty) {
+        EmptyFolder(modifier = Modifier.fillMaxSize())
+    }
     // --- UI 渲染 ---
     val lazyListState = rememberLazyListState()
     ScrollbarContainer(
@@ -290,9 +296,9 @@ fun FileTreePicker(
                         modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Loading root...", color = Color.White)
+//                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+//                        Spacer(Modifier.width(8.dp))
+//                        Text("Loading root...", color = Color.White)
                     }
                 }
             } else {
@@ -301,15 +307,36 @@ fun FileTreePicker(
                     if (hideRoot) {
                         // 如果隐藏根目录，直接渲染其子项
                         if (root.children != null) {
-                            fileTreeItems(
-                                nodes = root.children,
-                                depth = 0,
-                                selectionMode = selectionMode,
-                                allowedExtensions = allowedExtensions.map { it.lowercase() },
-                                selectedPaths = selectedPaths,
-                                onDirectoryClick = { onDirectoryClick(it) },
-                                onToggleSelection = onToggleSelection
-                            )
+                            // 过滤出符合 allowedExtensions 条件的节点
+                            val filteredNodes = root.children.filter { node ->
+                                val extension =
+                                    if (!node.isDirectory) node.name.substringAfterLast('.', "")
+                                        .lowercase() else ""
+                                when {
+                                    node.isDirectory -> true
+                                    allowedExtensions.isEmpty() -> true
+                                    extension in allowedExtensions.map { it.lowercase() } -> true
+                                    else -> false
+                                }
+                            }
+
+                            if (filteredNodes.isEmpty()) {
+                                isEmpty = true
+                                // 显示“空空如也”
+//                                item {
+//                                    EmptyFolder(modifier = Modifier.fillMaxSize())
+//                                }
+                            } else {
+                                fileTreeItems(
+                                    nodes = root.children,
+                                    depth = 0,
+                                    selectionMode = selectionMode,
+                                    allowedExtensions = allowedExtensions.map { it.lowercase() },
+                                    selectedPaths = selectedPaths,
+                                    onDirectoryClick = { onDirectoryClick(it) },
+                                    onToggleSelection = onToggleSelection
+                                )
+                            }
                         } else if (root.isLoading) {
                             // 显示加载状态
                             item {
@@ -317,10 +344,15 @@ fun FileTreePicker(
                                     modifier = Modifier.padding(16.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Loading ${root.name}...", color = Color.White)
+//                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+//                                    Spacer(Modifier.width(8.dp))
+//                                    Text("Loading ${root.name}...", color = Color.White)
                                 }
+                            }
+                        } else {
+                            // 显示空目录
+                            item {
+                                EmptyFolder(modifier = Modifier.fillMaxSize())
                             }
                         }
                     } else {
@@ -351,17 +383,17 @@ fun FileTreePicker(
                             )
                         } else if (root.isLoading) {
                             // 显示单个根节点的加载状态
-                            item {
-                                Row(
-                                    modifier = Modifier.padding(16.dp, 0.dp, 16.dp, 16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Spacer(Modifier.width(24.dp)) // 缩进根节点的子级
-                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Loading ${root.name}...", color = Color.White)
-                                }
-                            }
+//                            item {
+//                                Row(
+//                                    modifier = Modifier.padding(16.dp, 0.dp, 16.dp, 16.dp),
+//                                    verticalAlignment = Alignment.CenterVertically
+//                                ) {
+//                                    Spacer(Modifier.width(24.dp)) // 缩进根节点的子级
+//                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+//                                    Spacer(Modifier.width(8.dp))
+//                                    Text("Loading ${root.name}...", color = Color.White)
+//                                }
+//                            }
                         } else if (!root.isExpanded && root.children == null) {
                             // 根节点未展开且未加载子项时，不显示任何内容
                             // 这样就实现了懒加载的效果
@@ -491,7 +523,7 @@ private fun FileNodeItem(
             Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
                 if (node.isDirectory) {
                     if (node.isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+//                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
                     } else {
                         val arrowIcon =
                             if (node.isExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight
@@ -549,3 +581,30 @@ private fun FileNodeItem(
         }
     }
 }
+
+@Composable
+fun EmptyFolder(modifier: Modifier) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Image(
+                painter = painterResource(Res.drawable.empty_folder),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(110.dp)
+                    .padding(bottom = 24.dp)
+            )
+            Text(
+                "空空如也",
+                fontSize = 14.sp,
+                color = FluentTheme.colors.text.text.primary
+            )
+        }
+    }
+}
+

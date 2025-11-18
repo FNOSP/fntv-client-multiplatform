@@ -91,8 +91,11 @@ fun AddNasSubtitleDialog(
                 }
             }
             // Button Grid
-            Box(Modifier.height(40.dp).padding(horizontal = 25.dp), Alignment.CenterEnd) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.height(50.dp).padding(horizontal = 25.dp), Alignment.CenterEnd) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     AccentButton(
                         modifier = Modifier.weight(1f),
                         onClick = {
@@ -366,21 +369,21 @@ fun MainContent(
             // 对于"视频所在位置"，使用ServerPathViewModel获取的数据
             when (serverPathUiState) {
                 is UiState.Loading -> {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Loading...", color = Color.White)
-                    }
+//                    Row(
+//                        modifier = Modifier.padding(16.dp),
+//                        verticalAlignment = Alignment.CenterVertically
+//                    ) {
+//                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+//                        Spacer(Modifier.width(8.dp))
+//                        Text("Loading...", color = Color.White)
+//                    }
                 }
 
                 is UiState.Success -> {
                     FileTreePicker(
                         rootPaths = selectedSidebarItem.path,
                         selectionMode = SelectionMode.FilesOnly,
-                        allowedExtensions = listOf("ass", "srt", "vtt"),
+                        allowedExtensions = listOf("ass", "srt", "vtt", "sub", "ssa"),
                         onSelectionChanged = onSelectionChanged,
                         hideRoot = true // 隐藏根目录
                     )
@@ -398,7 +401,7 @@ fun MainContent(
                     FileTreePicker(
                         rootPaths = selectedSidebarItem.path,
                         selectionMode = SelectionMode.FilesOnly,
-                        allowedExtensions = listOf("ass", "srt", "vtt"),
+                        allowedExtensions = listOf("ass", "srt", "vtt", "sub", "ssa"),
                         onSelectionChanged = onSelectionChanged,
                         hideRoot = true // 隐藏根目录
                     )
@@ -409,7 +412,7 @@ fun MainContent(
             FileTreePicker(
                 rootPaths = selectedSidebarItem.path,
                 selectionMode = SelectionMode.FilesOnly,
-                allowedExtensions = listOf("ass", "srt", "vtt"),
+                allowedExtensions = listOf("ass", "srt", "vtt", "sub", "ssa"),
                 onSelectionChanged = onSelectionChanged,
                 hideRoot = false // 不隐藏根目录
             )
