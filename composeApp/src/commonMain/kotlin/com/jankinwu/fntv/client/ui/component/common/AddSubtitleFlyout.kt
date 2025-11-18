@@ -1,4 +1,4 @@
-package com.jankinwu.fntv.client.ui.component.detail
+package com.jankinwu.fntv.client.ui.component.common
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -53,11 +53,12 @@ import java.io.File
 
 @Preview
 @Composable
-fun MediaDetailAddSubtitleFlyout(
+fun AddSubtitleFlyout(
     mediaGuid: String,
     modifier: Modifier = Modifier,
     guid: String,
     onAddNasSubtitleSelected: (String) -> Unit = {},
+    onSearchSubtitleSelected: (String) -> Unit = {}
 ) {
     val frameWindowScope = LocalFrameWindowScope.current
     val subtitleUploadViewModel: SubtitleUploadViewModel = koinViewModel()
@@ -100,6 +101,7 @@ fun MediaDetailAddSubtitleFlyout(
                 },
                 onClick = {
                     isFlyoutVisible = false
+                    onSearchSubtitleSelected(mediaGuid)
                 },
                 icon = {
                     Icon(
@@ -177,7 +179,7 @@ fun MediaDetailAddSubtitleFlyout(
             )
         },
         content = {
-            SubtitleButton(
+            FlyoutButton(
                 isSelected = isFlyoutVisible,
                 onClick = {
                     isFlyoutVisible = !isFlyoutVisible
@@ -191,7 +193,7 @@ fun MediaDetailAddSubtitleFlyout(
 }
 
 @Composable
-private fun SubtitleButton(
+fun FlyoutButton(
     isSelected: Boolean,
     onClick: () -> Unit,
     buttonText: String,
@@ -207,7 +209,7 @@ private fun SubtitleButton(
     val targetRotation = if (isSelected) -180f else 0f
     val animatedRotation by animateFloatAsState(targetValue = targetRotation)
     Row(
-        modifier = Modifier
+        modifier = modifier
             .clip(CircleShape)
             .border(1.dp, Color.Gray.copy(alpha = 0.4f), CircleShape)
             .background(backgroundColor)

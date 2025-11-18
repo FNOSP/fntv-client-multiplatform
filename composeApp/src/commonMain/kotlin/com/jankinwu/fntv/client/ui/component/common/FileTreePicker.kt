@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -322,10 +323,6 @@ fun FileTreePicker(
 
                             if (filteredNodes.isEmpty()) {
                                 isEmpty = true
-                                // 显示“空空如也”
-//                                item {
-//                                    EmptyFolder(modifier = Modifier.fillMaxSize())
-//                                }
                             } else {
                                 fileTreeItems(
                                     nodes = root.children,
@@ -344,9 +341,9 @@ fun FileTreePicker(
                                     modifier = Modifier.padding(16.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-//                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-//                                    Spacer(Modifier.width(8.dp))
-//                                    Text("Loading ${root.name}...", color = Color.White)
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Loading ${root.name}...", color = Color.White)
                                 }
                             }
                         } else {
@@ -383,17 +380,17 @@ fun FileTreePicker(
                             )
                         } else if (root.isLoading) {
                             // 显示单个根节点的加载状态
-//                            item {
-//                                Row(
-//                                    modifier = Modifier.padding(16.dp, 0.dp, 16.dp, 16.dp),
-//                                    verticalAlignment = Alignment.CenterVertically
-//                                ) {
-//                                    Spacer(Modifier.width(24.dp)) // 缩进根节点的子级
-//                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-//                                    Spacer(Modifier.width(8.dp))
-//                                    Text("Loading ${root.name}...", color = Color.White)
-//                                }
-//                            }
+                            item {
+                                Row(
+                                    modifier = Modifier.padding(16.dp, 0.dp, 16.dp, 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Spacer(Modifier.width(24.dp)) // 缩进根节点的子级
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Loading ${root.name}...", color = Color.White)
+                                }
+                            }
                         } else if (!root.isExpanded && root.children == null) {
                             // 根节点未展开且未加载子项时，不显示任何内容
                             // 这样就实现了懒加载的效果

@@ -41,8 +41,11 @@ import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.icons.ArrowUp
 import com.jankinwu.fntv.client.icons.Delete
+import com.jankinwu.fntv.client.ui.component.common.AddNasSubtitleDialog
 import com.jankinwu.fntv.client.ui.flyoutTitleItemColors
 import com.jankinwu.fntv.client.ui.component.common.CustomContentDialog
+import com.jankinwu.fntv.client.ui.component.common.AddSubtitleFlyout
+import com.jankinwu.fntv.client.ui.component.common.SubtitleSearchDialog
 import com.jankinwu.fntv.client.viewmodel.StreamListViewModel
 import com.jankinwu.fntv.client.viewmodel.SubtitleDeleteViewModel
 import com.jankinwu.fntv.client.viewmodel.SubtitleMarkViewModel
@@ -75,6 +78,7 @@ fun StreamSelector(
     val lazyListState = rememberScrollState(0)
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showAddNasSubtitleDialog by remember { mutableStateOf(false) }
+    var showSearchSubtitleDialog by remember { mutableStateOf(false) }
     var deletedItemTitle by remember { mutableStateOf("") }
     var deletedItemGuid by remember { mutableStateOf("") }
     val subtitleDeleteViewModel: SubtitleDeleteViewModel = koinViewModel()
@@ -126,12 +130,15 @@ fun StreamSelector(
                                         .width(120.dp)
                                 )
                                 // 添加 "字幕" 下拉框
-                                MediaDetailAddSubtitleFlyout(
+                                AddSubtitleFlyout(
                                     mediaGuid,
                                     modifier = Modifier.hoverable(interactionSource),
                                     guid,
                                     onAddNasSubtitleSelected = {
                                         showAddNasSubtitleDialog = true
+                                    },
+                                    onSearchSubtitleSelected = {
+                                        showSearchSubtitleDialog = true
                                     }
                                 )
                             }
@@ -281,6 +288,7 @@ fun StreamSelector(
                         subtitleMarkViewModel.markSubtitles(mediaGuid, selectedPaths.toList())
                     }
                 }
+
                 ContentDialogButton.Secondary -> {
 
                 }
@@ -289,6 +297,13 @@ fun StreamSelector(
             }
             showAddNasSubtitleDialog = false
         }
+    )
+    SubtitleSearchDialog(
+        title = "添加字幕",
+        visible = showSearchSubtitleDialog,
+        size = DialogSize.Max,
+        mediaGuid,
+        onDismissRequest = { showSearchSubtitleDialog = false }
     )
 }
 

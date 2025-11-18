@@ -1,4 +1,4 @@
-package com.jankinwu.fntv.client.ui.component.detail
+package com.jankinwu.fntv.client.ui.component.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,13 +13,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -32,11 +30,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jankinwu.fntv.client.data.model.response.AuthDir
-import com.jankinwu.fntv.client.ui.component.common.FileTreePicker
-import com.jankinwu.fntv.client.ui.component.common.SelectionMode
 import com.jankinwu.fntv.client.ui.customAccentButtonColors
 import com.jankinwu.fntv.client.ui.screen.LocalFileInfo
 import com.jankinwu.fntv.client.viewmodel.AppAuthorizedDirViewModel
@@ -73,7 +71,7 @@ fun AddNasSubtitleDialog(
                 Modifier
                     .fillMaxWidth()
 //                    .background(FluentTheme.colors.background.layer.alt)
-                    .padding(24.dp)
+                    .padding(top = 24.dp, bottom = 8.dp, start = 25.dp, end = 25.dp)
             ) {
                 Text(
                     style = FluentTheme.typography.subtitle,
@@ -91,7 +89,12 @@ fun AddNasSubtitleDialog(
                 }
             }
             // Button Grid
-            Box(Modifier.height(50.dp).padding(horizontal = 25.dp), Alignment.CenterEnd) {
+            Box(
+                Modifier
+                    .height(50.dp)
+                    .padding(horizontal = 25.dp, vertical = 8.dp),
+                Alignment.CenterEnd
+            ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -215,6 +218,7 @@ fun TopBarBox(title: String, contentColor: Color) {
                 .padding(start = 16.dp),
             color = contentColor
         )
+        // TODO 所选文件/目录路径
     }
 }
 
@@ -271,7 +275,7 @@ fun Sidebar(
             if (path.startsWith("/vol") && path.length >= 5) {
                 val volNumber = path.substring(4, 5)
                 if (volNumber.all { it.isDigit() }) {
-                    val storageTitle = "存储空间$volNumber"
+                    val storageTitle = "存储空间 $volNumber"
                     // 检查是否已存在相同标题的项
                     val existingItem = sidebarItems.find { it.title == storageTitle }
                     if (existingItem != null) {
@@ -335,6 +339,7 @@ fun SidebarItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .pointerHoverIcon(PointerIcon.Hand)
             .background(backgroundColor, RoundedCornerShape(4.dp))
             .padding(12.dp),
         color = textColor,
@@ -369,14 +374,6 @@ fun MainContent(
             // 对于"视频所在位置"，使用ServerPathViewModel获取的数据
             when (serverPathUiState) {
                 is UiState.Loading -> {
-//                    Row(
-//                        modifier = Modifier.padding(16.dp),
-//                        verticalAlignment = Alignment.CenterVertically
-//                    ) {
-//                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
-//                        Spacer(Modifier.width(8.dp))
-//                        Text("Loading...", color = Color.White)
-//                    }
                 }
 
                 is UiState.Success -> {
