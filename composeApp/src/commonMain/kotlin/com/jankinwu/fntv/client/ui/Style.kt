@@ -48,7 +48,7 @@ typealias SwitcherStyleScheme = PentaVisualScheme<SwitcherStyle>
 
 @Stable
 @Composable
-fun selectedCheckBoxColors(
+fun customSelectedCheckBoxColors(
     default: CheckBoxColor = CheckBoxColor(
         fillColor = Color(0xFF3A7BFF),
         contentColor = Color.White,

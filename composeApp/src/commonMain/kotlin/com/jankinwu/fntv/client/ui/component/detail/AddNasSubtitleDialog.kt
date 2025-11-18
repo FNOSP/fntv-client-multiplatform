@@ -58,7 +58,6 @@ fun AddNasSubtitleDialog(
     closeButtonText: String? = null,
     onButtonClick: (ContentDialogButton, Set<String>?) -> Unit,
     size: DialogSize = DialogSize.Standard,
-    currentDir: String = "",
 ) {
     // 状态：用于保存文件选择器返回的路径 (此处仅用于演示，可以传递给其他组件)
     var selectedFilePaths by remember { mutableStateOf(emptySet<String>()) }
@@ -129,12 +128,12 @@ fun AddNasSubtitleBox(
     var selectedSidebarItem: SidebarItem? by remember { mutableStateOf(null) }
     Box(
         modifier = Modifier
-            .height(400.dp)
-            .width(800.dp),
+            .height(300.dp)
+            .fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
-                .border(1.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                .border(1.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                 .fillMaxSize()
         ) {
             // 1. 顶部标题栏
@@ -178,15 +177,17 @@ fun AddNasSubtitleBox(
                 )
 
                 // 2c. 主内容 (调用文件选择器)
-                MainContent(
-                    selectedSidebarItem = selectedSidebarItem,
-                    onSelectionChanged = { paths ->
-                        onSelectionChanged(paths)
-                        // 调试：打印选中的路径
-                        println("Selected Paths: $paths")
-                    },
-                    modifier = Modifier.fillMaxSize() // 占据剩余空间
-                )
+                selectedSidebarItem?.let {
+                    MainContent(
+                        selectedSidebarItem = it,
+                        onSelectionChanged = { paths ->
+                            onSelectionChanged(paths)
+                            // 调试：打印选中的路径
+                            println("Selected Paths: $paths")
+                        },
+                        modifier = Modifier.fillMaxSize() // 占据剩余空间
+                    )
+                }
             }
         }
     }
@@ -289,7 +290,7 @@ fun Sidebar(
 
     Column(
         modifier = modifier
-            .background(Color(0xFF2B2B2B)) // 侧边栏背景
+//            .background(Color(0xFF2B2B2B)) // 侧边栏背景
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
@@ -333,7 +334,7 @@ fun SidebarItem(
  */
 @Composable
 fun MainContent(
-    selectedSidebarItem: SidebarItem?,
+    selectedSidebarItem: SidebarItem,
     onSelectionChanged: (Set<String>) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -342,7 +343,7 @@ fun MainContent(
 
     // 当选中的侧边栏项改变时，加载对应的文件列表
     LaunchedEffect(selectedSidebarItem) {
-        if (selectedSidebarItem?.title == "视频所在位置" && selectedSidebarItem.path.isNotEmpty()) {
+        if (selectedSidebarItem.title == "视频所在位置" && selectedSidebarItem.path.isNotEmpty()) {
             serverPathViewModel.loadFilesByServerPath(selectedSidebarItem.path.first())
         }
     }
@@ -351,10 +352,7 @@ fun MainContent(
         modifier = modifier
 //            .background(Color(0xFF2B2B2B)) // 主内容区域背景
     ) {
-        // ---
-        // --- 这是您所要求的文件选择器的 "调用代码" ---
-        // ---
-        if (selectedSidebarItem?.title == "视频所在位置") {
+        if (selectedSidebarItem.title == "视频所在位置") {
             // 对于"视频所在位置"，使用ServerPathViewModel获取的数据
             when (serverPathUiState) {
                 is UiState.Loading -> {
@@ -370,7 +368,7 @@ fun MainContent(
 
                 is UiState.Success -> {
                     FileTreeSelector(
-                        rootPath = selectedSidebarItem.path.firstOrNull() ?: "root",
+                        rootPaths = selectedSidebarItem.path,
                         selectionMode = SelectionMode.FilesOnly,
                         allowedExtensions = listOf("ass", "srt", "vtt"),
                         onSelectionChanged = onSelectionChanged,
@@ -388,7 +386,7 @@ fun MainContent(
 
                 else -> {
                     FileTreeSelector(
-                        rootPath = selectedSidebarItem.path.firstOrNull() ?: "root",
+                        rootPaths = selectedSidebarItem.path,
                         selectionMode = SelectionMode.FilesOnly,
                         allowedExtensions = listOf("ass", "srt", "vtt"),
                         onSelectionChanged = onSelectionChanged,
@@ -399,7 +397,7 @@ fun MainContent(
         } else {
             // 对于其他存储空间，显示所有根目录，但采用懒加载方式
             FileTreeSelector(
-                rootPaths = selectedSidebarItem?.path ?: listOf("root"),
+                rootPaths = selectedSidebarItem.path,
                 selectionMode = SelectionMode.FilesOnly,
                 allowedExtensions = listOf("ass", "srt", "vtt"),
                 onSelectionChanged = onSelectionChanged,

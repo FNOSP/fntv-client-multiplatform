@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.koin.java.KoinJavaComponent.inject
 
+/**
+ * ViewModel for handling server path related operations
+ */
 class ServerPathViewModel : BaseViewModel() {
 
     private val fnOfficialApi: FnOfficialApiImpl by inject(FnOfficialApiImpl::class.java)
@@ -16,6 +19,10 @@ class ServerPathViewModel : BaseViewModel() {
     private val _uiState = MutableStateFlow<UiState<List<ServerPathResponse>>>(UiState.Initial)
     val uiState: StateFlow<UiState<List<ServerPathResponse>>> = _uiState.asStateFlow()
 
+    /**
+     * Load files by server path
+     * @param path The server path to load files from
+     */
     fun loadFilesByServerPath(path: String) {
         viewModelScope.launch {
             executeWithLoading(_uiState) {
@@ -24,10 +31,17 @@ class ServerPathViewModel : BaseViewModel() {
         }
     }
 
+    /**
+     * Refresh files by server path
+     * @param path The server path to refresh files from
+     */
     fun refreshFilesByServerPath(path: String) {
         loadFilesByServerPath(path)
     }
 
+    /**
+     * Clear error state and reset to initial state
+     */
     fun clearError() {
         _uiState.value = UiState.Initial
     }

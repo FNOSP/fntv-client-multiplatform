@@ -1,7 +1,8 @@
 package com.jankinwu.fntv.client.ui.component.common
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,13 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,15 +28,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.network.impl.FnOfficialApiImpl
 import com.jankinwu.fntv.client.ui.component.common.DirectoryContentFetcher.fetchDirectoryContents
+import com.jankinwu.fntv.client.ui.customSelectedCheckBoxColors
+import fntv_client_multiplatform.composeapp.generated.resources.Res
+import fntv_client_multiplatform.composeapp.generated.resources.folder
+import fntv_client_multiplatform.composeapp.generated.resources.text
+import io.github.composefluent.FluentTheme
+import io.github.composefluent.component.CheckBox
+import io.github.composefluent.component.CheckBoxDefaults
 import io.github.composefluent.component.Icon
+import io.github.composefluent.component.ScrollbarContainer
 import io.github.composefluent.component.Text
-import kotlinx.coroutines.delay
+import io.github.composefluent.component.rememberScrollbarAdapter
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -80,8 +88,6 @@ data class TreeNode(
     val isRoot: Boolean = false
 )
 
-// --- 2. 模拟的 API 请求 ---
-
 /**
  * 通过API获取指定路径下的文件和目录列表
  */
@@ -117,32 +123,6 @@ object DirectoryContentFetcher : KoinComponent {
 /**
  * 文件树选择器的主 Composable (支持多选)
  *
- * @param rootPath 启动时加载的根路径
- * @param selectionMode 允许选择的类型 (文件 / 文件夹 / 两者)
- * @param allowedExtensions 允许显示的文件后缀名列表 (小写)。如果为空，则显示所有文件。
- * @param onSelectionChanged 当选择项发生变化时调用的回调，返回一个包含所有选中路径的 Set
- * @param hideRoot 是否隐藏根目录（对于"视频所在位置"使用）
- */
-@Composable
-fun FileTreeSelector(
-    rootPath: String,
-    selectionMode: SelectionMode,
-    allowedExtensions: List<String>,
-    onSelectionChanged: (selectedPaths: Set<String>) -> Unit,
-    hideRoot: Boolean = false
-) {
-    FileTreeSelector(
-        rootPaths = listOf(rootPath),
-        selectionMode = selectionMode,
-        allowedExtensions = allowedExtensions,
-        onSelectionChanged = onSelectionChanged,
-        hideRoot = hideRoot
-    )
-}
-
-/**
- * 文件树选择器的主 Composable (支持多选)
- *
  * @param rootPaths 启动时加载的根路径列表
  * @param selectionMode 允许选择的类型 (文件 / 文件夹 / 两者)
  * @param allowedExtensions 允许显示的文件后缀名列表 (小写)。如果为空，则显示所有文件。
@@ -174,7 +154,7 @@ fun FileTreeSelector(
         )
     }
 
-    // **[修改点]** 当前选择的项的路径集合 (Set)
+    // 当前选择的项的路径集合 (Set)
     var selectedPaths by remember { mutableStateOf(emptySet<String>()) }
 
     // 用于执行异步加载的协程作用域
@@ -287,95 +267,100 @@ fun FileTreeSelector(
     }
 
     // --- UI 渲染 ---
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF2B2B2B))
+    val lazyListState = rememberLazyListState()
+    ScrollbarContainer(
+        adapter = rememberScrollbarAdapter(lazyListState)
     ) {
-        // 启动递归渲染
-        if (roots.any { it.children == null && !it.isLoading && hideRoot }) {
-            // 根目录的初始加载
-            item {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Loading root...", color = Color.White)
+        LazyColumn(
+            state = lazyListState,
+            modifier = Modifier
+                .fillMaxSize()
+//            .background(Color(0xFF2B2B2B))
+        ) {
+            // 启动递归渲染
+            if (roots.any { it.children == null && !it.isLoading && hideRoot }) {
+                // 根目录的初始加载
+                item {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Loading root...", color = Color.White)
+                    }
                 }
-            }
-        } else {
-            // 递归渲染所有根节点下的文件树项
-            roots.forEach { root ->
-                if (hideRoot) {
-                    // 如果隐藏根目录，直接渲染其子项
-                    if (root.children != null) {
-                        fileTreeItems(
-                            nodes = root.children,
-                            depth = 0,
-                            selectionMode = selectionMode,
-                            allowedExtensions = allowedExtensions.map { it.lowercase() },
-                            selectedPaths = selectedPaths,
-                            onDirectoryClick = { onDirectoryClick(it) },
-                            onToggleSelection = onToggleSelection
-                        )
-                    } else if (root.isLoading) {
-                        // 显示加载状态
-                        item {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Loading ${root.name}...", color = Color.White)
+            } else {
+                // 递归渲染所有根节点下的文件树项
+                roots.forEach { root ->
+                    if (hideRoot) {
+                        // 如果隐藏根目录，直接渲染其子项
+                        if (root.children != null) {
+                            fileTreeItems(
+                                nodes = root.children,
+                                depth = 0,
+                                selectionMode = selectionMode,
+                                allowedExtensions = allowedExtensions.map { it.lowercase() },
+                                selectedPaths = selectedPaths,
+                                onDirectoryClick = { onDirectoryClick(it) },
+                                onToggleSelection = onToggleSelection
+                            )
+                        } else if (root.isLoading) {
+                            // 显示加载状态
+                            item {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Loading ${root.name}...", color = Color.White)
+                                }
                             }
                         }
-                    }
-                } else {
-                    // 显示根节点（作为普通目录节点显示）
-                    item {
-                        FileNodeItem(
-                            node = root.copy(isDirectory = true), // 确保根节点显示为目录图标
-                            depth = 0,
-                            isSelectable = false,
-                            isSelected = false,
-                            onNodeClick = {
-                                onDirectoryClick(root)
-                            },
-                            onCheckboxChange = {}
-                        )
-                    }
-                    
-                    // 递归渲染文件树项（仅在展开时）
-                    if (root.isExpanded && root.children != null) {
-                        fileTreeItems(
-                            nodes = root.children,
-                            depth = 1, // 根目录本身占一层深度
-                            selectionMode = selectionMode,
-                            allowedExtensions = allowedExtensions.map { it.lowercase() },
-                            selectedPaths = selectedPaths,
-                            onDirectoryClick = { onDirectoryClick(it) },
-                            onToggleSelection = onToggleSelection
-                        )
-                    } else if (root.isLoading) {
-                        // 显示单个根节点的加载状态
+                    } else {
+                        // 显示根节点（作为普通目录节点显示）
                         item {
-                            Row(
-                                modifier = Modifier.padding(16.dp, 0.dp, 16.dp, 16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Spacer(Modifier.width(24.dp)) // 缩进根节点的子级
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Loading ${root.name}...", color = Color.White)
-                            }
+                            FileNodeItem(
+                                node = root.copy(isDirectory = true), // 确保根节点显示为目录图标
+                                depth = 0,
+                                isSelectable = false,
+                                isSelected = false,
+                                onNodeClick = {
+                                    onDirectoryClick(root)
+                                },
+                                onCheckboxChange = {}
+                            )
                         }
-                    } else if (!root.isExpanded && root.children == null) {
-                        // 根节点未展开且未加载子项时，不显示任何内容
-                        // 这样就实现了懒加载的效果
+
+                        // 递归渲染文件树项（仅在展开时）
+                        if (root.isExpanded && root.children != null) {
+                            fileTreeItems(
+                                nodes = root.children,
+                                depth = 1, // 根目录本身占一层深度
+                                selectionMode = selectionMode,
+                                allowedExtensions = allowedExtensions.map { it.lowercase() },
+                                selectedPaths = selectedPaths,
+                                onDirectoryClick = { onDirectoryClick(it) },
+                                onToggleSelection = onToggleSelection
+                            )
+                        } else if (root.isLoading) {
+                            // 显示单个根节点的加载状态
+                            item {
+                                Row(
+                                    modifier = Modifier.padding(16.dp, 0.dp, 16.dp, 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Spacer(Modifier.width(24.dp)) // 缩进根节点的子级
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Loading ${root.name}...", color = Color.White)
+                                }
+                            }
+                        } else if (!root.isExpanded && root.children == null) {
+                            // 根节点未展开且未加载子项时，不显示任何内容
+                            // 这样就实现了懒加载的效果
+                        }
                     }
                 }
             }
@@ -424,12 +409,12 @@ private fun LazyListScope.fileTreeItems(
                         if (node.isDirectory) {
                             onDirectoryClick(node)
                         } else if (isSelectable) {
-                            // **[修改点]** 点击文件行也触发 toggle
+                            // 点击文件行也触发 toggle
                             onToggleSelection(node.path)
                         }
                     },
                     onCheckboxChange = {
-                        // **[修改点]** 点击复选框触发 toggle
+                        // 点击复选框触发 toggle
                         onToggleSelection(node.path)
                     }
                 )
@@ -466,44 +451,55 @@ private fun FileNodeItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onNodeClick)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onNodeClick
+            )
             .padding(vertical = 4.dp)
             .padding(start = (depth * 24 + 8).dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
 
         // 1. 展开/折叠箭头 (或加载指示器)
-        Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
             if (node.isDirectory) {
                 if (node.isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp))
                 } else {
-                    val arrowIcon = if (node.isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight
+                    val arrowIcon = if (node.isExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight
                     Icon(imageVector = arrowIcon, contentDescription = "Expand", tint = Color.LightGray)
                 }
             }
         }
 
+//        Spacer(Modifier.width(8.dp))
+
         // 2. 复选框 (如果可选择)
-        Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-            if (isSelectable) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { onCheckboxChange() }, // onCheckedChange lambda 已是 () -> Unit
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = Colors.PrimaryColor,
-                        uncheckedColor = Color.Gray
-                    )
-                )
-            }
+        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+            CheckBox(
+                isSelected && isSelectable,
+                enabled = isSelectable,
+                onCheckStateChange = { onCheckboxChange() },
+                colors = if(isSelected && isSelectable) {
+                    customSelectedCheckBoxColors()
+                } else {
+                    CheckBoxDefaults.defaultCheckBoxColors()
+                },
+                modifier = Modifier
+                    .pointerHoverIcon(if (isSelectable) PointerIcon.Hand else PointerIcon.Default)
+                    .size(15.dp)
+            )
         }
 
+        Spacer(Modifier.width(8.dp))
+
         // 3. 文件/目录图标
-        Icon(
-            imageVector = if (node.isDirectory) Icons.Default.Folder else Icons.Default.Description,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = if (node.isDirectory) Color(0xFFFACC15) else Color.LightGray
+        Image(
+            painterResource(if (node.isDirectory) Res.drawable.folder else Res.drawable.text),
+            contentDescription = "文件夹 logo",
+            modifier = Modifier
+                .size(24.dp)
         )
 
         Spacer(Modifier.width(8.dp))
@@ -511,46 +507,9 @@ private fun FileNodeItem(
         // 4. 文件名
         Text(
             text = node.name,
-            color = if (isSelected) Colors.PrimaryColor else Color.White,
+            color = FluentTheme.colors.text.text.primary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
     }
 }
-
-// --- 4. 示例用法 ---
-/*
-// 在你的 main 函数中这样使用：
-fun main() = application {
-    Window(onCloseRequest = ::exitApplication) {
-        // **[修改点]** 使用 mutableStateOf(emptySet<String>()) 来存储多选结果
-        var selectedFiles by remember { mutableStateOf(emptySet<String>()) }
-
-        Column(Modifier.fillMaxSize()) {
-            // **[修改点]** 显示所有选中的文件
-            Text(
-                "Selected (${selectedFiles.size}):",
-                color = Color.White,
-                modifier = Modifier.padding(16.dp)
-            )
-            LazyColumn(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
-                items(selectedFiles.toList()) { path ->
-                    Text(path, color = Color.Gray, fontSize = 12.sp)
-                }
-            }
-
-            Divider()
-
-            // **[修改点]** onSelectionChanged 现在返回一个 Set
-            FileTreeSelector(
-                modifier = Modifier.weight(3f), // 分配更多空间给选择器
-                selectionMode = SelectionMode.FilesOnly,
-                allowedExtensions = listOf("ass", "mkv", "mp4"),
-                onSelectionChanged = { paths ->
-                    selectedFiles = paths
-                }
-            )
-        }
-    }
-}
-*/
