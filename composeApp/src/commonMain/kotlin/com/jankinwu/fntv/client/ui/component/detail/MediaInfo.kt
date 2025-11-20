@@ -24,12 +24,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.jankinwu.fntv.client.icons.Audio
-import com.jankinwu.fntv.client.icons.Subtitle
-import com.jankinwu.fntv.client.icons.Video
+import com.jankinwu.fntv.client.data.convertor.FnDataConvertor
+import com.jankinwu.fntv.client.ui.screen.CurrentStreamData
+import com.jankinwu.fntv.client.ui.screen.LocalIsoTagData
 import io.github.composefluent.FluentTheme
 
 // 文件信息数据
@@ -66,20 +69,24 @@ object DarkThemeColors {
 }
 
 @Composable
-fun MediaInfoScreen(modifier: Modifier = Modifier) {
+fun MediaInfo(modifier: Modifier = Modifier, currentStreamData: CurrentStreamData, imdbId: String) {
+    val isoTagData = LocalIsoTagData.current
+    val uriHandler = LocalUriHandler.current
+//    convertToMediaDetails(currentStreamData, isoTagData)
     // 模拟数据
-    val sampleData = MediaDetails(
-        fileInfo = FileInfoData(
-            location = "存储空间2/admin 的文件/files/video/电影/【高清影视之家发布 www.HDBTHD.com】查理和巧克力工厂[粤英多音轨+简繁英字幕].2005.1080p.BluRay.x265.10bit.DTS.3Audio-SONYHD/Charlie.and.the.Chocolate.Factory.2005.1080p.BluRay.x265.10bit.DTS.3Audio-SONYHD.mkv",
-            size = "6.53 GB",
-            createdDate = "2025-11-08 15:26",
-            addedDate = "2025-11-08 15:26"
-        ),
-        videoTrack = MediaTrackInfo("视频", "1080P HEVC 5.65 Mbps • 10 bit", Video),
-        audioTrack = MediaTrackInfo("音频", "英语 DTS 5.1(side) • 48000 Hz", Audio),
-        subtitleTrack = MediaTrackInfo("字幕", "中文 HDMV_PGS_SUBTITLE", Subtitle),
-        imdbLink = "IMDB链接"
-    )
+//    val sampleData = MediaDetails(
+//        fileInfo = FileInfoData(
+//            location = "存储空间2/admin 的文件/files/video/电影/【高清影视之家发布 www.HDBTHD.com】查理和巧克力工厂[粤英多音轨+简繁英字幕].2005.1080p.BluRay.x265.10bit.DTS.3Audio-SONYHD/Charlie.and.the.Chocolate.Factory.2005.1080p.BluRay.x265.10bit.DTS.3Audio-SONYHD.mkv",
+//            size = "6.53 GB",
+//            createdDate = "2025-11-08 15:26",
+//            addedDate = "2025-11-08 15:26"
+//        ),
+//        videoTrack = MediaTrackInfo("视频", "1080P HEVC 5.65 Mbps • 10 bit", Video),
+//        audioTrack = MediaTrackInfo("音频", "英语 DTS 5.1(side) • 48000 Hz", Audio),
+//        subtitleTrack = MediaTrackInfo("字幕", "中文 HDMV_PGS_SUBTITLE", Subtitle),
+//        imdbLink = "https://www.imdb.com/title/tt0367594/"
+//    )
+    val mediaDetailData = FnDataConvertor.convertToMediaDetails(currentStreamData, isoTagData, imdbId)
 
     // 整体容器
     Column(
@@ -89,15 +96,15 @@ fun MediaInfoScreen(modifier: Modifier = Modifier) {
             .padding(vertical = 24.dp)
     ) {
         // 1. 文件信息部分
-        FileInfoSection(sampleData.fileInfo)
+        FileInfoSection(mediaDetailData.fileInfo)
 
         Spacer(modifier = Modifier.height(24.dp))
 
         // 2. 视频信息部分
         VideoInfoSection(
-            video = sampleData.videoTrack,
-            audio = sampleData.audioTrack,
-            subtitle = sampleData.subtitleTrack
+            video = mediaDetailData.videoTrack,
+            audio = mediaDetailData.audioTrack,
+            subtitle = mediaDetailData.subtitleTrack
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -110,15 +117,20 @@ fun MediaInfoScreen(modifier: Modifier = Modifier) {
                 fontSize = 14.sp
             )
             Text(
-                text = sampleData.imdbLink,
-                color = DarkThemeColors.TextPrimary, // 或者用 TextLink
+                text = "IMDB链接",
+                color = DarkThemeColors.TextPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.clickable { /* Handle click */ }
+                modifier = Modifier
+                    .clickable {
+                        uriHandler.openUri(mediaDetailData.imdbLink)
+                    }
+                    .pointerHoverIcon(PointerIcon.Hand)
             )
         }
     }
 }
+
 
 // --- 组件：文件信息区域 ---
 @Composable
@@ -223,7 +235,7 @@ fun SectionHeader(title: String) {
 
 @Composable
 fun InfoRow(label: String, value: String, isLongText: Boolean = false) {
-    Row(verticalAlignment = if(isLongText) Alignment.Top else Alignment.CenterVertically) {
+    Row(verticalAlignment = if (isLongText) Alignment.Top else Alignment.CenterVertically) {
         Text(
             text = label,
             color = DarkThemeColors.TextSecondary,

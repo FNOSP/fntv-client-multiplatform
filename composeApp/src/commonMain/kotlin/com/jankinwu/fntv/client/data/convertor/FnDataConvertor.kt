@@ -7,7 +7,15 @@ import com.jankinwu.fntv.client.data.model.response.PersonList
 import com.jankinwu.fntv.client.data.model.response.PlayDetailResponse
 import com.jankinwu.fntv.client.data.model.response.SearchingSubtitleInfo
 import com.jankinwu.fntv.client.enums.FnTvMediaType
+import com.jankinwu.fntv.client.icons.Audio
+import com.jankinwu.fntv.client.icons.Subtitle
+import com.jankinwu.fntv.client.icons.Video
 import com.jankinwu.fntv.client.ui.component.common.SubtitleItemData
+import com.jankinwu.fntv.client.ui.component.detail.FileInfoData
+import com.jankinwu.fntv.client.ui.component.detail.MediaDetails
+import com.jankinwu.fntv.client.ui.component.detail.MediaTrackInfo
+import com.jankinwu.fntv.client.ui.screen.CurrentStreamData
+import com.jankinwu.fntv.client.ui.screen.IsoTagData
 import java.util.concurrent.TimeUnit
 
 fun convertMediaDbListResponseToScrollRowItem(item: MediaDbListResponse): ScrollRowItemData {
@@ -110,7 +118,7 @@ fun convertPersonToScrollRowItemData(personList: List<PersonList>): List<ScrollR
             person.order
         }
     )
-    
+
     val scrollRowList = sortedPersonList.map {
         val description = when (it.job) {
             "Director" -> "导演"
@@ -155,5 +163,89 @@ fun convertToSubtitleItemList(subtitles: List<SearchingSubtitleInfo>): List<Subt
             download = it.download,
             trimId = it.trimId,
         )
+    }
+}
+
+object FnDataConvertor {
+    fun convertToMediaDetails(
+        currentStreamData: CurrentStreamData,
+        isoTagData: IsoTagData,
+        imdbId: String = ""
+    ): MediaDetails {
+        val fileInfo = FileInfoData(
+            location = currentStreamData.fileInfo.path,
+            size = formatFileSize(currentStreamData.fileInfo.size),
+            createdDate = formatTimestampToDateTime(currentStreamData.fileInfo.updateTime),
+            addedDate = formatTimestampToDateTime(currentStreamData.fileInfo.updateTime)
+        )
+        val videoTrack = MediaTrackInfo(
+            type = "视频",
+            details = "${currentStreamData.videoStream.resolutionType} ${currentStreamData.videoStream.codecName.uppercase()} ${formatBitrate(currentStreamData.videoStream.bps)} · ${currentStreamData.videoStream.bitDepth} bit",
+            icon = Video
+        )
+        val audioTrack = MediaTrackInfo(
+            type = "音频",
+            details = "",
+            icon = Audio
+        )
+        val subtitleTrack = MediaTrackInfo(
+            type = "字幕",
+            details = "",
+            icon = Subtitle
+        )
+        return MediaDetails(fileInfo, videoTrack, audioTrack, subtitleTrack, "https://www.imdb.com/title/$imdbId/")
+    }
+
+    /**
+     * 将字节大小转换为易读的格式
+     * @param bytes 字节数
+     * @return 格式化后的字符串，如 "1.25 KB", "3.50 MB" 等
+     */
+    fun formatFileSize(bytes: Long): String {
+        if (bytes < 0) return "0 B"
+
+        val units = arrayOf("B", "KB", "MB", "GB", "TB")
+        var size = bytes.toDouble()
+        var unitIndex = 0
+
+        while (size >= 1024 && unitIndex < units.size - 1) {
+            size /= 1024
+            unitIndex++
+        }
+
+        // 四舍五入保留两位小数
+        return "${String.format(java.util.Locale.ROOT,"%.2f", size)} ${units[unitIndex]}"
+    }
+
+    /**
+     * 将比特率(bps)转换为易读的格式
+     * @param bps 比特率(bits per second)
+     * @return 格式化后的字符串，如 "5.65 Mbps", "1.20 Gbps" 等
+     */
+    fun formatBitrate(bps: Int): String {
+        if (bps < 0) return "0 bps"
+
+        val units = arrayOf("bps", "Kbps", "Mbps", "Gbps")
+        var bitrate = bps.toDouble()
+        var unitIndex = 0
+
+        while (bitrate >= 1000 && unitIndex < units.size - 1) {
+            bitrate /= 1000
+            unitIndex++
+        }
+
+        // 保留两位小数
+        return "${String.format(java.util.Locale.ROOT, "%.2f", bitrate)} ${units[unitIndex]}"
+    }
+
+    /**
+     * 将时间戳转换为 "YYYY-MM-dd HH:mm" 格式
+     * @param timestamp 时间戳（毫秒）
+     * @return 格式化后的时间字符串
+     */
+    fun formatTimestampToDateTime(timestamp: Long): String {
+        val date = java.util.Date(timestamp)
+        val formatter = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+        return formatter.format(date)
     }
 }
