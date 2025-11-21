@@ -10,7 +10,7 @@ import com.jankinwu.fntv.client.enums.FnTvMediaType
 import com.jankinwu.fntv.client.icons.Audio
 import com.jankinwu.fntv.client.icons.Subtitle
 import com.jankinwu.fntv.client.icons.Video
-import com.jankinwu.fntv.client.ui.component.common.SubtitleItemData
+import com.jankinwu.fntv.client.ui.component.common.dialog.SubtitleItemData
 import com.jankinwu.fntv.client.ui.component.detail.FileInfoData
 import com.jankinwu.fntv.client.ui.component.detail.MediaDetails
 import com.jankinwu.fntv.client.ui.component.detail.MediaTrackInfo
@@ -34,7 +34,11 @@ fun convertToScrollRowItemData(item: MediaItem): ScrollRowItemData {
         if (!item.firstAirDate.isNullOrBlank() && !item.lastAirDate.isNullOrBlank()) {
             "共 ${item.numberOfSeasons} 季 · ${item.firstAirDate.take(4)}~${item.lastAirDate.take(4)}"
         } else if (item.numberOfSeasons == 1 && item.status == "Ended") {
-            "共 ${item.numberOfEpisodes} 集${if (!item.releaseDate.isNullOrBlank()) " · " else ""}${item.releaseDate?.take(4)}"
+            "共 ${item.numberOfEpisodes} 集${if (!item.releaseDate.isNullOrBlank()) " · " else ""}${
+                item.releaseDate?.take(
+                    4
+                )
+            }"
         } else if (item.numberOfSeasons != null && !item.releaseDate.isNullOrBlank()) {
             "第 ${item.seasonNumber} 季 · ${item.releaseDate.take(4)}"
         } else {
@@ -65,8 +69,8 @@ fun convertToScrollRowItemData(item: MediaItem): ScrollRowItemData {
         isFavourite = item.isFavorite == 1,
         isAlreadyWatched = item.watched == 1,
         guid = item.guid,
-        posterWidth = item.posterWidth?: 0,
-        posterHeight = item.posterHeight?: 0,
+        posterWidth = item.posterWidth ?: 0,
+        posterHeight = item.posterHeight ?: 0,
         status = item.status,
         type = item.type
     )
@@ -77,15 +81,17 @@ fun convertPlayDetailToScrollRowItemData(item: PlayDetailResponse): ScrollRowIte
         "Episode" -> {
             "第 ${item.seasonNumber} 季 · 第 ${item.episodeNumber} 集"
         }
+
         "Video" -> {
             " "
         }
+
         else -> {
             FnTvMediaType.getDescByValue(item.type)
         }
     }
     val title = when (item.type) {
-        "Episode" -> item.tvTitle?: item.title
+        "Episode" -> item.tvTitle ?: item.title
         else -> item.title
     }
 
@@ -178,17 +184,17 @@ object FnDataConvertor {
             createdDate = formatTimestampToDateTime(currentStreamData.fileInfo.updateTime),
             addedDate = formatTimestampToDateTime(currentStreamData.fileInfo.updateTime)
         ) else FileInfoData()
-        val videoTrack = if (currentStreamData.videoStream != null) MediaTrackInfo(
-            type = "视频",
-            details = "${currentStreamData.videoStream.resolutionType} ${currentStreamData.videoStream.codecName.uppercase()} ${formatBitrate(
-                currentStreamData.videoStream.bps
-            )} · ${currentStreamData.videoStream.bitDepth} bit",
-            icon = Video
-        ) else MediaTrackInfo(
+        val videoTrack = MediaTrackInfo(
             type = "视频",
             details = "",
             icon = Video
         )
+        currentStreamData.videoStream?.let {
+            videoTrack.details =
+                "${currentStreamData.videoStream.resolutionType} ${currentStreamData.videoStream.codecName.uppercase()} ${
+                    formatBitrate(currentStreamData.videoStream.bps)} · ${currentStreamData.videoStream.bitDepth} bit"
+        }
+
         val audioTrack = MediaTrackInfo(
             type = "音频",
             details = "",
@@ -210,8 +216,10 @@ object FnDataConvertor {
                     it?.language ?: ""
                 }
             }
-            audioTrack.details = "$languageName ${it?.codecName?.uppercase()} ${it?.channelLayout} · ${it?.sampleRate} Hz"
+            audioTrack.details =
+                "$languageName ${it?.codecName?.uppercase()} ${it?.channelLayout} · ${it?.sampleRate} Hz"
         }
+
         val subtitleTrack = MediaTrackInfo(
             type = "字幕",
             details = "",
@@ -235,7 +243,13 @@ object FnDataConvertor {
             }
             subtitleTrack.details = "$languageName ${it?.codecName?.uppercase()}"
         }
-        return MediaDetails(fileInfo, videoTrack, audioTrack, subtitleTrack, "https://www.imdb.com/title/$imdbId/")
+        return MediaDetails(
+            fileInfo,
+            videoTrack,
+            audioTrack,
+            subtitleTrack,
+            "https://www.imdb.com/title/$imdbId/"
+        )
     }
 
     /**
@@ -256,7 +270,7 @@ object FnDataConvertor {
         }
 
         // 四舍五入保留两位小数
-        return "${String.format(java.util.Locale.ROOT,"%.2f", size)} ${units[unitIndex]}"
+        return "${String.format(java.util.Locale.ROOT, "%.2f", size)} ${units[unitIndex]}"
     }
 
     /**
@@ -287,7 +301,8 @@ object FnDataConvertor {
      */
     fun formatTimestampToDateTime(timestamp: Long): String {
         val date = java.util.Date(timestamp)
-        val formatter = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+        val formatter =
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
         return formatter.format(date)
     }
 }
