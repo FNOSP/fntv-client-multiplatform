@@ -27,23 +27,24 @@
 
 ### 桌面端
 
-| 功能            | 进度                                        |
-| --------------- |-------------------------------------------|
-| 登录页          | ![Progress](https://progress-bar.xyz/80/) |
-| 首页            | ![Progress](https://progress-bar.xyz/90/) |
-| 收藏页          | ![Progress](https://progress-bar.xyz/0/)  |
-| 媒体库页        | ![Progress](https://progress-bar.xyz/90/) |
-| 媒体详情页      | ![Progress](https://progress-bar.xyz/10/) |
-| 播放器          | ![Progress](https://progress-bar.xyz/60/) |
-| 通用设置        | ![Progress](https://progress-bar.xyz/0/)  |
+| 功能         | 进度                                        |
+|------------|-------------------------------------------|
+| 登录页        | ![Progress](https://progress-bar.xyz/80/) |
+| 首页         | ![Progress](https://progress-bar.xyz/90/) |
+| 收藏页        | ![Progress](https://progress-bar.xyz/0/)  |
+| 媒体库页       | ![Progress](https://progress-bar.xyz/90/) |
+| 媒体详情页      | ![Progress](https://progress-bar.xyz/20/) |
+| 播放器        | ![Progress](https://progress-bar.xyz/60/) |
+| 通用设置       | ![Progress](https://progress-bar.xyz/0/)  |
 | 媒体库管理      | ![Progress](https://progress-bar.xyz/0/)  |
-| 影视服务器设置  | ![Progress](https://progress-bar.xyz/0/)  |
-| 用户设置        | ![Progress](https://progress-bar.xyz/0/)  |
-| 任务计划        | ![Progress](https://progress-bar.xyz/0/)  |
-| 搜索            | ![Progress](https://progress-bar.xyz/0/)  |
-| 弹幕            | ![Progress](https://progress-bar.xyz/0/)  |
-| 更新检测        | ![Progress](https://progress-bar.xyz/0/)  |
+| 影视服务器设置    | ![Progress](https://progress-bar.xyz/0/)  |
+| 用户设置       | ![Progress](https://progress-bar.xyz/0/)  |
+| 任务计划       | ![Progress](https://progress-bar.xyz/0/)  |
+| 搜索         | ![Progress](https://progress-bar.xyz/0/)  |
+| 弹幕         | ![Progress](https://progress-bar.xyz/0/)  |
+| 更新检测       | ![Progress](https://progress-bar.xyz/0/)  |
 | 集成 mpv 播放器 | ![Progress](https://progress-bar.xyz/0/)  |
+| 文件夹视图      | ![Progress](https://progress-bar.xyz/0/)  |
 
 ## 🙏 特别感谢
 

@@ -1,4 +1,4 @@
-package com.jankinwu.fntv.client.ui.component.common
+package com.jankinwu.fntv.client.ui.component.common.dialog
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

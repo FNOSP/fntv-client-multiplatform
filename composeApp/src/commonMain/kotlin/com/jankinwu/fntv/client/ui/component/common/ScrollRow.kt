@@ -19,9 +19,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -41,8 +41,9 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.jankinwu.fntv.client.LocalStore
+import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.model.ScrollRowItemData
-import io.github.composefluent.FluentTheme
 import io.github.composefluent.LocalContentColor
 import io.github.composefluent.component.Icon
 import io.github.composefluent.icons.Icons
@@ -55,6 +56,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ScrollRow(
     itemsData: List<ScrollRowItemData>,
+    modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     item: @Composable (index: Int, movie: ScrollRowItemData, modifier: Modifier, onMarkAsWatched: (() -> Unit)?) -> Unit = { _, _, _, _ -> }
 ) {
@@ -71,7 +73,7 @@ fun ScrollRow(
     )
 
     BoxWithConstraints(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false }
@@ -172,7 +174,7 @@ fun ScrollRow(
 @Composable
 internal fun ScrollButton(onClick: () -> Unit, isLeft: Boolean, modifier: Modifier = Modifier) {
     var isIconHovered by remember { mutableStateOf(false) }
-
+    val store = LocalStore.current
     // icon 缩放动画
     val iconSize by animateDpAsState(
         targetValue = if (isIconHovered) 24.dp else 16.dp,
@@ -189,7 +191,7 @@ internal fun ScrollButton(onClick: () -> Unit, isLeft: Boolean, modifier: Modifi
             .width(30.dp)
             .fillMaxHeight()
             .background(
-                FluentTheme.colors.controlOnImage.default.copy(alpha = 0.9f)
+                if (store.darkMode) Colors.BackgroundColorDark.copy(alpha = 0.9f) else Colors.BackgroundColorLight.copy(alpha = 0.9f)
             ),
         contentAlignment = Alignment.Center
     ) {

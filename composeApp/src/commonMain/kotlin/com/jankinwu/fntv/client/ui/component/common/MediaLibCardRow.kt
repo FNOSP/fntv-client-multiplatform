@@ -57,7 +57,7 @@ fun MediaLibCardRow(
             )
         }
 
-        ScrollRow(mediaLibs, listState = rememberLazyListState(),{ _, mediaLib, modifier, _ ->
+        ScrollRow(mediaLibs, listState = rememberLazyListState()){ _, mediaLib, modifier, _ ->
             val interactionSource = remember { MutableInteractionSource() }
             MediaLibraryCard(
                 title = mediaLib.title,
@@ -69,7 +69,7 @@ fun MediaLibCardRow(
                     onClick = { onItemClick?.invoke(mediaLib) }
                 )
             )
-        })
+        }
 
     }
 }

@@ -140,46 +140,47 @@ fun RecentlyWatched(
 
         ScrollRow(
             itemsData = movies,
-            listState = recentlyWatchedListState,
-            item = { index, movie, modifier, _ ->
-                RecentlyWatchedItem(
-                    modifier = modifier,
-                    title = movie.title,
-                    subtitle = movie.subtitle,
-                    posterImg = movie.posterImg,
-                    isFavorite = movie.isFavourite,
-                    isAlreadyWatched = movie.isAlreadyWatched,
-                    duration = movie.duration,
-                    ts = movie.ts,
-                    guid = movie.guid,
-                    onFavoriteToggle = onFavoriteToggle,
-                    onWatchedToggle = onWatchedToggle,
-                    onMarkAsWatched = {
-                        // 当动画结束时，通知父组件移除该项目
-                        onItemRemoved?.invoke(movie.guid)
-                    },
-                    status = movie.status,
-                    onClick = { movieGuid ->
-                        if (movie.type == FnTvMediaType.MOVIE.value) {
-                            // 创建电影详情页面组件并导航到该页面
-                            val movieDetailComponent = ComponentItem(
-                                name = "电影详情",
-                                group = "/详情",
-                                description = "电影详情页面",
-                                guid = "movie_detail_$movieGuid",
-                                content = { nav ->
-                                    MovieDetailScreen(
-                                        guid = movieGuid,
-                                        navigator = nav
-                                    )
-                                }
-                            )
-                            navigator.navigate(movieDetailComponent)
-                        }
-                    }
-                )
-            }
+            listState = recentlyWatchedListState
         )
+        { index, movie, modifier, _ ->
+            RecentlyWatchedItem(
+                modifier = modifier,
+                title = movie.title,
+                subtitle = movie.subtitle,
+                posterImg = movie.posterImg,
+                isFavorite = movie.isFavourite,
+                isAlreadyWatched = movie.isAlreadyWatched,
+                duration = movie.duration,
+                ts = movie.ts,
+                guid = movie.guid,
+                onFavoriteToggle = onFavoriteToggle,
+                onWatchedToggle = onWatchedToggle,
+                onMarkAsWatched = {
+                    // 当动画结束时，通知父组件移除该项目
+                    onItemRemoved?.invoke(movie.guid)
+                },
+                status = movie.status,
+                onClick = { movieGuid ->
+                    if (movie.type == FnTvMediaType.MOVIE.value) {
+                        // 创建电影详情页面组件并导航到该页面
+                        val movieDetailComponent = ComponentItem(
+                            name = "电影详情",
+                            group = "/详情",
+                            description = "电影详情页面",
+                            guid = "movie_detail_$movieGuid",
+                            content = { nav ->
+                                MovieDetailScreen(
+                                    guid = movieGuid,
+                                    navigator = nav
+                                )
+                            }
+                        )
+                        navigator.navigate(movieDetailComponent)
+                    }
+                }
+            )
+        }
+
 
     }
 }
@@ -248,7 +249,10 @@ fun RecentlyWatchedItem(
         exit = fadeOut(animationSpec = tween(durationMillis = watchedAnimationDuration)) +
                 shrinkHorizontally(
                     shrinkTowards = Alignment.Start,
-                    animationSpec = tween(durationMillis = watchedAnimationDuration, easing = LinearOutSlowInEasing)
+                    animationSpec = tween(
+                        durationMillis = watchedAnimationDuration,
+                        easing = LinearOutSlowInEasing
+                    )
                 )
     ) {
         val interactionSource = remember { MutableInteractionSource() }
@@ -272,7 +276,11 @@ fun RecentlyWatchedItem(
                 modifier = Modifier
                     .aspectRatio(16f / 9f)
                     .weight(1f)
-                    .border(1.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape((8 * scaleFactor).dp))
+                    .border(
+                        1.dp,
+                        Color.Gray.copy(alpha = 0.5f),
+                        RoundedCornerShape((8 * scaleFactor).dp)
+                    )
                     .clip(RoundedCornerShape((8 * scaleFactor).dp))
                     .onSizeChanged { size ->
                         imageContainerWidthPx = size.width

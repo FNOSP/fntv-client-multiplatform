@@ -24,9 +24,9 @@ import io.github.composefluent.FluentTheme
 @Composable
 fun CastScrollRow(
     modifier: Modifier = Modifier,
-    scrollRowItemList: List<ScrollRowItemData> = emptyList(),
+    castScrollRowItemList: List<ScrollRowItemData> = emptyList(),
 ) {
-    if (scrollRowItemList.isNotEmpty()) {
+    if (castScrollRowItemList.isNotEmpty()) {
         Column(
             modifier = modifier
                 .height(140.dp),
@@ -64,7 +64,11 @@ fun CastScrollRow(
                 )
             }
 
-            ScrollRow(scrollRowItemList) { _, movie, modifier, _ ->
+            ScrollRow(
+                castScrollRowItemList,
+                modifier = Modifier
+//                    .padding(end = 48.dp)
+            ) { _, movie, modifier, _ ->
                 CastAvatar(
                     modifier = modifier,
                     imageUrl = movie.posterImg,
