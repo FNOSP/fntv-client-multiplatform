@@ -5,6 +5,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -20,10 +22,24 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 @Composable
 fun AnimatedScrollbarLazyColumn(
@@ -31,39 +47,65 @@ fun AnimatedScrollbarLazyColumn(
     modifier: Modifier = Modifier,
     content: LazyListScope.() -> Unit
 ) {
-    Box(modifier = modifier) {
+    var isHovered by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val density = LocalDensity.current
+
+    Box(
+        modifier = modifier.pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    when (event.type) {
+                        PointerEventType.Enter -> isHovered = true
+                        PointerEventType.Exit -> isHovered = false
+                    }
+                }
+            }
+        }
+    ) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().padding(end = 8.dp)
+            modifier = Modifier.fillMaxSize().padding(end = 12.dp)
         ) {
             content()
         }
 
-        // 自定义滚动条 (覆盖在右侧)
         AnimatedVisibility(
-            visible = listState.isScrollInProgress,
+            visible = listState.isScrollInProgress || isHovered,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.CenterEnd)
         ) {
-            val layoutInfo = listState.layoutInfo
-            if (layoutInfo.visibleItemsInfo.isNotEmpty() && layoutInfo.totalItemsCount > 0) {
-                val firstVisibleIndex = layoutInfo.visibleItemsInfo.first().index
-                val visibleItemCount = layoutInfo.visibleItemsInfo.size
-                val totalItemCount = layoutInfo.totalItemsCount
-                val totalHeight = layoutInfo.viewportSize.height
+            val layoutInfo = remember(listState) {
+                derivedStateOf { listState.layoutInfo }
+            }.value
+            val visibleItemsInfo = layoutInfo.visibleItemsInfo
+            if (visibleItemsInfo.isNotEmpty() && layoutInfo.totalItemsCount > 0) {
+                val viewportHeight = layoutInfo.viewportSize.height.toFloat()
 
-                // 动态计算滚动条高度比例
-                val scrollbarHeightRatio = visibleItemCount.toFloat() / totalItemCount.toFloat()
-                val scrollbarHeight = (scrollbarHeightRatio * totalHeight).dp
+                val averageItemHeight = visibleItemsInfo.sumOf { it.size } / visibleItemsInfo.size.toFloat()
+                val totalContentHeight = averageItemHeight * layoutInfo.totalItemsCount
 
-                // 计算滚动条位置比例
-                val scrollRatio =
-                    firstVisibleIndex.toFloat() / (totalItemCount - visibleItemCount).coerceAtLeast(
-                        1
-                    ).toFloat()
-                val maxOffset = (totalHeight - scrollbarHeight.value).coerceAtLeast(0f)
-                val offset = (scrollRatio * maxOffset).dp
+                if (totalContentHeight <= viewportHeight) return@AnimatedVisibility
+
+                val scrollbarHeightRatio = viewportHeight / totalContentHeight
+                val scrollbarHeightPx = scrollbarHeightRatio * viewportHeight
+                val scrollbarHeight = with(density) { scrollbarHeightPx.toDp() }
+
+                var scrollPosition by remember { mutableFloatStateOf(0f) }
+                LaunchedEffect(listState) {
+                    snapshotFlow {
+                        listState.firstVisibleItemIndex * averageItemHeight + listState.firstVisibleItemScrollOffset
+                    }.collect {
+                        scrollPosition = it
+                    }
+                }
+                val scrollableDistance = totalContentHeight - viewportHeight
+                val scrollbarMaxOffset = viewportHeight - scrollbarHeightPx
+
+                val scrollbarOffsetPx = (scrollPosition / scrollableDistance * scrollbarMaxOffset)
+                val scrollbarOffset = with(density) { scrollbarOffsetPx.toDp() }
 
                 Box(
                     modifier = Modifier
@@ -76,8 +118,19 @@ fun AnimatedScrollbarLazyColumn(
                             .height(scrollbarHeight)
                             .fillMaxWidth()
                             .align(Alignment.TopCenter)
-                            .offset(y = offset)
+                            .offset(y = scrollbarOffset)
                             .background(Color.Gray, CircleShape)
+                            .pointerInput(Unit) {
+                                detectDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    coroutineScope.launch {
+                                        if (scrollbarMaxOffset > 0) {
+                                            val scrollDelta = (dragAmount.y / scrollbarMaxOffset) * scrollableDistance
+                                            listState.scrollBy(scrollDelta)
+                                        }
+                                    }
+                                }
+                            }
                     )
                 }
             }
@@ -91,36 +144,58 @@ fun AnimatedScrollbarColumn(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    Box(modifier = modifier) {
+    var isHovered by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    var viewportHeight by remember { mutableStateOf(0f) }
+    val density = LocalDensity.current
+
+    Box(
+        modifier = modifier
+            .onSizeChanged { viewportHeight = it.height.toFloat() }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        when (event.type) {
+                            PointerEventType.Enter -> isHovered = true
+                            PointerEventType.Exit -> isHovered = false
+                        }
+                    }
+                }
+            }
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(end = 8.dp)
+                .padding(end = 12.dp)
         ) {
             content()
         }
 
-        // 自定义滚动条 (覆盖在右侧)
         AnimatedVisibility(
-            visible = scrollState.isScrollInProgress,
+            visible = scrollState.isScrollInProgress || isHovered,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.CenterEnd)
         ) {
-            // 对于普通滚动，需要不同的计算方式
-            val scrollTop = scrollState.value
-            val scrollRange = scrollState.maxValue
+            if (scrollState.maxValue > 0 && viewportHeight > 0) {
+                val contentHeight = scrollState.maxValue + viewportHeight
 
-            if (scrollRange > 0) {
-                // 这里需要根据实际内容高度和容器高度计算
-                val scrollbarHeight = 40.dp // 或根据比例计算
-                val offset = (scrollTop.toFloat() / scrollRange.toFloat() * 100).dp // 示例计算
+                val scrollbarHeightRatio = viewportHeight / contentHeight
+                val scrollbarHeightPx = scrollbarHeightRatio * viewportHeight
+                val scrollbarHeight = with(density) { scrollbarHeightPx.toDp() }
+
+                val scrollableDistance = contentHeight - viewportHeight
+                val scrollbarMaxOffset = viewportHeight - scrollbarHeightPx
+
+                val scrollbarOffsetPx = (scrollState.value.toFloat() / scrollableDistance * scrollbarMaxOffset)
+                val scrollbarOffset = with(density) { scrollbarOffsetPx.toDp() }
 
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .width(4.dp)
+                        .width(8.dp)
                         .background(Color.Transparent)
                 ) {
                     Box(
@@ -128,8 +203,19 @@ fun AnimatedScrollbarColumn(
                             .height(scrollbarHeight)
                             .fillMaxWidth()
                             .align(Alignment.TopCenter)
-                            .offset(y = offset)
+                            .offset(y = scrollbarOffset)
                             .background(Color.Gray, CircleShape)
+                            .pointerInput(Unit) {
+                                detectDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    coroutineScope.launch {
+                                        if (scrollbarMaxOffset > 0) {
+                                            val scrollDelta = (dragAmount.y / scrollbarMaxOffset) * scrollableDistance
+                                            scrollState.scrollBy(scrollDelta)
+                                        }
+                                    }
+                                }
+                            }
                     )
                 }
             }

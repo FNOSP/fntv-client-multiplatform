@@ -212,7 +212,6 @@ private fun LanguageSwitchFlyout(
     )
 }
 
-@Suppress("FrequentlyChangingValue")
 @Composable
 fun SubtitleResultList(results: List<SubtitleItemData>,
                        mediaGuid: String,
