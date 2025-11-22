@@ -1,9 +1,6 @@
 package com.jankinwu.fntv.client.ui.component.common.dialog
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,20 +9,16 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Arrangement.spacedBy
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -51,6 +44,7 @@ import com.jankinwu.fntv.client.LocalTypography
 import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.convertor.convertToSubtitleItemList
 import com.jankinwu.fntv.client.icons.Download
+import com.jankinwu.fntv.client.ui.component.common.AnimatedScrollbarLazyColumn
 import com.jankinwu.fntv.client.ui.component.common.FlyoutButton
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.screen.LocalToastManager
@@ -233,9 +227,6 @@ fun SubtitleResultList(results: List<SubtitleItemData>,
     val listState = rememberLazyListState()
     val toastManager = LocalToastManager.current
 
-    // 滚动条可见性逻辑：正在滚动时显示
-    val isScrolling = listState.isScrollInProgress
-
     LaunchedEffect(subtitleDownloadState) {
         if (subtitleDownloadState is UiState.Success) {
             val subtitleDownloadResponse =
@@ -261,52 +252,12 @@ fun SubtitleResultList(results: List<SubtitleItemData>,
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize().padding(end = 8.dp) // 给滚动条留点位置
-        ) {
-            items(results, key = { item -> item.trimId }) { item ->
-                val downloadStatus = downloadStatusMap[item.trimId] ?: 0
-                SubtitleListItem(item, downloadStatus) { trimId ->
-                    subtitleDownloadViewModel.downloadSubtitle(mediaGuid, trimId)
-                    downloadStatusMap[trimId] = 1
-                }
-            }
-        }
-
-        // 自定义滚动条 (覆盖在右侧)
-        AnimatedVisibility(
-            visible = isScrolling,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.CenterEnd)
-        ) {
-            val layoutInfo = listState.layoutInfo
-            if (layoutInfo.visibleItemsInfo.isNotEmpty() && layoutInfo.totalItemsCount > 0) {
-                val firstVisibleIndex = layoutInfo.visibleItemsInfo.first().index
-                val itemHeight = layoutInfo.visibleItemsInfo.first().size
-                val totalHeight = layoutInfo.viewportSize.height
-
-                // 计算滚动条位置比例
-                val scrollRatio = firstVisibleIndex.toFloat() / layoutInfo.totalItemsCount.toFloat()
-                val offset = (scrollRatio * totalHeight).dp
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .width(4.dp)
-                        .background(Color.Transparent)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .height(40.dp)
-                            .fillMaxWidth()
-                            .align(Alignment.TopCenter)
-                            .offset(y = offset)
-                            .background(Color.Gray, CircleShape)
-                    )
-                }
+    AnimatedScrollbarLazyColumn(listState = listState, modifier = Modifier.fillMaxSize()) {
+        items(results, key = { item -> item.trimId }) { item ->
+            val downloadStatus = downloadStatusMap[item.trimId] ?: 0
+            SubtitleListItem(item, downloadStatus) { trimId ->
+                subtitleDownloadViewModel.downloadSubtitle(mediaGuid, trimId)
+                downloadStatusMap[trimId] = 1
             }
         }
     }
