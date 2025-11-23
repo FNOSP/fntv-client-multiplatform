@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -42,6 +43,7 @@ import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.icons.ArrowUp
 import com.jankinwu.fntv.client.icons.Delete
 import com.jankinwu.fntv.client.ui.component.common.AddSubtitleFlyout
+import com.jankinwu.fntv.client.ui.component.common.EmptyFolder
 import com.jankinwu.fntv.client.ui.component.common.dialog.AddNasSubtitleDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.CustomContentDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.SubtitleSearchDialog
@@ -97,15 +99,17 @@ fun StreamSelector(
         }
     }
 
-    if (streamOptions.isNotEmpty() && streamOptions.size > 1) {
+    if (isSubtitle || streamOptions.isNotEmpty() && streamOptions.size > 1) {
         val interactionSource = remember { MutableInteractionSource() }
         val isHovered by interactionSource.collectIsHoveredAsState()
         var flyoutHeight by remember(streamOptions) {
             mutableStateOf(
                 if (isSubtitle && streamOptions.size > 6) {
                     317.dp
-                } else if (isSubtitle) {
+                } else if (isSubtitle && streamOptions.size > 1) {
                     57.dp * (streamOptions.size - 1) + 32.dp
+                } else if (isSubtitle && streamOptions.size == 1) {
+                    317.dp
                 } else {
                     57.dp * streamOptions.size
                 }
@@ -177,23 +181,32 @@ fun StreamSelector(
                             lazyListState.scrollTo(targetPosition)
                         }
                         // 如果有 "_no_display_" 选项，则先显示它
-                        noDisplayItem?.let { streamOptionItem ->
-                            MenuFlyoutItem(
-                                text = {
-                                    NoDisplayRow(
-                                        modifier = Modifier.hoverable(interactionSource),
-                                        title = streamOptionItem.title,
-                                        isDefault = streamOptionItem.isDefault,
-                                        isSelected = streamOptionItem.isSelected,
-                                    )
-                                },
-                                onClick = {
-                                    onSelected(streamOptionItem.optionGuid)
-                                    isFlyoutVisible = false
-                                },
+                        if (otherItems.isNotEmpty()) {
+                            noDisplayItem?.let { streamOptionItem ->
+                                MenuFlyoutItem(
+                                    text = {
+                                        NoDisplayRow(
+                                            modifier = Modifier.hoverable(interactionSource),
+                                            title = streamOptionItem.title,
+                                            isDefault = streamOptionItem.isDefault,
+                                            isSelected = streamOptionItem.isSelected,
+                                        )
+                                    },
+                                    onClick = {
+                                        onSelected(streamOptionItem.optionGuid)
+                                        isFlyoutVisible = false
+                                    },
+                                    modifier = Modifier
+                                        .width(240.dp)
+                                        .hoverable(interactionSource)
+                                )
+                            }
+                        } else if (noDisplayItem != null) {
+                            EmptyFolder(
                                 modifier = Modifier
-                                    .width(240.dp)
-                                    .hoverable(interactionSource)
+                                    .fillMaxSize()
+                                    .hoverable(interactionSource),
+                                "无内容"
                             )
                         }
                         // 显示其他项目

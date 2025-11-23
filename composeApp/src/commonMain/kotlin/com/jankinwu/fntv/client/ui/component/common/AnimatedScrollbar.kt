@@ -110,7 +110,7 @@ fun AnimatedScrollbarLazyColumn(
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .width(4.dp)
+                        .width(6.dp)
                         .background(Color.Transparent)
                 ) {
                     Box(

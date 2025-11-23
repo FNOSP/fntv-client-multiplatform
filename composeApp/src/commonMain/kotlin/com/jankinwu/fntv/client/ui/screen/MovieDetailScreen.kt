@@ -1001,7 +1001,8 @@ fun MiddleControls(
                     currentSubtitleStreamList,
                     currentSubtitleStream,
                     onSubtitleSelected,
-                    guid
+                    guid,
+                    mediaGuid
                 )
                 AudioSelector(
                     currentAudioStreamList,
@@ -1097,6 +1098,7 @@ fun SubtitleSelector(
     currentSubtitleStream: SubtitleStream?,
     onSubtitleSelected: (String) -> Unit,
     guid: String = "",
+    mediaGuid: String = "",
 ) {
     val isoTagData = LocalIsoTagData.current
     val iso6391Map = isoTagData.iso6391Map
@@ -1143,7 +1145,7 @@ fun SubtitleSelector(
             }
 
             null -> {
-                "未知字幕"
+                "无字幕"
             }
 
             else -> {
@@ -1176,7 +1178,7 @@ fun SubtitleSelector(
         selectedLanguage,
         onSubtitleSelected,
         true,
-        currentSubtitleStream?.mediaGuid ?: "",
+        mediaGuid,
         guid,
         selectedIndex,
         trimIdList,

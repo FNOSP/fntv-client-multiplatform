@@ -120,7 +120,7 @@ object DirectoryContentFetcher : KoinComponent {
         } catch (e: kotlinx.coroutines.CancellationException) {
             // 正常处理协程取消
             throw e
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // 处理其他异常
             emptyList()
         }
@@ -276,7 +276,7 @@ fun FileTreePicker(
     }
     var isEmpty by remember(rootPaths) { mutableStateOf(false) }
     if (isEmpty) {
-        EmptyFolder(modifier = Modifier.fillMaxSize())
+        EmptyFolder(modifier = Modifier.fillMaxSize(), "空空如也")
     }
     // --- UI 渲染 ---
     val lazyListState = rememberLazyListState()
@@ -349,7 +349,7 @@ fun FileTreePicker(
                         } else {
                             // 显示空目录
                             item {
-                                EmptyFolder(modifier = Modifier.fillMaxSize())
+                                EmptyFolder(modifier = Modifier.fillMaxSize(), "空空如也")
                             }
                         }
                     } else {
@@ -580,7 +580,7 @@ private fun FileNodeItem(
 }
 
 @Composable
-fun EmptyFolder(modifier: Modifier) {
+fun EmptyFolder(modifier: Modifier, text: String) {
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
@@ -597,7 +597,7 @@ fun EmptyFolder(modifier: Modifier) {
                     .padding(bottom = 24.dp)
             )
             Text(
-                "空空如也",
+                text,
                 fontSize = 14.sp,
                 color = FluentTheme.colors.text.text.primary
             )

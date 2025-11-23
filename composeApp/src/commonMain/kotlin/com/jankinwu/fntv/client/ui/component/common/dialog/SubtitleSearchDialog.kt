@@ -45,6 +45,7 @@ import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.convertor.convertToSubtitleItemList
 import com.jankinwu.fntv.client.icons.Download
 import com.jankinwu.fntv.client.ui.component.common.AnimatedScrollbarLazyColumn
+import com.jankinwu.fntv.client.ui.component.common.EmptyFolder
 import com.jankinwu.fntv.client.ui.component.common.FlyoutButton
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.screen.LocalToastManager
@@ -250,15 +251,18 @@ fun SubtitleResultList(results: List<SubtitleItemData>,
             downloadStatusMap[trimId] = 2
         }
     }
-
-    AnimatedScrollbarLazyColumn(listState = listState, modifier = Modifier.fillMaxSize()) {
-        items(results, key = { item -> item.trimId }) { item ->
-            val downloadStatus = downloadStatusMap[item.trimId] ?: 0
-            SubtitleListItem(item, downloadStatus) { trimId ->
-                subtitleDownloadViewModel.downloadSubtitle(mediaGuid, trimId)
-                downloadStatusMap[trimId] = 1
+    if (results.isNotEmpty()) {
+        AnimatedScrollbarLazyColumn(listState = listState, modifier = Modifier.fillMaxSize()) {
+            items(results, key = { item -> item.trimId }) { item ->
+                val downloadStatus = downloadStatusMap[item.trimId] ?: 0
+                SubtitleListItem(item, downloadStatus) { trimId ->
+                    subtitleDownloadViewModel.downloadSubtitle(mediaGuid, trimId)
+                    downloadStatusMap[trimId] = 1
+                }
             }
         }
+    } else {
+        EmptyFolder(modifier = Modifier.fillMaxSize(), "未搜索到相关字幕")
     }
 }
 
