@@ -205,7 +205,9 @@ private fun LanguageSwitchFlyout(
                 },
                 buttonText = buttonName,
                 modifier = Modifier
-                    .pointerHoverIcon(PointerIcon.Hand)
+                    .pointerHoverIcon(PointerIcon.Hand),
+                horizontalPadding = 14.dp,
+                verticalPadding = 8.dp
             )
         },
         placement = FlyoutPlacement.BottomAlignedEnd,
