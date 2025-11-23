@@ -49,6 +49,7 @@
 - 打包桌面端项目：
   - 在 Android Studio 中，在 Gradle Tasks 中找到 `compose desktop` -> `packageReleaseDistributionForCurrentOS` 任务，双击运行
   - 或者，使用命令行运行：
+
     Linux 或 macOS
     ```bash
     ./gradlew :composeApp:packageReleaseDistributionForCurrentOS
