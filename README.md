@@ -21,7 +21,42 @@
 
 ![image-20251019000006440](http://oss.jankinwu.com/img/image-20251019000006440.png)
 
+## 使用说明
 
+### 运行桌面端
+
+- 克隆项目到本地：
+  ```bash
+  git clone https://github.com/FNOSP/fntv-client-multiplatform.git
+  ```
+- 打开项目：
+  - 使用 Android Studio 打开项目
+  - 或者，使用命令行导航到项目目录
+- 运行项目：
+  - 在 Android Studio 中，在 Gradle Tasks 中找到 `compose desktop` -> `run` 任务，双击运行
+- 或者，使用命令行运行：
+
+  Linux 或 macOS
+  ```bash
+  ./gradlew :composeApp:run
+  ```
+  Windows
+  ```shell
+  .\gradlew.bat :composeApp:run
+  ```
+### 打包为可执行文件
+
+- 打包桌面端项目：
+  - 在 Android Studio 中，在 Gradle Tasks 中找到 `compose desktop` -> `packageReleaseDistributionForCurrentOS` 任务，双击运行
+  - 或者，使用命令行运行：
+    Linux 或 macOS
+    ```bash
+    ./gradlew :composeApp:packageReleaseDistributionForCurrentOS
+    ```
+    Windows
+    ```shell
+    .\gradlew.bat :composeApp:packageReleaseDistributionForCurrentOS
+    ```
 
 ## 开发进度
 
@@ -73,4 +108,4 @@
 <a href="#readme">
     <img src="https://img.shields.io/badge/-返回顶部-7d09f1.svg" alt="#" align="right">
 </a>
- 
+
