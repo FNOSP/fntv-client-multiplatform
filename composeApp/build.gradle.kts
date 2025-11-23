@@ -80,16 +80,28 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "com.jankinwu.fntv.client.MainKt"
-//        buildTypes.release.proguard {
+
+        buildTypes.release.proguard {
+            isEnabled = false
 //            configurationFiles.from("compose-desktop.pro")
-//        }
+        }
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "fntv-client"
+            targetFormats(TargetFormat.Dmg, TargetFormat.Deb, TargetFormat.Exe, TargetFormat.Rpm)
+            packageName = "飞牛影视"
             packageVersion = "1.0.0"
             modules("jdk.unsupported")
             windows {
                 iconFile.set(project.file("icons/favicon.ico"))
+                shortcut = true
+            }
+            macOS {
+                iconFile.set(project.file("icons/favicon.icns"))
+                dockName = "飞牛影视"
+            }
+            linux {
+                iconFile.set(project.file("icons/favicon.png"))
+                packageName = "飞牛影视"
+                shortcut = true
             }
         }
     }
