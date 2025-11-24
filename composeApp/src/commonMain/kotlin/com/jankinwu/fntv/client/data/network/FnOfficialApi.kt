@@ -15,6 +15,7 @@ import com.jankinwu.fntv.client.data.model.response.ItemListQueryResponse
 import com.jankinwu.fntv.client.data.model.response.ItemResponse
 import com.jankinwu.fntv.client.data.model.response.LoginResponse
 import com.jankinwu.fntv.client.data.model.response.MediaDbListResponse
+import com.jankinwu.fntv.client.data.model.response.MediaItemResponse
 import com.jankinwu.fntv.client.data.model.response.PersonListResponse
 import com.jankinwu.fntv.client.data.model.response.PlayDetailResponse
 import com.jankinwu.fntv.client.data.model.response.PlayInfoResponse
@@ -87,4 +88,8 @@ interface FnOfficialApi {
     suspend fun subtitleSearch(request: SubtitleSearchRequest): SubtitleSearchResponse
 
     suspend fun subtitleDownload(request: SubtitleDownloadRequest): SubtitleDownloadResponse
+
+    suspend fun mediaItemFile(guid: String): List<MediaItemResponse>
+
+    suspend fun scrap(guid: String, mediaGuids: List<String>): Boolean
 }

@@ -23,6 +23,7 @@ import com.jankinwu.fntv.client.data.model.response.ItemListQueryResponse
 import com.jankinwu.fntv.client.data.model.response.ItemResponse
 import com.jankinwu.fntv.client.data.model.response.LoginResponse
 import com.jankinwu.fntv.client.data.model.response.MediaDbListResponse
+import com.jankinwu.fntv.client.data.model.response.MediaItemResponse
 import com.jankinwu.fntv.client.data.model.response.PersonListResponse
 import com.jankinwu.fntv.client.data.model.response.PlayDetailResponse
 import com.jankinwu.fntv.client.data.model.response.PlayInfoResponse
@@ -213,6 +214,14 @@ class FnOfficialApiImpl() : FnOfficialApi {
 
     override suspend fun subtitleDownload(request: SubtitleDownloadRequest): SubtitleDownloadResponse {
         return post("/v/api/v1/subtitle/download", request)
+    }
+
+    override suspend fun mediaItemFile(guid: String): List<MediaItemResponse> {
+        return get("/v/api/v1/media/itemfile/$guid")
+    }
+
+    override suspend fun scrap(guid: String, mediaGuids: List<String>): Boolean {
+        return delete("/v/api/v1/scrap/$guid", mapOf("media_guids" to mediaGuids))
     }
 
     private suspend inline fun <reified T> get(

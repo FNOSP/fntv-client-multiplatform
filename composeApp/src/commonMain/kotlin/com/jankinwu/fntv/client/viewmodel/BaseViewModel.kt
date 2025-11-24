@@ -66,4 +66,6 @@ val viewModelModule = module {
     viewModelOf (::SubtitleMarkViewModel)
     viewModelOf (::SubtitleSearchViewModel)
     viewModelOf (::SubtitleDownloadViewModel)
+    viewModelOf (::MediaItemFileViewModel)
+    viewModelOf (::ScrapViewModel)
 }

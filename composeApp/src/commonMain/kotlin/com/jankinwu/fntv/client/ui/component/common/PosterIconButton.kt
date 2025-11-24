@@ -29,7 +29,7 @@ internal fun BottomIconButton(
     modifier: Modifier = Modifier,
     icon: ImageVector,
     contentDescription: String,
-    onClick: () -> Unit,
+    onClick: () -> Unit =  {},
     scaleFactor: Float,
     iconTint: Color = Color.White,
     iconYOffset: Dp = 0.dp
@@ -39,11 +39,11 @@ internal fun BottomIconButton(
         modifier = modifier
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false }
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = { onClick() }
-            )
+//            .clickable(
+//                interactionSource = remember { MutableInteractionSource() },
+//                indication = null,
+//                onClick = { onClick() }
+//            )
     ) {
         // 悬停时显示的圆形背景
         Box(

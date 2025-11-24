@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -59,18 +58,12 @@ import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.constants.Constants
 import com.jankinwu.fntv.client.data.store.AccountDataCache
 import com.jankinwu.fntv.client.enums.FnTvMediaType
-import com.jankinwu.fntv.client.icons.Delete
-import com.jankinwu.fntv.client.icons.Edit
 import com.jankinwu.fntv.client.icons.HeartFilled
-import com.jankinwu.fntv.client.icons.Lifted
+import com.jankinwu.fntv.client.ui.component.common.dialog.ManageVersionsDialog
 import com.jankinwu.fntv.client.ui.screen.LocalMediaPlayer
 import com.jankinwu.fntv.client.ui.screen.MovieDetailScreen
 import com.jankinwu.fntv.client.ui.screen.rememberPlayMediaFunction
 import io.github.composefluent.FluentTheme
-import io.github.composefluent.component.FlyoutPlacement
-import io.github.composefluent.component.MenuFlyoutContainer
-import io.github.composefluent.component.MenuFlyoutItem
-import io.github.composefluent.component.MenuFlyoutSeparator
 import io.github.composefluent.icons.Icons
 import io.github.composefluent.icons.regular.Checkmark
 import io.github.composefluent.icons.regular.MoreHorizontal
@@ -157,6 +150,7 @@ fun MoviePoster(
             .pointerHoverIcon(PointerIcon.Hand),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        var isManageVersionsDialogVisible by remember { mutableStateOf(false) }
 
         // 海报图片和覆盖层的容器
         Box(
@@ -380,86 +374,93 @@ fun MoviePoster(
                     .padding((8 * scaleFactor).dp)
                     .align(Alignment.BottomEnd)
             ) {
-                MenuFlyoutContainer(
-                    flyout = {
-                        MenuFlyoutItem(
-                            text = {
-                                Text(
-                                    "手动匹配影片",
-                                    fontSize = (12 * scaleFactor).sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = FluentTheme.colors.text.text.tertiary
-                                )
-                            },
-                            onClick = {
-                                isFlyoutVisible = false
-                                // TODO: 处理手动匹配影片按钮点击事件
-                            },
-                            icon = {
-                                Icon(
-                                    Edit,
-                                    contentDescription = "手动匹配影片",
-                                    tint = FluentTheme.colors.text.text.tertiary,
-                                    modifier = Modifier.requiredSize((20 * scaleFactor).dp)
-                                )
-                            })
-                        MenuFlyoutItem(
-                            text = {
-                                Text(
-                                    "解除匹配影片",
-                                    fontSize = (12 * scaleFactor).sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = FluentTheme.colors.text.text.tertiary
-                                )
-                            },
-                            onClick = {
-                                isFlyoutVisible = false
-                                // TODO: 处理解除匹配影片按钮点击事件
-                            },
-                            icon = {
-                                Icon(
-                                    Lifted,
-                                    tint = FluentTheme.colors.text.text.tertiary,
-                                    contentDescription = "解除匹配影片",
-                                    modifier = Modifier.requiredSize((20 * scaleFactor).dp)
-                                )
-                            })
-                        MenuFlyoutSeparator(modifier = Modifier.padding(horizontal = 1.dp))
-                        MenuFlyoutItem(
-                            text = {
-                                Text(
-                                    "删除",
-                                    fontSize = (12 * scaleFactor).sp,
-                                    color = FluentTheme.colors.text.text.tertiary,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            },
-                            onClick = {
-                                isFlyoutVisible = false
-                                // TODO: 处理删除按钮点击事件
-                            },
-                            icon = {
-                                Icon(
-                                    Delete,
-                                    tint = FluentTheme.colors.text.text.tertiary,
-                                    contentDescription = "删除",
-                                    modifier = Modifier.requiredSize((20 * scaleFactor).dp)
-                                )
-                            })
-                    },
-                    content = {
-                        BottomIconButton(
-                            icon = Icons.Regular.MoreHorizontal,
-                            contentDescription = "more",
-                            onClick = {
-                                isFlyoutVisible = !isFlyoutVisible
-                            },
-                            scaleFactor = scaleFactor
-                        )
-                    },
-                    adaptivePlacement = true,
-                    placement = FlyoutPlacement.BottomAlignedEnd
-                )
+                MediaMoreFlyout(onManageVersionsClick = { isManageVersionsDialogVisible = true }){
+                    BottomIconButton(
+                        icon = Icons.Regular.MoreHorizontal,
+                        contentDescription = "more",
+                        scaleFactor = scaleFactor
+                    )
+                }
+//                MenuFlyoutContainer(
+//                    flyout = {
+//                        MenuFlyoutItem(
+//                            text = {
+//                                Text(
+//                                    "手动匹配影片",
+//                                    fontSize = (12 * scaleFactor).sp,
+//                                    fontWeight = FontWeight.Bold,
+//                                    color = FluentTheme.colors.text.text.tertiary
+//                                )
+//                            },
+//                            onClick = {
+//                                isFlyoutVisible = false
+//                                // TODO: 处理手动匹配影片按钮点击事件
+//                            },
+//                            icon = {
+//                                Icon(
+//                                    Edit,
+//                                    contentDescription = "手动匹配影片",
+//                                    tint = FluentTheme.colors.text.text.tertiary,
+//                                    modifier = Modifier.requiredSize((20 * scaleFactor).dp)
+//                                )
+//                            })
+//                        MenuFlyoutItem(
+//                            text = {
+//                                Text(
+//                                    "解除匹配影片",
+//                                    fontSize = (12 * scaleFactor).sp,
+//                                    fontWeight = FontWeight.Bold,
+//                                    color = FluentTheme.colors.text.text.tertiary
+//                                )
+//                            },
+//                            onClick = {
+//                                isFlyoutVisible = false
+//                                // TODO: 处理解除匹配影片按钮点击事件
+//                            },
+//                            icon = {
+//                                Icon(
+//                                    Lifted,
+//                                    tint = FluentTheme.colors.text.text.tertiary,
+//                                    contentDescription = "解除匹配影片",
+//                                    modifier = Modifier.requiredSize((20 * scaleFactor).dp)
+//                                )
+//                            })
+//                        MenuFlyoutSeparator(modifier = Modifier.padding(horizontal = 1.dp))
+//                        MenuFlyoutItem(
+//                            text = {
+//                                Text(
+//                                    "删除",
+//                                    fontSize = (12 * scaleFactor).sp,
+//                                    color = FluentTheme.colors.text.text.tertiary,
+//                                    fontWeight = FontWeight.Bold,
+//                                )
+//                            },
+//                            onClick = {
+//                                isFlyoutVisible = false
+//                                // TODO: 处理删除按钮点击事件
+//                            },
+//                            icon = {
+//                                Icon(
+//                                    Delete,
+//                                    tint = FluentTheme.colors.text.text.tertiary,
+//                                    contentDescription = "删除",
+//                                    modifier = Modifier.requiredSize((20 * scaleFactor).dp)
+//                                )
+//                            })
+//                    },
+//                    content = {
+//                        BottomIconButton(
+//                            icon = Icons.Regular.MoreHorizontal,
+//                            contentDescription = "more",
+//                            onClick = {
+//                                isFlyoutVisible = !isFlyoutVisible
+//                            },
+//                            scaleFactor = scaleFactor
+//                        )
+//                    },
+//                    adaptivePlacement = true,
+//                    placement = FlyoutPlacement.BottomAlignedEnd
+//                )
             }
 
         }
@@ -499,5 +500,15 @@ fun MoviePoster(
                 )
             }
         }
+
+        ManageVersionsDialog(
+            visible = isManageVersionsDialogVisible,
+            guid = guid,
+            itemTitle = title,
+            onDismiss = { isManageVersionsDialogVisible = false },
+            onDelete = { _, _ -> },
+            onUnmatchConfirmed = { _, _ -> },
+            onMatchToOther = { _, _ -> }
+        )
     }
 }

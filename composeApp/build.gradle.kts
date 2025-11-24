@@ -58,6 +58,7 @@ kotlin {
             implementation(libs.multiplatform.settings.no.arg)
             implementation(libs.haze)
             implementation(libs.haze.materials)
+            implementation(libs.kotlinx.datetime)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
