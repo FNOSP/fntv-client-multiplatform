@@ -23,6 +23,13 @@
 
 ## 使用说明
 
+### 准备环境
+
+- 安装 [Android Studio](https://developer.android.com/studio) 或 [IntelliJ IDEA](https://www.jetbrains.com/idea/)
+- JDK 17 或以上版本并配置环境变量
+  - 确保 `JAVA_HOME` 环境变量指向 JDK 17 安装目录
+  - 确保 `PATH` 环境变量包含 `%JAVA_HOME%\bin`
+
 ### 运行桌面端
 
 - 克隆项目到本地：
@@ -58,6 +65,7 @@
     ```shell
     .\gradlew.bat :composeApp:packageReleaseDistributionForCurrentOS
     ```
+  - 打包完成后，可在 `composeApp\build\compose\binaries\main-release` 目录下找到可执行文件
 
 ## 开发进度
 
