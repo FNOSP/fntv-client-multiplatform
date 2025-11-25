@@ -144,5 +144,5 @@ fun DialogSize.Companion.createCustomSize(min: Dp, max: Dp): DialogSize {
     return DialogSize(min, max)
 }
 
-val LargeDialogSize = DialogSize.createCustomSize(720.dp, 720.dp)
+val LargeDialogSize = DialogSize.createCustomSize(720.dp, 960.dp)
 

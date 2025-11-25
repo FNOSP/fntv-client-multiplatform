@@ -63,7 +63,7 @@ import io.github.composefluent.icons.regular.Dismiss
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun ManageVersionsDialog(
+fun VersionManagementDialog(
     visible: Boolean,
     guid: String,
     itemTitle: String,
@@ -193,29 +193,39 @@ fun ManageVersionsDialog(
                 Alignment.CenterEnd
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Button(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier,
                         onClick = { onDelete(guid, selectedMediaGuids.toList()) },
                         disabled = selectedMediaGuids.isEmpty()
-                    ) { Text("删除") }
-                    Button(
-                        modifier = Modifier.weight(1f),
-                        onClick = { showConfirmDialog = true },
-                        disabled = selectedMediaGuids.isEmpty()
-                    ) { Text("解除与当前影片的匹配") }
-                    AccentButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { onMatchToOther(guid, selectedMediaGuids.toList()) },
-                        disabled = selectedMediaGuids.isEmpty(),
-                        buttonColors = customAccentButtonColors()
-                    ) { Text(
-                        "匹配为其他影片",
+                    ) { Text("删除",
                         style = LocalTypography.current.bodyStrong,
-                        color = FluentTheme.colors.text.text.primary
-                    ) }
+                        color = FluentTheme.colors.text.text.primary) }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            modifier = Modifier,
+                            onClick = { showConfirmDialog = true },
+                            disabled = selectedMediaGuids.isEmpty()
+                        ) { Text("解除与当前影片的匹配",
+                            style = LocalTypography.current.bodyStrong,
+                            color = FluentTheme.colors.text.text.primary) }
+                        AccentButton(
+                            modifier = Modifier,
+                            onClick = { onMatchToOther(guid, selectedMediaGuids.toList()) },
+                            disabled = selectedMediaGuids.isEmpty(),
+                            buttonColors = customAccentButtonColors()
+                        ) { Text(
+                            "匹配为其他影片",
+                            style = LocalTypography.current.bodyStrong,
+                            color = FluentTheme.colors.text.text.primary
+                        ) }
+                    }
                 }
             }
         }

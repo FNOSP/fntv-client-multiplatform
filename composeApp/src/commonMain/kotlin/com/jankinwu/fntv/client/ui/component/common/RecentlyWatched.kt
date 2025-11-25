@@ -65,7 +65,7 @@ import com.jankinwu.fntv.client.data.model.ScrollRowItemData
 import com.jankinwu.fntv.client.data.store.AccountDataCache
 import com.jankinwu.fntv.client.enums.FnTvMediaType
 import com.jankinwu.fntv.client.icons.HeartFilled
-import com.jankinwu.fntv.client.ui.component.common.dialog.ManageVersionsDialog
+import com.jankinwu.fntv.client.ui.component.common.dialog.VersionManagementDialog
 import com.jankinwu.fntv.client.ui.screen.LocalMediaPlayer
 import com.jankinwu.fntv.client.ui.screen.MovieDetailScreen
 import com.jankinwu.fntv.client.ui.screen.rememberPlayMediaFunction
@@ -490,7 +490,7 @@ fun RecentlyWatchedItem(
 //                        )
                     }
 
-                    ManageVersionsDialog(
+                    VersionManagementDialog(
                         visible = isManageVersionsDialogVisible,
                         guid = guid,
                         itemTitle = title,
