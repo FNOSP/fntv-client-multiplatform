@@ -871,7 +871,7 @@ fun MiddleControls(
             CircleIconButton(
                 icon = HeartFilled,
                 description = "收藏",
-                iconColor = if (isFavorite) Colors.DangerColor else FluentTheme.colors.text.text.primary,
+                iconColor = if (isFavorite) Colors.DangerDefaultColor else FluentTheme.colors.text.text.primary,
                 onClick = {
                     favoriteViewModel.toggleFavorite(
                         guid,

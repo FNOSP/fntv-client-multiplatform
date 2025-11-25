@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jankinwu.fntv.client.LocalTypography
 import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.icons.ArrowUp
@@ -283,9 +284,12 @@ fun StreamSelector(
             }
             showDeleteDialog = false
         },
+        isWarning = true,
         content = {
-            io.github.composefluent.component.Text(
-                "确定要删除 $deletedItemTitle 外挂字幕吗？"
+            Text(
+                "确定要删除 $deletedItemTitle 外挂字幕吗？",
+                style = LocalTypography.current.body,
+                color = FluentTheme.colors.text.text.primary
             )
         }
     )

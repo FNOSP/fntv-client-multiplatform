@@ -54,6 +54,7 @@ import io.github.composefluent.component.AccentButton
 import io.github.composefluent.component.Button
 import io.github.composefluent.component.CheckBox
 import io.github.composefluent.component.CheckBoxDefaults
+import io.github.composefluent.component.ContentDialogButton
 import io.github.composefluent.component.DialogSize
 import io.github.composefluent.component.FluentDialog
 import io.github.composefluent.component.Icon
@@ -232,16 +233,46 @@ fun VersionManagementDialog(
     }
 
     if (showConfirmDialog) {
-        CustomConfirmDialog(
-            onDismissRequest = { showConfirmDialog = false },
-            title = "确认解除",
-            contentText = "是否解除与当前影片的匹配",
-            confirmButtonText = "确认解除",
-            onConfirmClick = {
-                onUnmatchConfirmed(guid, selectedMediaGuids.toList())
-                scrapViewModel.scrap(guid, selectedMediaGuids.toList())
-                showConfirmDialog = false
-                onDismiss()
+//        CustomConfirmDialog(
+//            onDismissRequest = { showConfirmDialog = false },
+//            title = "确认解除",
+//            contentText = "是否解除与当前影片的匹配",
+//            confirmButtonText = "确认解除",
+//            onConfirmClick = {
+//                onUnmatchConfirmed(guid, selectedMediaGuids.toList())
+//                scrapViewModel.scrap(guid, selectedMediaGuids.toList())
+//                showConfirmDialog = false
+//                onDismiss()
+//            }
+//        )
+        CustomContentDialog(
+            title = "解除影片匹配",
+            visible = true,
+            size = DialogSize.Standard,
+            primaryButtonText = "确认解除",
+            secondaryButtonText = "取消",
+            onButtonClick = { contentDialogButton ->
+                when (contentDialogButton) {
+                    ContentDialogButton.Secondary -> {
+                        showConfirmDialog = false
+                    }
+
+                    ContentDialogButton.Primary -> {
+                        onUnmatchConfirmed(guid, selectedMediaGuids.toList())
+                        scrapViewModel.scrap(guid, selectedMediaGuids.toList())
+                        showConfirmDialog = false
+                        onDismiss()
+                    }
+
+                    ContentDialogButton.Close -> {}
+                }
+            },
+            content = {
+                androidx.compose.material3.Text(
+                    "是否解除与当前影片的匹配",
+                    style = LocalTypography.current.body,
+                    color = FluentTheme.colors.text.text.primary
+                )
             }
         )
     }
