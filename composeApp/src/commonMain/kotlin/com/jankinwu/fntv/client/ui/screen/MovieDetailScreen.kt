@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,8 +23,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -89,6 +86,8 @@ import com.jankinwu.fntv.client.ui.component.common.ImgLoadingError
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
+import com.jankinwu.fntv.client.ui.component.detail.DetailPlayButton
+import com.jankinwu.fntv.client.ui.component.detail.DetailTags
 import com.jankinwu.fntv.client.ui.component.detail.MediaInfo
 import com.jankinwu.fntv.client.ui.component.detail.StreamOptionItem
 import com.jankinwu.fntv.client.ui.component.detail.StreamSelector
@@ -525,7 +524,7 @@ fun MediaInfo(
     var totalDuration by remember { mutableIntStateOf(0) }
     val reminingDuration = totalDuration.minus(itemData.watchedTs)
     val formatReminingDuration = FnDataConvertor.formatSecondsToCNDateTime(reminingDuration)
-    val formatTotalDuration = FnDataConvertor.formatSecondsToCNDateTime(totalDuration)
+    val formatedTotalDuration = FnDataConvertor.formatSecondsToCNDateTime(totalDuration)
 
     LaunchedEffect(guid, streamData, playInfoResponse) {
         currentMediaGuid = playInfoResponse.mediaGuid
@@ -625,7 +624,7 @@ fun MediaInfo(
             MiddleControls(
                 modifier = Modifier.padding(bottom = 16.dp),
                 itemData,
-                formatTotalDuration,
+                formatedTotalDuration,
                 guid,
                 currentMediaGuid,
                 selectedVideoStreamIndex,
@@ -729,7 +728,7 @@ fun ProgressBar(
 fun MiddleControls(
     modifier: Modifier = Modifier,
     itemData: ItemResponse,
-    formatTotalDuration: String,
+    formatedTotalDuration: String,
     guid: String,
     mediaGuid: String,
     selectedVideoStreamIndex: Int,
@@ -819,31 +818,10 @@ fun MiddleControls(
             modifier = Modifier.padding(end = 64.dp)
         ) {
             // 播放按钮
-            Button(
-                onClick = {
-                    playMedia()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Colors.AccentColorDefault), // 蓝色背景
-                shape = CircleShape, // 圆角
-                modifier = Modifier.height(56.dp).width(160.dp).pointerHoverIcon(PointerIcon.Hand)
-            ) {
-                if (itemData.watchedTs == 0) {
-                    Text(
-                        "▶  播放",
-                        style = LocalTypography.current.title,
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                } else {
-                    Text(
-                        "▶  继续播放",
-                        style = LocalTypography.current.title,
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+            if (itemData.watchedTs == 0) {
+                DetailPlayButton("播放") { playMedia() }
+            } else {
+                DetailPlayButton("继续播放") { playMedia() }
             }
             // 收藏按钮
             CircleIconButton(
@@ -883,92 +861,7 @@ fun MiddleControls(
         ) {
             // 右侧：评分、标签
             // 使用 FlowRow 可以在空间不足时自动换行
-            FlowRow(
-                modifier = Modifier, // 占据右侧约 60% 宽度
-                horizontalArrangement = Arrangement.spacedBy(
-                    8.dp,
-                    Alignment.End
-                ),
-                verticalArrangement = Arrangement.Center
-            ) {
-                val voteAverage = itemData.voteAverage.toDoubleOrNull()?.let {
-                    "%.1f".format(it)
-                } ?: ""
-                if (voteAverage.isNotEmpty() && voteAverage != "0.0") {
-                    Text(
-                        "$voteAverage 分",
-                        color = Color(0xFFFACC15),
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 14.sp,
-//                        modifier = Modifier.offset(y = (-3).dp)
-                    )
-                    Separator()
-                }
-                val contentRatings = itemData.contentRatings ?: ""
-                if (contentRatings.isNotEmpty()) {
-                    Text(
-                        contentRatings,
-                        color = FluentTheme.colors.text.text.secondary,
-                        fontSize = 14.sp
-                    )
-                    Separator()
-                }
-                val year = itemData.airDate?.take(4) ?: ""
-                if (year.isNotEmpty()) {
-                    Text(
-                        year,
-                        color = FluentTheme.colors.text.text.secondary,
-                        fontSize = 14.sp
-                    )
-                    Separator()
-                }
-                val genresViewModel: GenresViewModel = koinViewModel<GenresViewModel>()
-                val genresUiState = genresViewModel.uiState.collectAsState().value
-                LaunchedEffect(genresUiState) {
-                    if (genresUiState !is UiState.Success) {
-                        genresViewModel.loadGenres()
-                    }
-                }
-                if (genresUiState is UiState.Success) {
-                    val genresMap = genresUiState.data.associateBy { it.id }
-                    val genresText = itemData.genres?.joinToString(" ") { genreId ->
-                        genresMap[genreId]?.value ?: ""
-                    }
-                    if (!genresText.isNullOrBlank()) {
-                        Text(
-                            genresText,
-                            color = FluentTheme.colors.text.text.secondary,
-                            fontSize = 14.sp
-                        )
-                    }
-                    Separator()
-                }
-                if (isoTagData.iso6391Map.isNotEmpty()) {
-                    val countriesText = itemData.productionCountries?.joinToString(" ") { locate ->
-                        isoTagData.iso6391Map[locate]?.value ?: locate
-                    }
-                    if (!countriesText.isNullOrBlank()) {
-                        Text(
-                            countriesText,
-                            color = FluentTheme.colors.text.text.secondary,
-                            fontSize = 14.sp
-                        )
-                    }
-                    Separator()
-                }
-                Text(
-                    formatTotalDuration,
-                    color = FluentTheme.colors.text.text.secondary,
-                    fontSize = 14.sp
-                )
-                Separator()
-                Text(
-                    itemData.ancestorName,
-                    color = FluentTheme.colors.text.text.secondary,
-                    fontSize = 14.sp
-                )
-
-            }
+            DetailTags(itemData, formatedTotalDuration)
             // 第二行：4K 标签
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
