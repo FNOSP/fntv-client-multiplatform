@@ -199,7 +199,7 @@ fun VersionManagementDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Button(
-                        modifier = Modifier,
+                        modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
                         onClick = { onDelete(guid, selectedMediaGuids.toList()) },
                         disabled = selectedMediaGuids.isEmpty()
                     ) { Text("删除",
@@ -210,14 +210,14 @@ fun VersionManagementDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Button(
-                            modifier = Modifier,
+                            modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
                             onClick = { showConfirmDialog = true },
                             disabled = selectedMediaGuids.isEmpty()
                         ) { Text("解除与当前影片的匹配",
                             style = LocalTypography.current.bodyStrong,
                             color = FluentTheme.colors.text.text.primary) }
                         AccentButton(
-                            modifier = Modifier,
+                            modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
                             onClick = { onMatchToOther(guid, selectedMediaGuids.toList()) },
                             disabled = selectedMediaGuids.isEmpty(),
                             buttonColors = customAccentButtonColors()

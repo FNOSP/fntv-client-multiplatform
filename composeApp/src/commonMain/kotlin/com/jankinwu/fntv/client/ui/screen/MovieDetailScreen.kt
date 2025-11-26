@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Text
@@ -41,7 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -79,8 +77,8 @@ import com.jankinwu.fntv.client.data.model.response.StreamListResponse
 import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.data.store.AccountDataCache
 import com.jankinwu.fntv.client.enums.MediaQualityTagEnums
-import com.jankinwu.fntv.client.icons.ArrowLeft
 import com.jankinwu.fntv.client.icons.HeartFilled
+import com.jankinwu.fntv.client.ui.component.common.BackButton
 import com.jankinwu.fntv.client.ui.component.common.CastScrollRow
 import com.jankinwu.fntv.client.ui.component.common.ComponentNavigator
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingError
@@ -481,26 +479,7 @@ fun MovieDetailBody(
             }
         }
         // 返回按钮
-        IconButton(
-            onClick = { navigator.navigateUp() },
-            modifier = Modifier
-                .padding(16.dp)
-                .align(Alignment.TopStart)
-                .pointerHoverIcon(PointerIcon.Hand)
-                .drawBehind {
-                    drawCircle(
-                        color = Color.Black.copy(alpha = 0.2f),
-                        radius = 29f,
-                    )
-                }
-        ) {
-            Icon(
-                imageVector = ArrowLeft,
-                contentDescription = "返回",
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
-        }
+        BackButton(navigator, modifier = Modifier.align(Alignment.TopStart))
         ToastHost(
             toastManager = toastManager,
             modifier = Modifier.fillMaxSize()
