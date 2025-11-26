@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -486,6 +487,12 @@ fun MovieDetailBody(
                 .padding(16.dp)
                 .align(Alignment.TopStart)
                 .pointerHoverIcon(PointerIcon.Hand)
+                .drawBehind {
+                    drawCircle(
+                        color = Color.Black.copy(alpha = 0.2f),
+                        radius = 29f,
+                    )
+                }
         ) {
             Icon(
                 imageVector = ArrowLeft,

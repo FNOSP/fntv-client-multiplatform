@@ -118,9 +118,9 @@ fun DetailTags(
             }
             Separator()
         }
-        if (isoTagData.iso6391Map.isNotEmpty()) {
+        if (isoTagData.iso3166Map.isNotEmpty()) {
             val countriesText = itemData.productionCountries?.joinToString(" ") { locate ->
-                isoTagData.iso6391Map[locate]?.value ?: locate
+                isoTagData.iso3166Map[locate]?.value ?: locate
             }
             if (!countriesText.isNullOrBlank()) {
                 Text(
