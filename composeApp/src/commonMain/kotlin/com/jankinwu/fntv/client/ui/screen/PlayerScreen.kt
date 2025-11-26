@@ -705,7 +705,7 @@ private suspend fun fetchStreamInfo(
 ): StreamResponse {
     // 获取用户信息以获取source_name
     val userInfo = userInfoViewModel.loadUserInfoAndWait()
-    val sourceName = userInfo.sources.firstOrNull()?.sourceName ?: ""
+    val sourceName = userInfo.userSources.firstOrNull()?.sourceName ?: ""
     val ip = MD5.digest(sourceName.toByteArray()).hex
 
     // 调用 getStreamList 接口

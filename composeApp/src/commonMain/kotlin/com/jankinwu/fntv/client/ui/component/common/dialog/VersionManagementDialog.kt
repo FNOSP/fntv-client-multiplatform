@@ -43,6 +43,7 @@ import com.jankinwu.fntv.client.ui.component.common.AnimatedScrollbarLazyColumn
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.customAccentButtonColors
 import com.jankinwu.fntv.client.ui.customSelectedCheckBoxColors
+import com.jankinwu.fntv.client.ui.screen.LocalUserInfo
 import com.jankinwu.fntv.client.ui.screen.MediaQualityTag
 import com.jankinwu.fntv.client.viewmodel.MediaItemFileViewModel
 import com.jankinwu.fntv.client.viewmodel.ScrapViewModel
@@ -233,18 +234,6 @@ fun VersionManagementDialog(
     }
 
     if (showConfirmDialog) {
-//        CustomConfirmDialog(
-//            onDismissRequest = { showConfirmDialog = false },
-//            title = "确认解除",
-//            contentText = "是否解除与当前影片的匹配",
-//            confirmButtonText = "确认解除",
-//            onConfirmClick = {
-//                onUnmatchConfirmed(guid, selectedMediaGuids.toList())
-//                scrapViewModel.scrap(guid, selectedMediaGuids.toList())
-//                showConfirmDialog = false
-//                onDismiss()
-//            }
-//        )
         CustomContentDialog(
             title = "解除影片匹配",
             visible = true,
@@ -285,6 +274,7 @@ private fun VersionItemRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val currentUserInfo = LocalUserInfo.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -342,7 +332,7 @@ private fun VersionItemRow(
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "位置: ${item.filePath}",
+                text = "位置: ${FnDataConvertor.humanizedFilePath(item.filePath, currentUserInfo.userSources)}",
                 fontSize = 12.sp,
                 color = FluentTheme.colors.text.text.secondary,
                 maxLines = 1,

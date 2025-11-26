@@ -6,6 +6,7 @@ import com.jankinwu.fntv.client.data.model.response.MediaItem
 import com.jankinwu.fntv.client.data.model.response.PersonList
 import com.jankinwu.fntv.client.data.model.response.PlayDetailResponse
 import com.jankinwu.fntv.client.data.model.response.SearchingSubtitleInfo
+import com.jankinwu.fntv.client.data.model.response.UserSource
 import com.jankinwu.fntv.client.enums.FnTvMediaType
 import com.jankinwu.fntv.client.icons.Audio
 import com.jankinwu.fntv.client.icons.Subtitle
@@ -315,5 +316,50 @@ object FnDataConvertor {
         val instant = fromEpochMilliseconds(timestamp)
         val localDateTime = instant.toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault())
         return "${localDateTime.date} ${localDateTime.time.toString().take(5)}"
+    }
+
+    fun humanizedFilePath(path: String, userSources: List<UserSource>): String {
+        if (path.startsWith("/vol") && path.length >= 5) {
+            // 查找第一个非数字字符的位置，用来提取完整的卷号
+            var volEndIndex = 4
+            while (volEndIndex < path.length && path[volEndIndex].isDigit()) {
+                volEndIndex++
+            }
+
+            if (volEndIndex > 4) { // 确保至少有一位数字
+                val volNumber = path.substring(4, volEndIndex)
+
+                // 查找匹配的用户源
+                val pathParts = path.split("/")
+                if (pathParts.size >= 3) {
+                    val sourceId = pathParts[2] // 提取source_id (例如: 1000)
+                    val matchedSource = userSources.find { it.sourceId == sourceId }
+
+                    // 构建人性化路径
+                    val storageTitle = "存储空间$volNumber"
+                    val userName = matchedSource?.sourceName ?: sourceId
+                    val remainingPath = path.substring(volEndIndex + sourceId.length + 1) // 去除/vol{number}/{sourceId}部分
+
+                    return "$storageTitle/$userName 的文件$remainingPath"
+                }
+            }
+        }
+        return path
+    }
+
+    fun getVolumeCNName(path: String, hasSpace:  Boolean = false): String {
+        if (path.startsWith("/vol") && path.length >= 5) {
+            // 查找第一个非数字字符的位置，用来提取完整的卷号
+            var volEndIndex = 4
+            while (volEndIndex < path.length && path[volEndIndex].isDigit()) {
+                volEndIndex++
+            }
+
+            if (volEndIndex > 4) { // 确保至少有一位数字
+                val volNumber = path.substring(4, volEndIndex)
+                return if (hasSpace) "存储空间 $volNumber" else "存储空间$volNumber"
+            }
+        }
+        return "未知存储空间"
     }
 }
