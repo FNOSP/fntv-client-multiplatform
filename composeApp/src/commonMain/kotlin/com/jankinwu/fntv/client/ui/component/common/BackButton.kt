@@ -1,14 +1,12 @@
 package com.jankinwu.fntv.client.ui.component.common
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -29,19 +27,21 @@ fun BackButton(
         IconButton(
             onClick = { navigator.navigateUp() },
             modifier = Modifier
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.2f),
-                            Color.Black.copy(alpha = 0.1f),
-                            Color.Black.copy(alpha = 0.01f),
-                            Color.Transparent
-                        ),
-                        center = Offset(24f, 24f),
-                        radius = 30f
-                    ),
-                    shape = CircleShape
-                )
+                .drawBehind {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.3f),
+                                Color.Black.copy(alpha = 0.15f),
+                                Color.Black.copy(alpha = 0.1f),
+                                Color.Black.copy(alpha = 0.01f),
+                                Color.Transparent
+                            ),
+                            radius = size.minDimension / 1.5f,
+                            center = center
+                        )
+                    )
+                }
                 .pointerHoverIcon(PointerIcon.Hand)
         ) {
             Icon(
