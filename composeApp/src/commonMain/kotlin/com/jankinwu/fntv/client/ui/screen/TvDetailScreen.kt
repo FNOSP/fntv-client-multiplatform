@@ -490,7 +490,9 @@ private fun TvMediaInfo(
             seasonList,
             playInfo
         )
-        MediaDescription(modifier = Modifier.padding(bottom = 32.dp), itemData)
+        if (!itemData.overview.isNullOrBlank()) {
+            MediaDescription(modifier = Modifier.padding(bottom = 32.dp), itemData)
+        }
     }
 }
 

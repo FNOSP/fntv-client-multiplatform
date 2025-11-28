@@ -248,7 +248,7 @@ object FnDataConvertor {
             language == null -> {
                 "无"
             }
-            language in listOf("", "und", "zxx", "qaa-qtz") -> {
+            language in listOf("", "und", "zxx", "qaa-qtz", "zz-unknow") -> {
                 "未知"
             }
             language.length == 2 -> {

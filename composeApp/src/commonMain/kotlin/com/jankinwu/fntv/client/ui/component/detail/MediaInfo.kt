@@ -74,7 +74,6 @@ fun MediaInfo(modifier: Modifier = Modifier, currentStreamData: CurrentStreamDat
         modifier = modifier
             .fillMaxSize()
             .background(Color.Transparent)
-            .padding(vertical = 24.dp)
     ) {
         // 1. 文件信息部分
         FileInfoSection(mediaDetailData.fileInfo)

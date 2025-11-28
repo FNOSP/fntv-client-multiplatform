@@ -400,7 +400,7 @@ fun MovieDetailBody(
                                 modifier = Modifier
                                     .align(Alignment.BottomStart)
                                     .height(imageHeight)
-                                    .padding(start = 48.dp, bottom = 12.dp),
+                                    .padding(start = 48.dp),
                                 contentScale = ContentScale.FillHeight,
                                 filterQuality = FilterQuality.High,
                                 loading = {
@@ -428,7 +428,7 @@ fun MovieDetailBody(
                                 modifier = Modifier
                                     .align(Alignment.BottomStart)
 //                                        .width(200.dp)
-                                    .padding(start = 48.dp, end = 48.dp, bottom = 12.dp)
+                                    .padding(start = 48.dp, end = 48.dp)
                             ) {
                                 Text(
                                     text = itemData?.title ?: "",
@@ -447,6 +447,7 @@ fun MovieDetailBody(
                 item {
                     val playInfoResponse = playInfoResponse
                     if (itemData != null && streamData != null && playInfoResponse != null) {
+                        Spacer(modifier = Modifier.height(24.dp))
                         MediaIntroduction(
                             itemData,
                             streamData,
@@ -459,22 +460,29 @@ fun MovieDetailBody(
                             }
                         )
                     }
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+                if (castScrollRowItemList.isNotEmpty()) {
+                    item {
+//                        Spacer(modifier = Modifier.height(24.dp))
+                        CastScrollRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            castScrollRowItemList
+                        )
+                        Spacer(modifier = Modifier.height(48.dp))
+                    }
                 }
                 item {
-                    CastScrollRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        castScrollRowItemList
-                    )
-                }
-                item {
+//                    Spacer(modifier = Modifier.height(24.dp))
                     currentStreamData?.let {
                         MediaInfo(
                             modifier = Modifier.padding(horizontal = 48.dp), it,
                             itemData?.imdbId
                         )
                     }
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }
@@ -591,7 +599,7 @@ fun MediaIntroduction(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 24.dp)
+//            .padding(vertical = 24.dp)
     ) {
         // 进度条
         itemData.watchedTs.let {
@@ -635,8 +643,9 @@ fun MediaIntroduction(
                 selectedVideoStreamIndex = it
             }, selectedVideoStreamIndex)
         }
-
-        MediaDescription(modifier = Modifier.padding(bottom = 32.dp), itemData)
+        if (!itemData.overview.isNullOrBlank()) {
+            MediaDescription(modifier = Modifier.padding(bottom = 32.dp), itemData)
+        }
     }
 }
 
