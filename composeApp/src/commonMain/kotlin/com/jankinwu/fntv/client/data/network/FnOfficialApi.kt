@@ -24,7 +24,7 @@ import com.jankinwu.fntv.client.data.model.response.PlayInfoResponse
 import com.jankinwu.fntv.client.data.model.response.PlayPlayResponse
 import com.jankinwu.fntv.client.data.model.response.QueryTagResponse
 import com.jankinwu.fntv.client.data.model.response.ScrapSearchResponse
-import com.jankinwu.fntv.client.data.model.response.SeasonItemResponse
+import com.jankinwu.fntv.client.data.model.response.SeasonListResponse
 import com.jankinwu.fntv.client.data.model.response.ServerPathResponse
 import com.jankinwu.fntv.client.data.model.response.StreamListResponse
 import com.jankinwu.fntv.client.data.model.response.StreamResponse
@@ -101,5 +101,5 @@ interface FnOfficialApi {
 
     suspend fun scrapRescrap(request: ScrapRescrapRequest): Boolean
 
-    suspend fun seasonList(guid: String): List<SeasonItemResponse>
+    suspend fun seasonList(guid: String): List<SeasonListResponse>
 }

@@ -1,7 +1,7 @@
 package com.jankinwu.fntv.client.viewmodel
 
 import androidx.lifecycle.viewModelScope
-import com.jankinwu.fntv.client.data.model.response.SeasonItemResponse
+import com.jankinwu.fntv.client.data.model.response.SeasonListResponse
 import com.jankinwu.fntv.client.data.network.impl.FnOfficialApiImpl
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,8 +13,8 @@ class SeasonListViewModel : BaseViewModel() {
 
     private val fnOfficialApi: FnOfficialApiImpl by inject(FnOfficialApiImpl::class.java)
 
-    private val _uiState = MutableStateFlow<UiState<List<SeasonItemResponse>>>(UiState.Initial)
-    val uiState: StateFlow<UiState<List<SeasonItemResponse>>> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow<UiState<List<SeasonListResponse>>>(UiState.Initial)
+    val uiState: StateFlow<UiState<List<SeasonListResponse>>> = _uiState.asStateFlow()
 
     fun loadData(guid: String) {
         viewModelScope.launch {

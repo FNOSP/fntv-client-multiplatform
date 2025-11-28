@@ -52,7 +52,6 @@ import coil3.compose.SubcomposeAsyncImage
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-
 import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.constants.Constants
 import com.jankinwu.fntv.client.data.store.AccountDataCache
@@ -64,6 +63,7 @@ import com.jankinwu.fntv.client.ui.providable.LocalStore
 import com.jankinwu.fntv.client.ui.providable.LocalTypography
 import com.jankinwu.fntv.client.ui.screen.MovieDetailScreen
 import com.jankinwu.fntv.client.ui.screen.TvSeasonDetailScreen
+import com.jankinwu.fntv.client.ui.screen.TvDetailScreen
 import com.jankinwu.fntv.client.ui.screen.rememberPlayMediaFunction
 import io.github.composefluent.FluentTheme
 import io.github.composefluent.icons.Icons
@@ -151,6 +151,20 @@ fun MoviePoster(
                             name = "剧集详情",
                             group = "/详情",
                             description = "剧集详情页面",
+                            guid = "tv_detail_$guid",
+                            content = { nav ->
+                                TvDetailScreen(
+                                    guid = guid,
+                                    navigator = nav
+                                )
+                            }
+                        )
+                        navigator.navigate(tvDetailComponent)
+                    } else if (type == FnTvMediaType.SEASON.value) {
+                        val tvDetailComponent = ComponentItem(
+                            name = "剧集分季详情",
+                            group = "/详情",
+                            description = "剧集分季详情页面",
                             guid = "tv_detail_$guid",
                             content = { nav ->
                                 TvSeasonDetailScreen(

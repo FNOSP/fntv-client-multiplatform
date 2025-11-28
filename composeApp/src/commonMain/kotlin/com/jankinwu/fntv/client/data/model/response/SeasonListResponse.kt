@@ -4,7 +4,7 @@ import androidx.compose.runtime.Immutable
 import com.fasterxml.jackson.annotation.JsonProperty
 
 @Immutable
-data class SeasonItemResponse(
+data class SeasonListResponse(
     @param:JsonProperty("guid")
     val guid: String,
 
