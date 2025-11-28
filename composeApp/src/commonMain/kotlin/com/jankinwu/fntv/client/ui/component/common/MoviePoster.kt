@@ -405,11 +405,12 @@ fun MoviePoster(
                     .padding((8 * scaleFactor).dp)
                     .align(Alignment.BottomEnd)
             ) {
-                MediaMoreFlyout(onManageVersionsClick = { isManageVersionsDialogVisible = true }){
+                MediaMoreFlyout(onManageVersionsClick = { isManageVersionsDialogVisible = true }){ onClick ->
                     BottomIconButton(
                         icon = Icons.Regular.MoreHorizontal,
                         contentDescription = "more",
-                        scaleFactor = scaleFactor
+                        scaleFactor = scaleFactor,
+                        onClick = onClick
                     )
                 }
             }
