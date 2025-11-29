@@ -717,7 +717,7 @@ private fun getMediaExtraFiles(
     subtitleStream: SubtitleStream
 ) : MediaExtraFiles {
     if (subtitleStream.isExternal == 1 && subtitleStream.format in listOf("srt", "ass")) {
-        val subtitleLink = "${AccountDataCache.getFnOfficialBaseUrl()}/v/api/v1/subtitle/dl/${subtitleStream.guid}"
+        val subtitleLink = "${AccountDataCache.getProxyBaseUrl()}/v/api/v1/subtitle/dl/${subtitleStream.guid}"
         val subtitle = Subtitle(subtitleLink)
         return MediaExtraFiles(listOf(subtitle))
     }
