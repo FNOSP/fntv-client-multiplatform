@@ -38,6 +38,7 @@ import com.jankinwu.fntv.client.ui.component.common.ToastManager
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.jankinwu.fntv.client.ui.providable.LocalRefreshState
+import com.jankinwu.fntv.client.ui.providable.LocalStore
 import com.jankinwu.fntv.client.ui.providable.LocalToastManager
 import com.jankinwu.fntv.client.ui.providable.LocalTypography
 import com.jankinwu.fntv.client.ui.providable.LocalUserInfo
@@ -399,26 +400,32 @@ fun HomePageScreen(navigator: ComponentNavigator) {
 
 @Composable
 fun FntvProxy(toastManager: ToastManager) {
+    val store = LocalStore.current
     val proxySettingViewModel = koinViewModel<ProxySettingViewModel>()
     val proxyUiState by proxySettingViewModel.uiState.collectAsState()
     LaunchedEffect(Unit) {
-        proxySettingViewModel.clearError()
-        proxySettingViewModel.setProxyInfo(
-            url = AccountDataCache.getFnOfficialBaseUrl(),
-            cookie = AccountDataCache.cookieState
-        )
+        if (!store.proxyInitialized) {
+            proxySettingViewModel.clearError()
+            proxySettingViewModel.setProxyInfo(
+                url = AccountDataCache.getFnOfficialBaseUrl(),
+                cookie = AccountDataCache.cookieState
+            )
+        }
     }
     LaunchedEffect(proxyUiState) {
-        when (proxyUiState) {
-            is UiState.Success -> {
-                toastManager.showToast("代理设置成功")
-            }
+        if (!store.proxyInitialized) {
+            when (proxyUiState) {
+                is UiState.Success -> {
+                    toastManager.showToast("代理设置成功")
+                    store.updateProxyInitialized(true)
+                }
 
-            is UiState.Error -> {
-                toastManager.showToast("代理设置失败, cause: ${(proxyUiState as UiState.Error).message}")
-            }
+                is UiState.Error -> {
+                    toastManager.showToast("代理设置失败, cause: ${(proxyUiState as UiState.Error).message}")
+                }
 
-            else -> {
+                else -> {
+                }
             }
         }
     }

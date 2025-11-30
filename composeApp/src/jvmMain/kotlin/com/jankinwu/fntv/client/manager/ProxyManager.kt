@@ -116,7 +116,7 @@ object ProxyManager {
             osName.contains("win") -> {
                 when {
                     osArch.contains("aarch64") || osArch.contains("arm64") -> "windows_arm64"
-                    osArch.contains("64") -> "windows_amd64"
+                    osArch.contains("amd64") -> "windows_amd64"
                     else -> "windows_386"
                 }
             }

@@ -27,6 +27,8 @@ class Store(
     // 缩放因子，用于调整组件大小
     var scaleFactor by mutableFloatStateOf((windowWidth / 1280.dp))
 
+    var proxyInitialized by mutableStateOf(false)
+
     val fnImgHeaders: NetworkHeaders
         get() = NetworkHeaders.Builder()
             .set("cookie", AccountDataCache.cookieState)
@@ -48,5 +50,9 @@ class Store(
 
     fun updateWindowHeight(newHeight: Dp) {
         windowHeightState = newHeight
+    }
+
+    fun updateProxyInitialized(state: Boolean) {
+        proxyInitialized = state
     }
 }
