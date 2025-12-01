@@ -135,8 +135,11 @@ compose.desktop {
         }
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Deb, TargetFormat.Exe, TargetFormat.Rpm)
-            packageName = "FNTVClient"
+            // 使用英文作为包名，避免Windows下打包乱码和路径问题
+            packageName = "FNTV"
             packageVersion = "1.0.0"
+            description = "飞牛影视"
+            vendor = "JankinWu"
             appResourcesRootDir.set(proxyResourcesDir)
 
             modules("jdk.unsupported")
@@ -147,6 +150,7 @@ compose.desktop {
                 menuGroup = "飞牛影视"
                 console = false
                 dirChooser = true
+                upgradeUuid = "9A262498-6C63-4816-A346-056028719600"
             }
             macOS {
                 iconFile.set(project.file("icons/favicon.icns"))
@@ -155,7 +159,7 @@ compose.desktop {
             }
             linux {
                 iconFile.set(project.file("icons/favicon.png"))
-                packageName = "飞牛影视"
+                packageName = "fntv-client"
                 shortcut = true
             }
         }
