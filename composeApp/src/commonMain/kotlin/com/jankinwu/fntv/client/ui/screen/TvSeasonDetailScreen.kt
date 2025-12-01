@@ -31,7 +31,6 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,7 +38,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.PlatformContext
 import coil3.compose.AsyncImagePainter
-import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.rememberAsyncImagePainter
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
@@ -286,8 +284,9 @@ fun TvEpisodeBody(
                                 .background(
                                     brush = Brush.verticalGradient(
                                         colorStops = arrayOf(
-                                            0.0f to Color(0xFF1A1E23).copy(alpha = 0.35f),
-                                            1.0f to Color(0xFF1A1E23).copy(alpha = 0.35f)
+                                            0.0f to Color.Transparent,
+                                            0.7f to Color(0xFF1A1E23).copy(alpha = 0.5f),
+                                            1.0f to if (store.darkMode) Colors.BackgroundColorDark else Colors.BackgroundColorLight
                                         )
                                     )
                                 )
