@@ -38,7 +38,67 @@ object ProxyManager {
                 }
             }
         }
+
+        // Check resources dir (for packaged app)
+        if (!proxyDir.exists()) {
+            val resourcesPath = System.getProperty("compose.application.resources.dir")
+            if (resourcesPath != null) {
+                val resourcesDir = File(resourcesPath)
+                val resourcesProxyDir = File(resourcesDir, "fntv-proxy")
+                if (resourcesProxyDir.exists()) {
+                    proxyDir = resourcesProxyDir
+                }
+            }
+        }
         
+        // Try to extract from classpath if not found
+        if (!proxyDir.exists() || !File(proxyDir, "$platformDir/$executableName").exists()) {
+            try {
+                // Use a persistent location for extracted files
+                // On Windows: AppData/Local/FNTVClient/fntv-proxy
+                // On others: ~/.fntv-client/fntv-proxy
+                val userHome = System.getProperty("user.home")
+                val appDataDir = if (osName.contains("win")) {
+                    File(System.getenv("LOCALAPPDATA") ?: "$userHome/AppData/Local", "FNTVClient")
+                } else {
+                    File(userHome, ".fntv-client")
+                }
+                
+                val extractDir = File(appDataDir, "fntv-proxy")
+                if (!extractDir.exists()) {
+                    extractDir.mkdirs()
+                }
+                
+                val resourcePath = "/fntv-proxy/$platformDir/$executableName"
+                val resourceStream = ProxyManager::class.java.getResourceAsStream(resourcePath)
+                
+                if (resourceStream != null) {
+                    val targetFile = File(extractDir, "$platformDir/$executableName")
+                    if (!targetFile.parentFile.exists()) {
+                        targetFile.parentFile.mkdirs()
+                    }
+                    
+                    // Copy if not exists or size differs (simple check)
+                    // Ideally check version or hash, but here we just ensure it exists
+                    if (!targetFile.exists()) {
+                        println("ProxyManager: Extracting proxy to ${targetFile.absolutePath}")
+                        targetFile.outputStream().use { output ->
+                            resourceStream.copyTo(output)
+                        }
+                        if (!osName.contains("win")) {
+                            targetFile.setExecutable(true)
+                        }
+                    }
+                    proxyDir = extractDir
+                } else {
+                    println("ProxyManager: Resource not found in classpath: $resourcePath")
+                }
+            } catch (e: Exception) {
+                println("ProxyManager: Failed to extract proxy: ${e.message}")
+                e.printStackTrace()
+            }
+        }
+
         val executableFile = File(proxyDir, "$platformDir/$executableName")
         
         if (!executableFile.exists()) {
@@ -64,7 +124,7 @@ object ProxyManager {
                     proxyProcess?.inputStream?.bufferedReader()?.forEachLine { 
                         // println("Proxy: $it") 
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Ignore stream close errors
                 }
             }.apply { 
@@ -77,7 +137,7 @@ object ProxyManager {
                     proxyProcess?.errorStream?.bufferedReader()?.forEachLine {
                         System.err.println("ProxyManager Error: $it")
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                      // Ignore stream close errors
                 }
             }.apply { 
