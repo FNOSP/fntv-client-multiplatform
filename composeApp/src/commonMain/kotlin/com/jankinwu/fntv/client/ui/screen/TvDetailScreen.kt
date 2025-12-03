@@ -59,9 +59,12 @@ import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.component.detail.DetailPlayButton
 import com.jankinwu.fntv.client.ui.component.detail.DetailTags
 import com.jankinwu.fntv.client.ui.component.detail.ImdbLink
+import com.jankinwu.fntv.client.ui.component.detail.MediaDescription
+import com.jankinwu.fntv.client.ui.component.detail.MediaDescriptionDialog
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
 import com.jankinwu.fntv.client.ui.providable.LocalIsoTagData
 import com.jankinwu.fntv.client.ui.providable.LocalMediaPlayer
+import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.jankinwu.fntv.client.ui.providable.LocalRefreshState
 import com.jankinwu.fntv.client.ui.providable.LocalStore
 import com.jankinwu.fntv.client.ui.providable.LocalToastManager
@@ -82,7 +85,6 @@ import io.github.composefluent.icons.regular.Checkmark
 import io.github.composefluent.icons.regular.MoreHorizontal
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
-import kotlin.collections.plus
 
 @Composable
 fun TvDetailScreen(
@@ -118,6 +120,16 @@ fun TvDetailScreen(
     val genresViewModel: GenresViewModel = koinViewModel<GenresViewModel>()
     val refreshState = LocalRefreshState.current
     val toastManager = rememberToastManager()
+    val playerManager = LocalPlayerManager.current
+    var isFirstLoad by remember(guid) { mutableStateOf(true) }
+    // 当从播放器返回时刷新最近播放列表
+    LaunchedEffect(playerManager.playerState) {
+        if (!playerManager.playerState.isVisible && !isFirstLoad) {
+            itemViewModel.loadData(guid)
+            playInfoViewModel.loadData(guid)
+            seasonListViewModel.loadData(guid)
+        }
+    }
 
     LaunchedEffect(Unit) {
         itemViewModel.loadData(guid)
@@ -161,7 +173,6 @@ fun TvDetailScreen(
         println("seasonListState: $seasonListState")
         if (seasonListState is UiState.Success) {
             seasonList = (seasonListState as UiState.Success<List<SeasonListResponse>>).data
-            println("seasonList2: $seasonList")
         }
     }
 
@@ -217,6 +228,7 @@ fun TvDetailBody(
     var pendingCallbacks by remember { mutableStateOf<Map<String, (Boolean) -> Unit>>(emptyMap()) }
     val seasonListViewModel: SeasonListViewModel = koinViewModel()
     val itemViewModel: ItemViewModel = koinViewModel()
+    var showDescriptionDialog by remember { mutableStateOf(false) }
 
     // 监听已观看操作结果并显示提示
     LaunchedEffect(watchedUiState) {
@@ -246,7 +258,7 @@ fun TvDetailBody(
 
         // 清除状态
         if (watchedUiState is UiState.Success || watchedUiState is UiState.Error) {
-            kotlinx.coroutines.delay(2000) // 2秒后清除状态
+            delay(2000) // 2秒后清除状态
             watchedViewModel.clearError()
         }
     }
@@ -383,7 +395,10 @@ fun TvDetailBody(
                             playInfoResponse,
                             seasonList,
                             modifier = Modifier
-                                .padding(start = 48.dp, end = 48.dp, top = 24.dp)
+                                .padding(start = 48.dp, end = 48.dp, top = 24.dp),
+                            showDescriptionDialog = {
+                                showDescriptionDialog = true
+                            }
                         )
                     }
                 }
@@ -466,6 +481,13 @@ fun TvDetailBody(
             toastManager = toastManager,
             modifier = Modifier.fillMaxSize()
         )
+        if (showDescriptionDialog) {
+            MediaDescriptionDialog(
+                title = "电影简介",
+                content = itemData?.overview?.replace("\n\n", "\n") ?: "",
+                onDismiss = { showDescriptionDialog = false }
+            )
+        }
     }
 }
 
@@ -475,7 +497,8 @@ private fun TvMediaInfo(
     guid: String,
     playInfo: PlayInfoResponse,
     seasonList: List<SeasonListResponse>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDescriptionDialog: () -> Unit
 ) {
 
     Column(
@@ -491,7 +514,8 @@ private fun TvMediaInfo(
             playInfo
         )
         if (!itemData.overview.isNullOrBlank()) {
-            MediaDescription(modifier = Modifier.padding(bottom = 32.dp), itemData)
+            MediaDescription(modifier = Modifier.padding(bottom = 32.dp), itemData,
+                onClick = { showDescriptionDialog() })
         }
     }
 }

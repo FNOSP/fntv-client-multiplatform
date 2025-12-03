@@ -23,19 +23,24 @@ import androidx.compose.ui.unit.dp
 import com.jankinwu.fntv.client.components
 import com.jankinwu.fntv.client.data.convertor.convertMediaDbListResponseToScrollRowItem
 import com.jankinwu.fntv.client.data.convertor.convertPlayDetailToScrollRowItemData
-import com.jankinwu.fntv.client.data.convertor.convertToScrollRowItemData
+import com.jankinwu.fntv.client.data.convertor.convertToScrollRowItemDataList
 import com.jankinwu.fntv.client.data.model.ScrollRowItemData
 import com.jankinwu.fntv.client.data.model.request.Tags
 import com.jankinwu.fntv.client.data.model.response.UserInfoResponse
+import com.jankinwu.fntv.client.data.store.AccountDataCache
 import com.jankinwu.fntv.client.enums.FnTvMediaType
+import com.jankinwu.fntv.client.manager.HandleFavoriteResult
+import com.jankinwu.fntv.client.manager.HandleWatchedResult
 import com.jankinwu.fntv.client.ui.component.common.ComponentNavigator
 import com.jankinwu.fntv.client.ui.component.common.MediaLibCardRow
 import com.jankinwu.fntv.client.ui.component.common.MediaLibGallery
 import com.jankinwu.fntv.client.ui.component.common.RecentlyWatched
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
+import com.jankinwu.fntv.client.ui.component.common.ToastManager
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.jankinwu.fntv.client.ui.providable.LocalRefreshState
+import com.jankinwu.fntv.client.ui.providable.LocalStore
 import com.jankinwu.fntv.client.ui.providable.LocalToastManager
 import com.jankinwu.fntv.client.ui.providable.LocalTypography
 import com.jankinwu.fntv.client.ui.providable.LocalUserInfo
@@ -43,6 +48,7 @@ import com.jankinwu.fntv.client.viewmodel.FavoriteViewModel
 import com.jankinwu.fntv.client.viewmodel.ItemListViewModel
 import com.jankinwu.fntv.client.viewmodel.MediaDbListViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayListViewModel
+import com.jankinwu.fntv.client.viewmodel.ProxySettingViewModel
 import com.jankinwu.fntv.client.viewmodel.UiState
 import com.jankinwu.fntv.client.viewmodel.UserInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.WatchedViewModel
@@ -84,7 +90,7 @@ fun HomePageScreen(navigator: ComponentNavigator) {
     }
     val refreshState = LocalRefreshState.current
     val recentlyWatchedListState = rememberLazyListState()
-
+    FntvProxy(toastManager)
     // 监听刷新状态变化
     LaunchedEffect(refreshState.refreshKey) {
         // 当刷新状态变化时执行刷新逻辑
@@ -127,67 +133,87 @@ fun HomePageScreen(navigator: ComponentNavigator) {
         }
     }
 
+    HandleFavoriteResult(
+        favoriteUiState = favoriteUiState,
+        toastManager = toastManager,
+        pendingCallbacks = pendingCallbacks,
+        onPendingCallbackHandled = { id ->
+            pendingCallbacks = pendingCallbacks - id
+        },
+        clearError = { favoriteViewModel.clearError() }
+    )
+
+    HandleWatchedResult(
+        watchedUiState = watchedUiState,
+        toastManager = toastManager,
+        pendingCallbacks = pendingCallbacks,
+        onPendingCallbackHandled = { id ->
+            pendingCallbacks = pendingCallbacks - id
+        },
+        clearError = { watchedViewModel.clearError() }
+    )
+
     // 监听收藏操作结果并显示提示
-    LaunchedEffect(favoriteUiState) {
-        when (val state = favoriteUiState) {
-            is UiState.Success -> {
-                toastManager.showToast(state.data.message, state.data.success)
-                // 调用对应的回调函数
-                pendingCallbacks[state.data.guid]?.invoke(state.data.success)
-                // 从 pendingCallbacks 中移除已处理的回调
-                pendingCallbacks = pendingCallbacks - state.data.guid
-            }
-
-            is UiState.Error -> {
-                // 显示错误提示
-                toastManager.showToast("操作失败，${state.message}", false)
-                state.operationId?.let {
-                    pendingCallbacks[state.operationId]?.invoke(false)
-                    // 从 pendingCallbacks 中移除已处理的回调
-                    pendingCallbacks = pendingCallbacks - state.operationId
-                }
-            }
-
-            else -> {}
-        }
-
-        // 清除状态
-        if (favoriteUiState is UiState.Success || favoriteUiState is UiState.Error) {
-            kotlinx.coroutines.delay(2000) // 2秒后清除状态
-            favoriteViewModel.clearError()
-        }
-    }
-
-    // 监听已观看操作结果并显示提示
-    LaunchedEffect(watchedUiState) {
-        when (val state = watchedUiState) {
-            is UiState.Success -> {
-                toastManager.showToast(state.data.message, state.data.success)
-                // 调用对应的回调函数
-                pendingCallbacks[state.data.guid]?.invoke(state.data.success)
-                // 从 pendingCallbacks 中移除已处理的回调
-                pendingCallbacks = pendingCallbacks - state.data.guid
-            }
-
-            is UiState.Error -> {
-                // 显示错误提示
-                toastManager.showToast("操作失败，${state.message}", false)
-                state.operationId?.let {
-                    pendingCallbacks[state.operationId]?.invoke(false)
-                    // 从 pendingCallbacks 中移除已处理的回调
-                    pendingCallbacks = pendingCallbacks - state.operationId
-                }
-            }
-
-            else -> {}
-        }
-
-        // 清除状态
-        if (watchedUiState is UiState.Success || watchedUiState is UiState.Error) {
-            kotlinx.coroutines.delay(2000) // 2秒后清除状态
-            watchedViewModel.clearError()
-        }
-    }
+//    LaunchedEffect(favoriteUiState) {
+//        when (val state = favoriteUiState) {
+//            is UiState.Success -> {
+//                toastManager.showToast(state.data.message, state.data.success)
+//                // 调用对应的回调函数
+//                pendingCallbacks[state.data.guid]?.invoke(state.data.success)
+//                // 从 pendingCallbacks 中移除已处理的回调
+//                pendingCallbacks = pendingCallbacks - state.data.guid
+//            }
+//
+//            is UiState.Error -> {
+//                // 显示错误提示
+//                toastManager.showToast("操作失败，${state.message}", false)
+//                state.operationId?.let {
+//                    pendingCallbacks[state.operationId]?.invoke(false)
+//                    // 从 pendingCallbacks 中移除已处理的回调
+//                    pendingCallbacks = pendingCallbacks - state.operationId
+//                }
+//            }
+//
+//            else -> {}
+//        }
+//
+//        // 清除状态
+//        if (favoriteUiState is UiState.Success || favoriteUiState is UiState.Error) {
+//            kotlinx.coroutines.delay(2000) // 2秒后清除状态
+//            favoriteViewModel.clearError()
+//        }
+//    }
+//
+//    // 监听已观看操作结果并显示提示
+//    LaunchedEffect(watchedUiState) {
+//        when (val state = watchedUiState) {
+//            is UiState.Success -> {
+//                toastManager.showToast(state.data.message, state.data.success)
+//                // 调用对应的回调函数
+//                pendingCallbacks[state.data.guid]?.invoke(state.data.success)
+//                // 从 pendingCallbacks 中移除已处理的回调
+//                pendingCallbacks = pendingCallbacks - state.data.guid
+//            }
+//
+//            is UiState.Error -> {
+//                // 显示错误提示
+//                toastManager.showToast("操作失败，${state.message}", false)
+//                state.operationId?.let {
+//                    pendingCallbacks[state.operationId]?.invoke(false)
+//                    // 从 pendingCallbacks 中移除已处理的回调
+//                    pendingCallbacks = pendingCallbacks - state.operationId
+//                }
+//            }
+//
+//            else -> {}
+//        }
+//
+//        // 清除状态
+//        if (watchedUiState is UiState.Success || watchedUiState is UiState.Error) {
+//            kotlinx.coroutines.delay(2000) // 2秒后清除状态
+//            watchedViewModel.clearError()
+//        }
+//    }
     CompositionLocalProvider(
         LocalUserInfo provides currentUserInfo,
         LocalToastManager provides toastManager
@@ -333,7 +359,7 @@ fun HomePageScreen(navigator: ComponentNavigator) {
                                     val mediaDataList = when (val listState = itemListUiState) {
                                         is UiState.Success -> {
                                             listState.data.list.map { item ->
-                                                convertToScrollRowItemData(item)
+                                                convertToScrollRowItemDataList(item)
                                             }
                                         }
 
@@ -390,6 +416,39 @@ fun HomePageScreen(navigator: ComponentNavigator) {
                 toastManager = toastManager,
                 modifier = Modifier.fillMaxSize()
             )
+        }
+    }
+}
+
+@Composable
+fun FntvProxy(toastManager: ToastManager) {
+    val store = LocalStore.current
+    val proxySettingViewModel = koinViewModel<ProxySettingViewModel>()
+    val proxyUiState by proxySettingViewModel.uiState.collectAsState()
+    LaunchedEffect(Unit) {
+        if (!store.proxyInitialized) {
+            proxySettingViewModel.clearError()
+            proxySettingViewModel.setProxyInfo(
+                url = AccountDataCache.getFnOfficialBaseUrl(),
+                cookie = AccountDataCache.cookieState
+            )
+        }
+    }
+    LaunchedEffect(proxyUiState) {
+        if (!store.proxyInitialized) {
+            when (proxyUiState) {
+                is UiState.Success -> {
+                    toastManager.showToast("代理设置成功")
+                    store.updateProxyInitialized(true)
+                }
+
+                is UiState.Error -> {
+                    toastManager.showToast("代理设置失败, cause: ${(proxyUiState as UiState.Error).message}")
+                }
+
+                else -> {
+                }
+            }
         }
     }
 }

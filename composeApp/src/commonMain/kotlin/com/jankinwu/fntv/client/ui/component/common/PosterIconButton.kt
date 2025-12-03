@@ -29,8 +29,8 @@ internal fun BottomIconButton(
     modifier: Modifier = Modifier,
     icon: ImageVector,
     contentDescription: String,
-    onClick: () -> Unit =  {},
-    scaleFactor: Float,
+    onClick: () -> Unit = {},
+    scaleFactor: Float? = null,
     iconTint: Color = Color.White,
     iconYOffset: Dp = 0.dp
 ) {
@@ -49,7 +49,7 @@ internal fun BottomIconButton(
         // 悬停时显示的圆形背景
         Box(
             modifier = Modifier
-                .size((28 * scaleFactor).dp)
+                .size(if (scaleFactor == null) 28.dp else (28 * scaleFactor).dp)
                 .align(Alignment.Center)
                 .background(
                     color = if (isHovered) Color.Black.copy(alpha = 0.5f) else Color.Transparent,
@@ -62,7 +62,7 @@ internal fun BottomIconButton(
             contentDescription = contentDescription,
             tint = iconTint,
             modifier = Modifier
-                .size((16 * scaleFactor).dp)
+                .size(if(scaleFactor == null) 16.dp else (16 * scaleFactor).dp)
                 .offset(y = iconYOffset)
                 .align(Alignment.Center)
         )

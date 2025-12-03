@@ -1,6 +1,7 @@
 package com.jankinwu.fntv.client.data.convertor
 
 import com.jankinwu.fntv.client.data.model.ScrollRowItemData
+import com.jankinwu.fntv.client.data.model.response.EpisodeListResponse
 import com.jankinwu.fntv.client.data.model.response.MediaDbListResponse
 import com.jankinwu.fntv.client.data.model.response.MediaItem
 import com.jankinwu.fntv.client.data.model.response.PersonList
@@ -33,7 +34,7 @@ fun convertMediaDbListResponseToScrollRowItem(item: MediaDbListResponse): Scroll
 /**
  * 将 MediaItem 转换为 MediaData
  */
-fun convertToScrollRowItemData(item: MediaItem): ScrollRowItemData {
+fun convertToScrollRowItemDataList(item: MediaItem): ScrollRowItemData {
     val subtitle = if (item.type == FnTvMediaType.TV.value) {
         if (!item.firstAirDate.isNullOrBlank() && !item.lastAirDate.isNullOrBlank()) {
             "共 ${item.numberOfSeasons} 季 · ${item.firstAirDate.take(4)}~${item.lastAirDate.take(4)}"
@@ -107,6 +108,7 @@ fun convertPlayDetailToScrollRowItemData(item: PlayDetailResponse): ScrollRowIte
         guid = item.guid,
         status = item.status,
         type = item.type,
+        parentGuid = item.parentGuid,
     )
 }
 
@@ -379,6 +381,22 @@ object FnDataConvertor {
             voteAverage?.toDoubleOrNull()?.toFloat()?.let { "%.1f".format(it) } ?: "0.0"
         } catch (_: Exception) {
             "0.0"
+        }
+    }
+
+    fun convertToScrollRowItemDataList(episodes: List<EpisodeListResponse>): List<ScrollRowItemData> {
+        return episodes.map { episode ->
+            ScrollRowItemData(
+                title = "第 ${episode.episodeNumber} 集 ${episode.title}",
+                subtitle = episode.overview,
+                resolutions = episode.mediaStream.resolutions,
+                posterImg = episode.poster,
+                isFavourite = episode.isFavorite == 1,
+                isAlreadyWatched = episode.watched == 1,
+                duration = episode.duration,
+                ts = episode.ts.toLong(),
+                guid = episode.guid
+            )
         }
     }
 }

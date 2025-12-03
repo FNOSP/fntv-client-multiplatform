@@ -1,13 +1,22 @@
 package com.jankinwu.fntv.client.ui.screen
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -20,37 +29,48 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.PlatformContext
-import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.AsyncImagePainter
+import coil3.compose.rememberAsyncImagePainter
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import coil3.size.Precision
 import coil3.size.Size
 import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.convertor.FnDataConvertor
+import com.jankinwu.fntv.client.data.convertor.convertPersonToScrollRowItemData
+import com.jankinwu.fntv.client.data.model.ScrollRowItemData
 import com.jankinwu.fntv.client.data.model.response.EpisodeListResponse
 import com.jankinwu.fntv.client.data.model.response.ItemResponse
+import com.jankinwu.fntv.client.data.model.response.PersonList
+import com.jankinwu.fntv.client.data.model.response.PersonListResponse
 import com.jankinwu.fntv.client.data.model.response.PlayInfoResponse
 import com.jankinwu.fntv.client.data.model.response.QueryTagResponse
 import com.jankinwu.fntv.client.data.store.AccountDataCache
 import com.jankinwu.fntv.client.ui.component.common.BackButton
+import com.jankinwu.fntv.client.ui.component.common.CastScrollRow
 import com.jankinwu.fntv.client.ui.component.common.ComponentNavigator
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingError
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
+import com.jankinwu.fntv.client.ui.component.detail.DetailPlayButton
+import com.jankinwu.fntv.client.ui.component.detail.DetailTags
+import com.jankinwu.fntv.client.ui.component.detail.EpisodesScrollRow
 import com.jankinwu.fntv.client.ui.component.detail.ImdbLink
+import com.jankinwu.fntv.client.ui.component.detail.MediaDescription
+import com.jankinwu.fntv.client.ui.component.detail.MediaDescriptionDialog
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
 import com.jankinwu.fntv.client.ui.providable.LocalIsoTagData
+import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.jankinwu.fntv.client.ui.providable.LocalRefreshState
 import com.jankinwu.fntv.client.ui.providable.LocalStore
 import com.jankinwu.fntv.client.ui.providable.LocalToastManager
@@ -58,11 +78,18 @@ import com.jankinwu.fntv.client.ui.providable.LocalTypography
 import com.jankinwu.fntv.client.viewmodel.EpisodeListViewModel
 import com.jankinwu.fntv.client.viewmodel.GenresViewModel
 import com.jankinwu.fntv.client.viewmodel.ItemViewModel
+import com.jankinwu.fntv.client.viewmodel.PersonListViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.TagViewModel
 import com.jankinwu.fntv.client.viewmodel.UiState
+import com.jankinwu.fntv.client.viewmodel.WatchedViewModel
+import io.github.composefluent.FluentTheme
 import io.github.composefluent.component.ScrollbarContainer
 import io.github.composefluent.component.rememberScrollbarAdapter
+import io.github.composefluent.icons.Icons
+import io.github.composefluent.icons.regular.Checkmark
+import io.github.composefluent.icons.regular.MoreHorizontal
+import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -82,7 +109,10 @@ fun TvSeasonDetailScreen(
     val episodeListViewModel: EpisodeListViewModel = koinViewModel()
     val episodeListState by episodeListViewModel.uiState.collectAsState()
     var episodeList: List<EpisodeListResponse> by remember { mutableStateOf(emptyList()) }
-
+    val personListViewModel: PersonListViewModel = koinViewModel()
+    val personListState by personListViewModel.uiState.collectAsState()
+    var personList: List<PersonList> by remember { mutableStateOf(emptyList()) }
+    var castScrollRowItemList by remember { mutableStateOf(emptyList<ScrollRowItemData>()) }
     val tagViewModel: TagViewModel = koinViewModel<TagViewModel>()
     val iso6392State by tagViewModel.iso6392State.collectAsState()
     val iso6391State by tagViewModel.iso6391State.collectAsState()
@@ -99,11 +129,21 @@ fun TvSeasonDetailScreen(
     val genresViewModel: GenresViewModel = koinViewModel<GenresViewModel>()
     val refreshState = LocalRefreshState.current
     val toastManager = rememberToastManager()
-
+    val playerManager = LocalPlayerManager.current
+    var isFirstLoad by remember(guid) { mutableStateOf(true) }
+    // 当从播放器返回时刷新最近播放列表
+    LaunchedEffect(playerManager.playerState) {
+        if (!playerManager.playerState.isVisible && !isFirstLoad) {
+            itemViewModel.loadData(guid)
+            playInfoViewModel.loadData(guid)
+            episodeListViewModel.loadData(guid)
+        }
+    }
     LaunchedEffect(Unit) {
         itemViewModel.loadData(guid)
         playInfoViewModel.loadData(guid)
         episodeListViewModel.loadData(guid)
+        personListViewModel.loadData(guid)
 
         if (iso6392State !is UiState.Success) {
             tagViewModel.loadIso6392Tags()
@@ -114,6 +154,7 @@ fun TvSeasonDetailScreen(
         if (iso3166State !is UiState.Success) {
             tagViewModel.loadIso3166Tags()
         }
+        isFirstLoad = false
     }
     // 监听刷新状态变化
     LaunchedEffect(refreshState.refreshKey) {
@@ -126,6 +167,7 @@ fun TvSeasonDetailScreen(
             tagViewModel.loadIso6392Tags()
             tagViewModel.loadIso3166Tags()
             genresViewModel.loadGenres()
+            personListViewModel.loadData(guid)
         }
     }
     LaunchedEffect(itemUiState) {
@@ -142,7 +184,36 @@ fun TvSeasonDetailScreen(
         println("seasonListState: $episodeListState")
         if (episodeListState is UiState.Success) {
             episodeList = (episodeListState as UiState.Success<List<EpisodeListResponse>>).data
-            println("seasonList2: $episodeList")
+        }
+    }
+
+    LaunchedEffect(playInfoUiState) {
+        when (playInfoUiState) {
+            is UiState.Success -> {
+                playInfoResponse = (playInfoUiState as UiState.Success<PlayInfoResponse>).data
+            }
+
+            is UiState.Error -> {
+                println("message: ${(playInfoUiState as UiState.Error).message}")
+            }
+
+            else -> {}
+        }
+    }
+
+    LaunchedEffect(personListState) {
+        when (personListState) {
+            is UiState.Success -> {
+                personList = (personListState as UiState.Success<PersonListResponse>).data.list
+                castScrollRowItemList = convertPersonToScrollRowItemData(personList)
+                print("scrollRowItemList: $castScrollRowItemList")
+            }
+
+            is UiState.Error -> {
+                println("message: ${(personListState as UiState.Error).message}")
+            }
+
+            else -> {}
         }
     }
 
@@ -174,6 +245,7 @@ fun TvSeasonDetailScreen(
             playInfoResponse = playInfoResponse,
             guid = guid,
             episodeList = episodeList,
+            castScrollRowItemList,
             navigator = navigator
         )
     }
@@ -185,11 +257,52 @@ fun TvEpisodeBody(
     playInfoResponse: PlayInfoResponse?,
     guid: String,
     episodeList: List<EpisodeListResponse>,
+    castScrollRowItemList: List<ScrollRowItemData>,
     navigator: ComponentNavigator,
 ) {
     val store = LocalStore.current
     val windowHeight = store.windowHeightState
     val toastManager = LocalToastManager.current
+    var isWatched by remember(itemData?.isWatched == 1) { mutableStateOf(itemData?.isWatched == 1) }
+    var showDescriptionDialog by remember { mutableStateOf(false) }
+    val watchedViewModel: WatchedViewModel = koinViewModel<WatchedViewModel>()
+    val watchedUiState by watchedViewModel.uiState.collectAsState()
+    val itemViewModel: ItemViewModel = koinViewModel()
+    val episodeListViewModel: EpisodeListViewModel = koinViewModel()
+    val imageRequest = remember(itemData) {
+        if (itemData != null && itemData.posters.isNotBlank()) {
+            ImageRequest.Builder(PlatformContext.INSTANCE)
+                .data("${AccountDataCache.getFnOfficialBaseUrl()}/v/api/v1/sys/img${itemData.posters}")
+                .httpHeaders(store.fnImgHeaders)
+                .crossfade(true)
+                .size(Size.ORIGINAL)
+                .build()
+        } else {
+            null
+        }
+    }
+
+    val painter = rememberAsyncImagePainter(model = imageRequest)
+    val painterState by painter.state.collectAsState()
+
+    // 监听已观看操作结果并显示提示
+    LaunchedEffect(watchedUiState) {
+        when (val state = watchedUiState) {
+            is UiState.Success -> {
+                itemViewModel.loadData(guid)
+                episodeListViewModel.loadData(guid)
+            }
+
+            else -> {}
+        }
+
+        // 清除状态
+        if (watchedUiState is UiState.Success || watchedUiState is UiState.Error) {
+            delay(2000) // 2秒后清除状态
+            watchedViewModel.clearError()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -201,29 +314,19 @@ fun TvEpisodeBody(
                 item {
                     Box(
                         modifier = Modifier
-                                    .height((windowHeight / 2.dp).dp)
-                                    .fillMaxWidth(),
+                            .height((windowHeight / 2.dp).dp)
+                            .fillMaxWidth(),
                         contentAlignment = Alignment.TopCenter
                     ) {
-                        if (itemData != null) {
-                            val backdropsImg =
-                                if (!itemData.backdrops.isNullOrBlank()) itemData.backdrops else itemData.posters
-                            SubcomposeAsyncImage(
-                                model = ImageRequest.Builder(PlatformContext.INSTANCE)
-                                    .data("${AccountDataCache.getFnOfficialBaseUrl()}/v/api/v1/sys/img${backdropsImg}")
-                                    .httpHeaders(store.fnImgHeaders)
-                                    .crossfade(true)
-                                    .size(Size.ORIGINAL)
-                                    .build(),
+                        if (imageRequest != null && itemData != null) {
+                            Image(
+                                painter = painter,
                                 contentDescription = itemData.title,
                                 modifier = Modifier
                                     .height((windowHeight / 2.dp).dp)
                                     .fillMaxWidth()
                                     .blur(10.dp),
                                 contentScale = ContentScale.Crop,
-                                filterQuality = FilterQuality.High,
-                                loading = { ImgLoadingProgressRing() },
-                                error = { ImgLoadingError() },
                             )
                         }
                         // Gradient Overlay
@@ -233,61 +336,156 @@ fun TvEpisodeBody(
                                 .background(
                                     brush = Brush.verticalGradient(
                                         colorStops = arrayOf(
-                                            0.45f to Color.Transparent,
+                                            0.0f to Color.Transparent,
+                                            0.7f to Color(0xFF1A1E23).copy(alpha = 0.5f),
                                             1.0f to if (store.darkMode) Colors.BackgroundColorDark else Colors.BackgroundColorLight
                                         )
                                     )
                                 )
                         )
-                        // Title / Logo
+
+                        // Poster and Info Row
                         if (itemData != null) {
-                            if (itemData.logos != null) {
-                                var imageHeight by remember { mutableStateOf(90.dp) }
-                                SubcomposeAsyncImage(
-                                    model = ImageRequest.Builder(PlatformContext.INSTANCE)
-                                        .data("${AccountDataCache.getFnOfficialBaseUrl()}/v/api/v1/sys/img${itemData.logos}")
-                                        .httpHeaders(store.fnImgHeaders)
-                                        .crossfade(true)
-                                        .precision(Precision.EXACT)
-                                        .build(),
-                                    contentDescription = itemData.title,
-                                    modifier = Modifier
-                                        .align(Alignment.BottomStart)
-                                        .height(imageHeight)
-                                        .padding(start = 48.dp, bottom = 12.dp),
-                                    contentScale = ContentScale.FillHeight,
-                                    filterQuality = FilterQuality.High,
-                                    onSuccess = { state ->
-                                        state.result.image.let { drawable ->
-                                            imageHeight = 90.dp
-                                            val width = drawable.width
-                                            val height = drawable.height
-                                            val actualWidth = width.toDouble() / height * 90
-                                            if (actualWidth > 0 && actualWidth < 280) {
-                                                imageHeight = 150.dp
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(horizontal = 48.dp, vertical = 24.dp)
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                // Poster
+                                if (imageRequest != null) {
+                                    when (painterState) {
+                                        is AsyncImagePainter.State.Loading -> {
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(180.dp)
+                                                    .aspectRatio(2f / 3f),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                ImgLoadingProgressRing()
                                             }
                                         }
+
+                                        is AsyncImagePainter.State.Error -> {
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(180.dp)
+                                                    .aspectRatio(2f / 3f),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                ImgLoadingError()
+                                            }
+                                        }
+
+                                        else -> {
+                                            Image(
+                                                painter = painter,
+                                                contentDescription = itemData.title,
+                                                modifier = Modifier
+                                                    .width(180.dp)
+                                                    .aspectRatio(2f / 3f)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .border(
+                                                        1.dp,
+                                                        Color.White.copy(alpha = 0.2f),
+                                                        RoundedCornerShape(8.dp)
+                                                    ),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        }
                                     }
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomStart)
-                                        .padding(horizontal = 48.dp)
+                                }
+
+                                // Info Column
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.weight(1f)
                                 ) {
+                                    // Title
                                     Text(
-                                        text = itemData.title,
+                                        text = itemData.tvTitle,
                                         style = LocalTypography.current.title,
                                         fontWeight = FontWeight.Medium,
                                         color = Color.White,
-                                        lineHeight = 80.sp,
-                                        fontSize = 60.sp,
+                                        fontSize = 48.sp,
+                                        lineHeight = 56.sp,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
+                                    )
+
+                                    // Season Name
+                                    Text(
+                                        text = itemData.title,
+                                        style = LocalTypography.current.subtitle,
+                                        color = Color.White.copy(alpha = 0.8f),
+                                        fontSize = 24.sp
+                                    )
+
+                                    // Tags
+                                    DetailTags(itemData)
+
+                                    // Buttons
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        DetailPlayButton("第1集") {
+                                            // TODO: Play first episode
+                                        }
+                                        CircleIconButton(
+                                            icon = Icons.Regular.Checkmark,
+                                            description = "已观看",
+                                            iconColor = if (isWatched) Colors.AccentColorDefault else FluentTheme.colors.text.text.primary,
+                                            onClick = {
+                                                watchedViewModel.toggleWatched(
+                                                    guid,
+                                                    isWatched
+                                                )
+                                            }
+                                        )
+                                        CircleIconButton(
+                                            icon = Icons.Regular.MoreHorizontal,
+                                            description = "更多",
+                                            iconColor = FluentTheme.colors.text.text.primary,
+                                            onClick = { /* TODO */ }
+                                        )
+                                    }
+
+                                    // Description
+                                    MediaDescription(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                        itemData = itemData,
+                                        isSeason = true,
+                                        onClick = {
+                                            showDescriptionDialog = true
+                                        }
                                     )
                                 }
                             }
                         }
+                    }
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+
+                item {
+                    EpisodesScrollRow(
+                        episodes = episodeList,
+                        navigator,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+                if (castScrollRowItemList.isNotEmpty()) {
+                    item {
+//                        Spacer(modifier = Modifier.height(24.dp))
+                        CastScrollRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            castScrollRowItemList
+                        )
                     }
                 }
 
@@ -306,5 +504,12 @@ fun TvEpisodeBody(
             toastManager = toastManager,
             modifier = Modifier.fillMaxSize()
         )
+        if (showDescriptionDialog) {
+            MediaDescriptionDialog(
+                title = "电影简介",
+                content = itemData?.overview?.replace("\n\n", "\n") ?: "",
+                onDismiss = { showDescriptionDialog = false }
+            )
+        }
     }
 }

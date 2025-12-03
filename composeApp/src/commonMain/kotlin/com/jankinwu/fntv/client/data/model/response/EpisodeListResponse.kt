@@ -105,7 +105,7 @@ data class EpisodeListResponse(
     val singleChildGuid: String,
 
     @param:JsonProperty("video_guid")
-    val videoGuid: String,
+    val videoGuid: String?,
 
     @param:JsonProperty("file_name")
     val fileName: String

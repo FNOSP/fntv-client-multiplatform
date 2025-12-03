@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -87,6 +88,8 @@ import com.jankinwu.fntv.client.ui.component.common.ToastHost
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.component.detail.DetailPlayButton
 import com.jankinwu.fntv.client.ui.component.detail.DetailTags
+import com.jankinwu.fntv.client.ui.component.detail.MediaDescription
+import com.jankinwu.fntv.client.ui.component.detail.MediaDescriptionDialog
 import com.jankinwu.fntv.client.ui.component.detail.MediaInfo
 import com.jankinwu.fntv.client.ui.component.detail.StreamOptionItem
 import com.jankinwu.fntv.client.ui.component.detail.StreamSelector
@@ -96,6 +99,7 @@ import com.jankinwu.fntv.client.ui.providable.IsoTagData
 import com.jankinwu.fntv.client.ui.providable.LocalFileInfo
 import com.jankinwu.fntv.client.ui.providable.LocalIsoTagData
 import com.jankinwu.fntv.client.ui.providable.LocalMediaPlayer
+import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.jankinwu.fntv.client.ui.providable.LocalRefreshState
 import com.jankinwu.fntv.client.ui.providable.LocalStore
 import com.jankinwu.fntv.client.ui.providable.LocalToastManager
@@ -156,7 +160,16 @@ fun MovieDetailScreen(
     var currentMediaGuid by remember(guid) { mutableStateOf(playInfoResponse?.mediaGuid ?: "") }
     var currentStreamData: CurrentStreamData? by remember(guid) { mutableStateOf(null) }
     val toastManager = rememberToastManager()
-
+    val playerManager = LocalPlayerManager.current
+    var isFirstLoad by remember(guid) { mutableStateOf(true) }
+    // 当从播放器返回时刷新最近播放列表
+    LaunchedEffect(playerManager.playerState) {
+        if (!playerManager.playerState.isVisible && !isFirstLoad) {
+            itemViewModel.loadData(guid)
+            playInfoViewModel.loadData(guid)
+            streamListViewModel.loadData(guid)
+        }
+    }
     LaunchedEffect(Unit) {
         itemViewModel.loadData(guid)
         streamListViewModel.loadData(guid)
@@ -328,6 +341,7 @@ fun MovieDetailBody(
     val store = LocalStore.current
     val windowHeight = store.windowHeightState
     val toastManager = LocalToastManager.current
+    var showDescriptionDialog by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -457,7 +471,10 @@ fun MovieDetailBody(
                                 .padding(horizontal = 48.dp),
                             onMediaGuidChanged = {
                                 onMediaGuidChanged(it)
-                            }
+                            },
+                            onShowDescriptionDialog = {
+                                showDescriptionDialog = true
+                            },
                         )
                     }
                     Spacer(modifier = Modifier.height(20.dp))
@@ -492,6 +509,13 @@ fun MovieDetailBody(
             toastManager = toastManager,
             modifier = Modifier.fillMaxSize()
         )
+        if (showDescriptionDialog) {
+            MediaDescriptionDialog(
+                title = "电影简介",
+                content = itemData?.overview?.replace("\n\n", "\n") ?: "",
+                onDismiss = { showDescriptionDialog = false }
+            )
+        }
     }
 }
 
@@ -503,6 +527,7 @@ fun MediaIntroduction(
     playInfoResponse: PlayInfoResponse,
     modifier: Modifier = Modifier,
     onMediaGuidChanged: (String) -> Unit = {},
+    onShowDescriptionDialog: () -> Unit = {}
 ) {
     var currentMediaGuid by remember { mutableStateOf(playInfoResponse.mediaGuid) }
     var selectedVideoStreamIndex by remember { mutableIntStateOf(0) }
@@ -644,7 +669,9 @@ fun MediaIntroduction(
             }, selectedVideoStreamIndex)
         }
         if (!itemData.overview.isNullOrBlank()) {
-            MediaDescription(modifier = Modifier.padding(bottom = 32.dp), itemData)
+            MediaDescription(modifier = Modifier.padding(bottom = 32.dp), itemData, onClick = {
+                onShowDescriptionDialog()
+            })
         }
     }
 }
@@ -660,11 +687,11 @@ fun MediaSourceBoxes(
     LaunchedEffect(selectedVideoStreamIndex) {
         selectedTagIndex = selectedVideoStreamIndex
     }
-    Row(
+    FlowRow(
         modifier = modifier
             .padding(top = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
     ) {
         val qualityTags = streamData.videoStreams.map {
             val colorRangeType = when (it.colorRangeType) {
@@ -751,7 +778,6 @@ fun MiddleControls(
     var isWatched by remember(itemData.isWatched == 1) { mutableStateOf(itemData.isWatched == 1) }
     val streamListViewModel: StreamListViewModel = koinViewModel()
     val itemViewModel: ItemViewModel = koinViewModel()
-    val isoTagData = LocalIsoTagData.current
     val toastManager = LocalToastManager.current
 
     // 监听收藏操作结果并显示提示
@@ -952,7 +978,7 @@ fun SubtitleSelector(
     val iso6391Map = isoTagData.iso6391Map
     val iso6392Map = isoTagData.iso6392Map
 
-    val selectorOptions by remember(currentSubtitleStreamList, iso6392Map, currentSubtitleStream) {
+    val selectorOptions by remember(currentSubtitleStreamList, iso6392Map, iso6391Map, currentSubtitleStream) {
         derivedStateOf {
             currentSubtitleStreamList.map { subtitleStream ->
                 val languageTitle: String =FnDataConvertor.getLanguageName(
@@ -1001,19 +1027,6 @@ fun Separator() {
         color = FluentTheme.colors.text.text.disabled.copy(alpha = 0.1f),
         fontSize = 16.sp,
         modifier = Modifier.offset(y = (-3).dp)
-    )
-}
-
-@Composable
-fun MediaDescription(modifier: Modifier = Modifier, itemData: ItemResponse?) {
-    val processedOverview = itemData?.overview?.replace("\n\n", "\n") ?: ""
-    Text(
-        text = processedOverview,
-        style = LocalTypography.current.body,
-        color = FluentTheme.colors.text.text.secondary,
-        fontSize = 15.sp,
-        lineHeight = 20.sp,
-        modifier = modifier.fillMaxWidth()
     )
 }
 

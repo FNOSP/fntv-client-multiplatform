@@ -21,5 +21,6 @@ data class ScrollRowItemData(
     val posterHeight: Int = 0,
     val posterWidth: Int = 0,
     val status: String? = "",
-    val type: String? = ""
+    val type: String? = "",
+    val parentGuid: String? = ""
 )

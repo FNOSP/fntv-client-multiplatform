@@ -75,6 +75,7 @@ import io.github.composefluent.icons.regular.PlayCircle
 import kotlinx.coroutines.delay
 import com.jankinwu.fntv.client.ui.providable.LocalStore
 import com.jankinwu.fntv.client.ui.providable.LocalTypography
+import com.jankinwu.fntv.client.ui.screen.TvSeasonDetailScreen
 
 /**
  * 最近观看
@@ -134,8 +135,7 @@ fun RecentlyWatched(
         ScrollRow(
             itemsData = movies,
             listState = recentlyWatchedListState
-        )
-        { index, movie, modifier, _ ->
+        ) { index, movie, modifier, _ ->
             RecentlyWatchedItem(
                 modifier = modifier,
                 title = movie.title,
@@ -146,6 +146,7 @@ fun RecentlyWatched(
                 duration = movie.duration,
                 ts = movie.ts,
                 guid = movie.guid,
+                parentGuid = movie.parentGuid,
                 onFavoriteToggle = onFavoriteToggle,
                 onWatchedToggle = onWatchedToggle,
                 onMarkAsWatched = {
@@ -153,8 +154,8 @@ fun RecentlyWatched(
                     onItemRemoved?.invoke(movie.guid)
                 },
                 status = movie.status,
-                onClick = { movieGuid ->
-                    if (movie.type == FnTvMediaType.MOVIE.value) {
+                onClick = { movieGuid, parentGuid ->
+                    if (movie.type == FnTvMediaType.MOVIE.value  || movie.type == FnTvMediaType.VIDEO.value) {
                         // 创建电影详情页面组件并导航到该页面
                         val movieDetailComponent = ComponentItem(
                             name = "电影详情",
@@ -169,6 +170,23 @@ fun RecentlyWatched(
                             }
                         )
                         navigator.navigate(movieDetailComponent)
+                    } else if (movie.type == FnTvMediaType.EPISODE.value) {
+//                        println("parentGuid: $parentGuid")
+                        val tvDetailComponent = ComponentItem(
+                            name = "剧集分季详情",
+                            group = "/详情",
+                            description = "剧集分季详情页面",
+                            guid = "tv_detail_$parentGuid",
+                            content = { nav ->
+                                parentGuid?.let {
+                                    TvSeasonDetailScreen(
+                                        guid = parentGuid,
+                                        navigator = nav
+                                    )
+                                }
+                            }
+                        )
+                        navigator.navigate(tvDetailComponent)
                     }
                 }
             )
@@ -190,11 +208,12 @@ fun RecentlyWatchedItem(
     duration: Int = 0,
     ts: Long = 0,
     guid: String,
+    parentGuid: String? = null,
     onFavoriteToggle: ((String, Boolean, (Boolean) -> Unit) -> Unit)? = null,
     onWatchedToggle: ((String, Boolean, (Boolean) -> Unit) -> Unit)? = null,
     onMarkAsWatched: (() -> Unit)? = null,
     status: String? = "",
-    onClick: ((String) -> Unit)? = null
+    onClick: ((String, String?) -> Unit)? = null
 ) {
     val store = LocalStore.current
     val scaleFactor = store.scaleFactor
@@ -259,7 +278,11 @@ fun RecentlyWatchedItem(
                     interactionSource = interactionSource,
                     indication = null, // 移除点击波纹效果
                     onClick = {
-                        onClick?.invoke(guid)
+                        if (parentGuid != null) {
+                            onClick?.invoke(guid, parentGuid)
+                        } else {
+                            onClick?.invoke(guid, null)
+                        }
                     }
                 )
                 .pointerHoverIcon(PointerIcon.Hand),
@@ -453,7 +476,9 @@ fun RecentlyWatchedItem(
                         text = it,
                         fontSize = (12 * scaleFactor).sp,
                         textAlign = TextAlign.Center,
-                        color = FluentTheme.colors.text.text.tertiary
+                        color = FluentTheme.colors.text.text.tertiary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
