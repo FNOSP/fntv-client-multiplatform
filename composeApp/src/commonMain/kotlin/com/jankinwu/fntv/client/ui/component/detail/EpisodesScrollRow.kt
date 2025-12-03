@@ -87,6 +87,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun EpisodesScrollRow(
     episodes: List<EpisodeListResponse>,
     navigator: ComponentNavigator,
+    modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberLazyListState()
     val scrollRowItemDataList = FnDataConvertor.convertToScrollRowItemDataList(episodes)
@@ -117,7 +118,7 @@ fun EpisodesScrollRow(
         clearError = { watchedViewModel.clearError() }
     )
     Column(
-        modifier = Modifier
+        modifier = modifier
             .height(230.dp)
     ) {
         ScrollRow(

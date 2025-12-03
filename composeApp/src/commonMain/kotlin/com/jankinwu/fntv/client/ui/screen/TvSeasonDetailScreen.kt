@@ -66,6 +66,8 @@ import com.jankinwu.fntv.client.ui.component.detail.DetailPlayButton
 import com.jankinwu.fntv.client.ui.component.detail.DetailTags
 import com.jankinwu.fntv.client.ui.component.detail.EpisodesScrollRow
 import com.jankinwu.fntv.client.ui.component.detail.ImdbLink
+import com.jankinwu.fntv.client.ui.component.detail.MediaDescription
+import com.jankinwu.fntv.client.ui.component.detail.MediaDescriptionDialog
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
 import com.jankinwu.fntv.client.ui.providable.LocalIsoTagData
 import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
@@ -80,12 +82,14 @@ import com.jankinwu.fntv.client.viewmodel.PersonListViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.TagViewModel
 import com.jankinwu.fntv.client.viewmodel.UiState
+import com.jankinwu.fntv.client.viewmodel.WatchedViewModel
 import io.github.composefluent.FluentTheme
 import io.github.composefluent.component.ScrollbarContainer
 import io.github.composefluent.component.rememberScrollbarAdapter
 import io.github.composefluent.icons.Icons
 import io.github.composefluent.icons.regular.Checkmark
 import io.github.composefluent.icons.regular.MoreHorizontal
+import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -260,8 +264,11 @@ fun TvEpisodeBody(
     val windowHeight = store.windowHeightState
     val toastManager = LocalToastManager.current
     var isWatched by remember(itemData?.isWatched == 1) { mutableStateOf(itemData?.isWatched == 1) }
-
-
+    var showDescriptionDialog by remember { mutableStateOf(false) }
+    val watchedViewModel: WatchedViewModel = koinViewModel<WatchedViewModel>()
+    val watchedUiState by watchedViewModel.uiState.collectAsState()
+    val itemViewModel: ItemViewModel = koinViewModel()
+    val episodeListViewModel: EpisodeListViewModel = koinViewModel()
     val imageRequest = remember(itemData) {
         if (itemData != null && itemData.posters.isNotBlank()) {
             ImageRequest.Builder(PlatformContext.INSTANCE)
@@ -277,6 +284,24 @@ fun TvEpisodeBody(
 
     val painter = rememberAsyncImagePainter(model = imageRequest)
     val painterState by painter.state.collectAsState()
+
+    // 监听已观看操作结果并显示提示
+    LaunchedEffect(watchedUiState) {
+        when (val state = watchedUiState) {
+            is UiState.Success -> {
+                itemViewModel.loadData(guid)
+                episodeListViewModel.loadData(guid)
+            }
+
+            else -> {}
+        }
+
+        // 清除状态
+        if (watchedUiState is UiState.Success || watchedUiState is UiState.Error) {
+            delay(2000) // 2秒后清除状态
+            watchedViewModel.clearError()
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -413,7 +438,12 @@ fun TvEpisodeBody(
                                             icon = Icons.Regular.Checkmark,
                                             description = "已观看",
                                             iconColor = if (isWatched) Colors.AccentColorDefault else FluentTheme.colors.text.text.primary,
-                                            onClick = { /* TODO */ }
+                                            onClick = {
+                                                watchedViewModel.toggleWatched(
+                                                    guid,
+                                                    isWatched
+                                                )
+                                            }
                                         )
                                         CircleIconButton(
                                             icon = Icons.Regular.MoreHorizontal,
@@ -427,7 +457,10 @@ fun TvEpisodeBody(
                                     MediaDescription(
                                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                                         itemData = itemData,
-                                        isSeason =  true
+                                        isSeason = true,
+                                        onClick = {
+                                            showDescriptionDialog = true
+                                        }
                                     )
                                 }
                             }
@@ -437,7 +470,11 @@ fun TvEpisodeBody(
                 }
 
                 item {
-                    EpisodesScrollRow(episodes = episodeList, navigator)
+                    EpisodesScrollRow(
+                        episodes = episodeList,
+                        navigator,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
                     Spacer(modifier = Modifier.height(24.dp))
                 }
                 if (castScrollRowItemList.isNotEmpty()) {
@@ -467,5 +504,12 @@ fun TvEpisodeBody(
             toastManager = toastManager,
             modifier = Modifier.fillMaxSize()
         )
+        if (showDescriptionDialog) {
+            MediaDescriptionDialog(
+                title = "电影简介",
+                content = itemData?.overview?.replace("\n\n", "\n") ?: "",
+                onDismiss = { showDescriptionDialog = false }
+            )
+        }
     }
 }

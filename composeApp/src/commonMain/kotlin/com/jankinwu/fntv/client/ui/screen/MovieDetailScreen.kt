@@ -88,6 +88,8 @@ import com.jankinwu.fntv.client.ui.component.common.ToastHost
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.component.detail.DetailPlayButton
 import com.jankinwu.fntv.client.ui.component.detail.DetailTags
+import com.jankinwu.fntv.client.ui.component.detail.MediaDescription
+import com.jankinwu.fntv.client.ui.component.detail.MediaDescriptionDialog
 import com.jankinwu.fntv.client.ui.component.detail.MediaInfo
 import com.jankinwu.fntv.client.ui.component.detail.StreamOptionItem
 import com.jankinwu.fntv.client.ui.component.detail.StreamSelector
@@ -339,6 +341,7 @@ fun MovieDetailBody(
     val store = LocalStore.current
     val windowHeight = store.windowHeightState
     val toastManager = LocalToastManager.current
+    var showDescriptionDialog by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -468,7 +471,10 @@ fun MovieDetailBody(
                                 .padding(horizontal = 48.dp),
                             onMediaGuidChanged = {
                                 onMediaGuidChanged(it)
-                            }
+                            },
+                            onShowDescriptionDialog = {
+                                showDescriptionDialog = true
+                            },
                         )
                     }
                     Spacer(modifier = Modifier.height(20.dp))
@@ -503,6 +509,13 @@ fun MovieDetailBody(
             toastManager = toastManager,
             modifier = Modifier.fillMaxSize()
         )
+        if (showDescriptionDialog) {
+            MediaDescriptionDialog(
+                title = "电影简介",
+                content = itemData?.overview?.replace("\n\n", "\n") ?: "",
+                onDismiss = { showDescriptionDialog = false }
+            )
+        }
     }
 }
 
@@ -514,6 +527,7 @@ fun MediaIntroduction(
     playInfoResponse: PlayInfoResponse,
     modifier: Modifier = Modifier,
     onMediaGuidChanged: (String) -> Unit = {},
+    onShowDescriptionDialog: () -> Unit = {}
 ) {
     var currentMediaGuid by remember { mutableStateOf(playInfoResponse.mediaGuid) }
     var selectedVideoStreamIndex by remember { mutableIntStateOf(0) }
@@ -655,7 +669,9 @@ fun MediaIntroduction(
             }, selectedVideoStreamIndex)
         }
         if (!itemData.overview.isNullOrBlank()) {
-            MediaDescription(modifier = Modifier.padding(bottom = 32.dp), itemData)
+            MediaDescription(modifier = Modifier.padding(bottom = 32.dp), itemData, onClick = {
+                onShowDescriptionDialog()
+            })
         }
     }
 }
@@ -1011,21 +1027,6 @@ fun Separator() {
         color = FluentTheme.colors.text.text.disabled.copy(alpha = 0.1f),
         fontSize = 16.sp,
         modifier = Modifier.offset(y = (-3).dp)
-    )
-}
-
-@Composable
-fun MediaDescription(modifier: Modifier = Modifier, itemData: ItemResponse?, isSeason: Boolean? = null) {
-    val processedOverview = itemData?.overview?.replace("\n\n", "\n") ?: ""
-    Text(
-        text = processedOverview,
-        style = LocalTypography.current.body,
-        color = FluentTheme.colors.text.text.secondary,
-        fontSize = 15.sp,
-        lineHeight = 20.sp,
-        modifier = modifier.fillMaxWidth(),
-        maxLines = if (isSeason == true) 2 else 5,
-        overflow = if (isSeason == true) TextOverflow.Ellipsis else TextOverflow.Visible
     )
 }
 
