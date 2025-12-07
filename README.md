@@ -37,10 +37,10 @@
   git clone https://github.com/FNOSP/fntv-client-multiplatform.git
   ```
 - 打开项目：
-  - 使用 Android Studio 打开项目
+  - 使用 Android Studio 或 IntelliJ IDEA 打开项目
   - 或者，使用命令行导航到项目目录
 - 运行项目：
-  - 在 Android Studio 中，在 Gradle Tasks 中找到 `compose desktop` -> `run` 任务，双击运行
+  - 在 Android Studio 或 IntelliJ IDEA 中，在 Gradle Tasks 中找到 `compose desktop` -> `run` 任务，双击运行
 - 或者，使用命令行运行：
 
   Linux 或 macOS
@@ -54,7 +54,7 @@
 ### 打包为可执行文件
 
 - 打包桌面端项目：
-  - 在 Android Studio 中，在 Gradle Tasks 中找到 `compose desktop` -> `packageReleaseDistributionForCurrentOS` 任务，双击运行
+  - 在 Android Studio 或 IntelliJ IDEA 中，在 Gradle Tasks 中找到 `compose desktop` -> `packageReleaseDistributionForCurrentOS` 任务，双击运行
   - 或者，使用命令行运行：
 
     Linux 或 macOS
