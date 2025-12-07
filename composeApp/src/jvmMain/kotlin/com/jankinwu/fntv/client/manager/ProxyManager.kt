@@ -1,6 +1,7 @@
 package com.jankinwu.fntv.client.manager
 
 import co.touchlab.kermit.Logger
+import com.jankinwu.fntv.client.utils.ExecutableDirectoryDetector
 import java.io.File
 import java.util.Locale
 
@@ -51,21 +52,27 @@ object ProxyManager {
                 }
             }
         }
+
+        // Check the executable directory as well, just in case it was already extracted there
+        if (!proxyDir.exists()) {
+            try {
+                val exeDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
+                val exeProxyDir = File(exeDir, "fntv-proxy")
+                if (exeProxyDir.exists()) {
+                    proxyDir = exeProxyDir
+                }
+            } catch (e: Exception) {
+                Logger.w("ProxyManager: Failed to get executable directory: ${e.message}")
+            }
+        }
         
         // Try to extract from classpath if not found
         if (!proxyDir.exists() || !File(proxyDir, "$platformDir/$executableName").exists()) {
             try {
-                // Use a persistent location for extracted files
-                // On Windows: AppData/Local/FNTVClient/fntv-proxy
-                // On others: ~/.fntv-client/fntv-proxy
-                val userHome = System.getProperty("user.home")
-                val appDataDir = if (osName.contains("win")) {
-                    File(System.getenv("LOCALAPPDATA") ?: "$userHome/AppData/Local", "FNTVClient")
-                } else {
-                    File(userHome, ".fntv-client")
-                }
+                // Extract to the directory where the executable is located
+                val exeDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
+                val extractDir = File(exeDir, "fntv-proxy")
                 
-                val extractDir = File(appDataDir, "fntv-proxy")
                 if (!extractDir.exists()) {
                     extractDir.mkdirs()
                 }
