@@ -2,11 +2,23 @@ package com.jankinwu.fntv.client.ui.screen
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.OutlinedTextField
+import com.jankinwu.fntv.client.BuildConfig
+import com.jankinwu.fntv.client.data.store.AppSettings
+import com.jankinwu.fntv.client.manager.UpdateStatus
+import com.jankinwu.fntv.client.viewmodel.UpdateViewModel
+import io.github.composefluent.component.AccentButton
+import io.github.composefluent.component.FluentDialog
+import io.github.composefluent.component.DialogSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -16,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +64,7 @@ import io.github.composefluent.icons.Icons
 import io.github.composefluent.icons.regular.ArrowUpRight
 import io.github.composefluent.icons.regular.Blur
 import io.github.composefluent.icons.regular.Color
+import io.github.composefluent.icons.regular.Globe
 import io.github.composefluent.icons.regular.List
 import io.github.composefluent.icons.regular.Navigation
 import org.jetbrains.compose.resources.painterResource
@@ -59,6 +73,9 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun SettingsScreen(componentNavigator: ComponentNavigator) {
     val logoutViewModel: LogoutViewModel = koinViewModel()
+    val updateViewModel: UpdateViewModel = koinViewModel()
+    val updateStatus by updateViewModel.status.collectAsState()
+    var proxyUrl by remember { mutableStateOf(AppSettings.updateProxyUrl) }
     val scrollState = rememberScrollState()
     val uriHandler = LocalUriHandler.current
     Column {
@@ -320,6 +337,34 @@ fun SettingsScreen(componentNavigator: ComponentNavigator) {
 //                    }
                 )
 
+                // Update Settings
+                Header("Update")
+                CardExpanderItem(
+                    heading = { Text("Update Proxy") },
+                    caption = { Text("Proxy URL for checking updates (e.g. https://ghfast.top/)") },
+                    icon = { Icon(Icons.Regular.Globe, null) },
+                    trailing = {
+                         OutlinedTextField(
+                            value = proxyUrl,
+                            onValueChange = { 
+                                proxyUrl = it
+                                AppSettings.updateProxyUrl = it
+                            },
+                            modifier = Modifier.width(200.dp),
+                            singleLine = true
+                        )
+                    }
+                )
+                
+                CardExpanderItem(
+                    heading = { Text("Current Version: ${BuildConfig.VERSION_NAME}") },
+                    trailing = {
+                        Button(onClick = { updateViewModel.checkUpdate() }) {
+                            Text("Check for Updates")
+                        }
+                    }
+                )
+
                 // 添加登出按钮
                 Header("Account")
                 CardExpanderItem(
@@ -341,6 +386,85 @@ fun SettingsScreen(componentNavigator: ComponentNavigator) {
                         LoginStateManager.logout(logoutViewModel)
                     }
                 )
+            }
+        }
+    }
+
+    val status = updateStatus
+    if (status !is UpdateStatus.Idle) {
+        FluentDialog(
+            visible = true,
+            size = DialogSize.Standard
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                when (status) {
+                    is UpdateStatus.Checking -> {
+                        Text("Checking for updates...", style = FluentTheme.typography.subtitle)
+                    }
+                    is UpdateStatus.Available -> {
+                        Text("Update Available", style = FluentTheme.typography.subtitle)
+                        Spacer(Modifier.height(12.dp))
+                        Text("Version: ${status.info.version}")
+                        Spacer(Modifier.height(8.dp))
+                        Text(status.info.releaseNotes)
+                        Spacer(Modifier.height(24.dp))
+                        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                            Button(onClick = { updateViewModel.clearStatus() }) {
+                                Text("Cancel")
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            AccentButton(onClick = { updateViewModel.downloadUpdate(status.info) }) {
+                                Text("Download")
+                            }
+                        }
+                    }
+                    is UpdateStatus.Downloading -> {
+                        Text("Downloading...", style = FluentTheme.typography.subtitle)
+                        Spacer(Modifier.height(12.dp))
+                        Text("Progress: ${(status.progress * 100).toInt()}%")
+                         // ProgressBar if available
+                        Spacer(Modifier.height(24.dp))
+                        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                            Button(onClick = { updateViewModel.clearStatus() }) {
+                                Text("Cancel")
+                            }
+                        }
+                    }
+                    is UpdateStatus.Downloaded -> {
+                        Text("Update Downloaded", style = FluentTheme.typography.subtitle)
+                        Spacer(Modifier.height(12.dp))
+                        Text("File saved to: ${status.filePath}")
+                        Spacer(Modifier.height(24.dp))
+                        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                            AccentButton(onClick = { updateViewModel.clearStatus() }) {
+                                Text("OK")
+                            }
+                        }
+                    }
+                    is UpdateStatus.Error -> {
+                        Text("Error", style = FluentTheme.typography.subtitle)
+                        Spacer(Modifier.height(12.dp))
+                        Text(status.message)
+                        Spacer(Modifier.height(24.dp))
+                        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                            AccentButton(onClick = { updateViewModel.clearStatus() }) {
+                                Text("OK")
+                            }
+                        }
+                    }
+                    is UpdateStatus.UpToDate -> {
+                        Text("Up to Date", style = FluentTheme.typography.subtitle)
+                        Spacer(Modifier.height(12.dp))
+                        Text("You are using the latest version.")
+                        Spacer(Modifier.height(24.dp))
+                        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                            AccentButton(onClick = { updateViewModel.clearStatus() }) {
+                                Text("OK")
+                            }
+                        }
+                    }
+                    else -> {}
+                }
             }
         }
     }

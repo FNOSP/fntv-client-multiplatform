@@ -5,6 +5,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 val osName = System.getProperty("os.name").lowercase()
 val osArch = System.getProperty("os.arch").lowercase()
 
+val appVersion = "1.0.0"
+
 val platformStr = when {
     osName.contains("win") -> {
         when {
@@ -43,6 +45,31 @@ afterEvaluate {
     tasks.findByName("processJvmMainResources")?.dependsOn(prepareProxyResources)
     tasks.findByName("jvmProcessResources")?.dependsOn(prepareProxyResources)
     tasks.findByName("processResources")?.dependsOn(prepareProxyResources)
+    
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        dependsOn(generateBuildConfig)
+    }
+}
+
+val buildConfigDir = layout.buildDirectory.dir("generated/source/buildConfig/commonMain")
+
+val generateBuildConfig by tasks.registering {
+    val outputDir = buildConfigDir
+    val version = appVersion
+    inputs.property("version", version)
+    outputs.dir(outputDir)
+
+    doLast {
+        val configFile = outputDir.get().file("com/jankinwu/fntv/client/BuildConfig.kt").asFile
+        configFile.parentFile.mkdirs()
+        configFile.writeText("""
+            package com.jankinwu.fntv.client
+
+            object BuildConfig {
+                const val VERSION_NAME = "$version"
+            }
+        """.trimIndent())
+    }
 }
 
 plugins {
@@ -64,6 +91,9 @@ kotlin {
     jvm()
     
     sourceSets {
+        commonMain {
+            kotlin.srcDir(buildConfigDir)
+        }
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
@@ -139,7 +169,7 @@ compose.desktop {
             // 使用英文作为包名，避免Windows下打包乱码和路径问题
             // Use English package name to avoid garbled text on Windows
             packageName = "FnMedia"
-            packageVersion = "1.0.0"
+            packageVersion = appVersion
             // Description acts as the process name in Task Manager. Using Chinese here causes garbled text due to jpackage limitations.
             description = "FnMedia"
             vendor = "JankinWu"
