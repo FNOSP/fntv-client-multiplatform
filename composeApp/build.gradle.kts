@@ -264,6 +264,34 @@ android {
 
 tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>().configureEach {
     dependsOn(prepareProxyResources)
+
+    doLast {
+        val destDir = destinationDir.get().asFile
+        val currentOs = System.getProperty("os.name").lowercase()
+        val osName = when {
+            currentOs.contains("mac") -> "MacOS"
+            currentOs.contains("nix") || currentOs.contains("nux") -> "Linux"
+            else -> "Unknown"
+        }
+        val arch = System.getProperty("os.arch").lowercase().let {
+            when (it) {
+                "x86_64" -> "amd64"
+                else -> it
+            }
+        }
+        
+        destDir.listFiles()?.forEach { file ->
+            val ext = file.extension
+            if (ext in listOf("dmg", "deb", "rpm")) {
+                val newName = "FnMedia_Setup_${osName}_${arch}_${appVersion}.${ext}"
+                val newFile = file.parentFile.resolve(newName)
+                if (file.name != newName) {
+                    file.renameTo(newFile)
+                    logger.lifecycle("Renamed output to: ${newFile.name}")
+                }
+            }
+        }
+    }
 }
 
 tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractRunDistributableTask>().configureEach {
