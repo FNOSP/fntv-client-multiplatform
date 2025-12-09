@@ -309,11 +309,14 @@ fun SettingsScreen(componentNavigator: ComponentNavigator) {
                     icon = {
                         Icon(
                             UpdateVersion,
-                            null, modifier = Modifier.size(18.dp)
+                            "版本升级", modifier = Modifier.size(18.dp)
                         )
                     },
                     trailing = {
-                        Button(onClick = { updateViewModel.checkUpdate() }) {
+                        Button(
+                            modifier = Modifier
+                                .pointerHoverIcon(PointerIcon.Hand),
+                            onClick = { updateViewModel.checkUpdate() }) {
                             Text("检查更新")
                         }
                     }
