@@ -5,16 +5,27 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/fatih/color"
 	"github.com/shirou/gopsutil/v3/process"
+	"golang.org/x/sys/windows"
 )
 
 // Constants
 const (
 	AppName = "FnMedia.exe"
+	
+	// MessageBox constants
+	MB_OK                = 0x00000000
+	MB_ICONINFORMATION   = 0x00000040
+	MB_ICONWARNING       = 0x00000030
+	MB_ICONERROR         = 0x00000010
+	MB_ICONQUESTION      = 0x00000020
+	MB_SYSTEMMODAL       = 0x00001000
 )
 
 // Logging
@@ -35,10 +46,38 @@ func success(format string, args ...interface{}) {
 
 func warn(format string, args ...interface{}) {
 	logMsg("warn", color.New(color.FgHiYellow), format, args...)
+	showMessageBox(fmt.Sprintf(format, args...), "FnMedia Updater - Warning", MB_OK|MB_ICONWARNING|MB_SYSTEMMODAL)
 }
 
 func errorLog(format string, args ...interface{}) {
 	logMsg("error", color.New(color.FgHiRed), format, args...)
+	showMessageBox(fmt.Sprintf(format, args...), "FnMedia Updater - Error", MB_OK|MB_ICONERROR|MB_SYSTEMMODAL)
+}
+
+// showMessageBox displays a Windows message box
+func showMessageBox(message, title string, flags uint) {
+	if !isWindows() {
+		return
+	}
+	
+	// Convert strings to UTF16 pointers
+	messagePtr, _ := windows.UTF16PtrFromString(message)
+	titlePtr, _ := windows.UTF16PtrFromString(title)
+	
+	// Show message box
+	user32 := windows.NewLazySystemDLL("user32.dll")
+	MessageBox := user32.NewProc("MessageBoxW")
+	MessageBox.Call(
+		0,
+		uintptr(unsafe.Pointer(messagePtr)),
+		uintptr(unsafe.Pointer(titlePtr)),
+		uintptr(flags),
+	)
+}
+
+// isWindows checks if we are running on Windows
+func isWindows() bool {
+	return strings.Contains(strings.ToLower(runtime.GOOS), "windows")
 }
 
 func main() {
@@ -74,7 +113,7 @@ func main() {
 	}
 
 	info("Starting installer: %s", installerPath)
-	// Execute “FnMedia_Setup_xxx.exe /SILENT /SP- /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS”
+	// Execute "FnMedia_Setup_xxx.exe /SILENT /SP- /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS"
 	cmd := exec.Command(installerPath, "/SILENT", "/SP-", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS")
 
 	if err := cmd.Run(); err != nil {
