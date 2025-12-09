@@ -25,6 +25,7 @@ import io.github.composefluent.component.Text
 fun UpdateDialog(
     status: UpdateStatus,
     onDownload: (UpdateInfo) -> Unit,
+    onInstall: (UpdateInfo) -> Unit,
     onDismiss: () -> Unit
 ) {
     if (status !is UpdateStatus.Idle) {
@@ -85,11 +86,15 @@ fun UpdateDialog(
                             horizontalArrangement = Arrangement.End,
                             modifier = Modifier.fillMaxWidth()
                         ) {
+                            Button(onClick = onDismiss) {
+                                Text("Cancel")
+                            }
+                            Spacer(Modifier.width(8.dp))
                             AccentButton(
                                 buttonColors = customAccentButtonColors(),
-                                onClick = onDismiss
+                                onClick = { onInstall(status.info) }
                             ) {
-                                Text("OK")
+                                Text("Install")
                             }
                         }
                     }

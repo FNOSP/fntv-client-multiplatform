@@ -5,9 +5,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 data class GitHubRelease(
     val url: String,
-    @param:JsonProperty("assets_url") val assetsUrl: String,
-    @param:JsonProperty("html_url") val htmlUrl: String,
-    @param:JsonProperty("tag_name") val tagName: String,
+    @param:JsonProperty("assets_url")
+    val assetsUrl: String,
+    @param:JsonProperty("html_url")
+    val htmlUrl: String,
+    @param:JsonProperty("tag_name")
+    val tagName: String,
     val name: String,
     val assets: List<GitHubAsset>,
     val body: String
@@ -16,7 +19,8 @@ data class GitHubRelease(
 data class GitHubAsset(
     val url: String,
     val name: String,
-    @param:JsonProperty("browser_download_url") val browserDownloadUrl: String,
+    @param:JsonProperty("browser_download_url")
+    val browserDownloadUrl: String,
     val size: Long
 )
 
@@ -35,12 +39,13 @@ sealed class UpdateStatus {
     object UpToDate : UpdateStatus()
     data class Error(val message: String) : UpdateStatus()
     data class Downloading(val progress: Float) : UpdateStatus()
-    data class Downloaded(val filePath: String) : UpdateStatus()
+    data class Downloaded(val info: UpdateInfo, val filePath: String) : UpdateStatus()
 }
 
 interface UpdateManager {
     val status: StateFlow<UpdateStatus>
     fun checkUpdate(proxyUrl: String)
     fun downloadUpdate(proxyUrl: String, info: UpdateInfo)
+    fun installUpdate(info: UpdateInfo)
     fun clearStatus()
 }

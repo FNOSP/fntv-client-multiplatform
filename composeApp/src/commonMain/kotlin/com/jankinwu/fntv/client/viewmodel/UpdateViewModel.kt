@@ -19,6 +19,10 @@ class UpdateViewModel : BaseViewModel() {
         updateManager.downloadUpdate(proxyUrl, info)
     }
     
+    fun installUpdate(info: UpdateInfo) {
+        updateManager.installUpdate(info)
+    }
+    
     fun clearStatus() {
         updateManager.clearStatus()
     }

@@ -78,6 +78,7 @@ fun SettingsScreen(componentNavigator: ComponentNavigator) {
     UpdateDialog(
         status = updateStatus,
         onDownload = { info -> updateViewModel.downloadUpdate(info) },
+        onInstall = { info -> updateViewModel.installUpdate(info) },
         onDismiss = { updateViewModel.clearStatus() }
     )
 

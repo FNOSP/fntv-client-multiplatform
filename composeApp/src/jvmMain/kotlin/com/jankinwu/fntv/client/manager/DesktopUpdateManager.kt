@@ -2,7 +2,11 @@ package com.jankinwu.fntv.client.manager
 
 import co.touchlab.kermit.Logger
 import com.jankinwu.fntv.client.BuildConfig
+import com.jankinwu.fntv.client.utils.DesktopUpdateInstaller
 import com.jankinwu.fntv.client.utils.ExecutableDirectoryDetector
+import com.jankinwu.fntv.client.utils.InstallationResult
+import com.jankinwu.fntv.client.utils.inSystem
+import com.jankinwu.fntv.client.utils.toKtPath
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -68,15 +72,22 @@ class DesktopUpdateManager : UpdateManager {
                     }
                     
                     if (asset != null) {
-                         _status.value = UpdateStatus.Available(
-                             UpdateInfo(
-                                 version = remoteVersion,
-                                 releaseNotes = release.body,
-                                 downloadUrl = asset.browserDownloadUrl,
-                                 fileName = asset.name,
-                                 size = asset.size
-                             )
+                         val updateInfo = UpdateInfo(
+                             version = remoteVersion,
+                             releaseNotes = release.body,
+                             downloadUrl = asset.browserDownloadUrl,
+                             fileName = asset.name,
+                             size = asset.size
                          )
+                         
+                         val executableDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
+                         val file = File(executableDir, asset.name)
+                         
+                         if (file.exists() && file.length() == asset.size) {
+                             _status.value = UpdateStatus.Downloaded(updateInfo, file.absolutePath)
+                         } else {
+                             _status.value = UpdateStatus.Available(updateInfo)
+                         }
                     } else {
                         _status.value = UpdateStatus.Error("No compatible asset found for arch: $arch")
                     }
@@ -132,7 +143,7 @@ class DesktopUpdateManager : UpdateManager {
                         output.close()
                     }
                 }
-                _status.value = UpdateStatus.Downloaded(file.absolutePath)
+                _status.value = UpdateStatus.Downloaded(info, file.absolutePath)
             } catch (e: Exception) {
                  Logger.e("Download failed", e)
                 _status.value = UpdateStatus.Error("Download failed: ${e.message}")
@@ -140,6 +151,21 @@ class DesktopUpdateManager : UpdateManager {
         }
     }
     
+    override fun installUpdate(info: UpdateInfo) {
+        val executableDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
+        val file = File(executableDir, info.fileName)
+        
+        val systemPath = file.toKtPath().inSystem
+        
+        val installer = DesktopUpdateInstaller.currentOS()
+        scope.launch {
+            val result = installer.install(systemPath, null)
+             if (result is InstallationResult.Failed) {
+                 _status.value = UpdateStatus.Error("Installation failed: ${result.message}")
+            }
+        }
+    }
+
     override fun clearStatus() {
         _status.value = UpdateStatus.Idle
     }
