@@ -73,6 +73,13 @@ func main() {
 
 	logger.Success("Installation completed successfully.")
 
+	logger.Info("Deleting installer file: %s", installerPath)
+	if err := os.Remove(installerPath); err != nil {
+		logger.Info("Failed to delete installer file: %v", err)
+	} else {
+		logger.Success("Installer file deleted successfully.")
+	}
+
 	// Launch the app
 	appName := consts.AppName
 	appPath := filepath.Join(installDir, appName)
