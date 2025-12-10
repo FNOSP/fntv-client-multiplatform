@@ -93,6 +93,8 @@ import io.github.composefluent.icons.regular.MoreHorizontal
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
+private val logger = Logger.withTag("TvSeasonDetailScreen")
+
 @Composable
 fun TvSeasonDetailScreen(
     guid: String,
@@ -194,7 +196,7 @@ fun TvSeasonDetailScreen(
             }
 
             is UiState.Error -> {
-                Logger.e("message: ${(playInfoUiState as UiState.Error).message}")
+                logger.e("message: ${(playInfoUiState as UiState.Error).message}")
             }
 
             else -> {}
@@ -206,11 +208,11 @@ fun TvSeasonDetailScreen(
             is UiState.Success -> {
                 personList = (personListState as UiState.Success<PersonListResponse>).data.list
                 castScrollRowItemList = convertPersonToScrollRowItemData(personList)
-                Logger.i("scrollRowItemList: $castScrollRowItemList")
+                logger.i("scrollRowItemList: $castScrollRowItemList")
             }
 
             is UiState.Error -> {
-                Logger.e("message: ${(personListState as UiState.Error).message}")
+                logger.e("message: ${(personListState as UiState.Error).message}")
             }
 
             else -> {}

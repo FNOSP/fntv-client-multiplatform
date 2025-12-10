@@ -223,7 +223,7 @@ compose.desktop {
             }
             linux {
                 iconFile.set(project.file("icons/favicon.png"))
-                packageName = "fntv-client"
+                packageName = "FnMedia"
                 shortcut = true
             }
         }

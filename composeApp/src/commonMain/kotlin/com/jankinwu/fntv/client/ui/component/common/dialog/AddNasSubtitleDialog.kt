@@ -61,6 +61,8 @@ import io.github.composefluent.component.Text
 import io.github.composefluent.component.rememberScrollbarAdapter
 import org.koin.compose.viewmodel.koinViewModel
 
+private val logger = Logger.withTag("AddNasSubtitleDialog")
+
 @Composable
 fun AddNasSubtitleDialog(
     title: String,
@@ -202,7 +204,7 @@ fun AddNasSubtitleBox(
                         onSelectionChanged = { paths ->
                             onSelectionChanged(paths)
                             // 调试：打印选中的路径
-                            Logger.i("Selected Paths: $paths")
+                            logger.i("Selected Paths: $paths")
                         },
                         modifier = Modifier.fillMaxSize() // 占据剩余空间
                     )

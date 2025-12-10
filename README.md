@@ -95,12 +95,12 @@
 本项目使用或参考以下开源项目：
 
 - [Fluent Design UI ](https://github.com/compose-fluent/compose-fluent-ui) - 适用于 Compose Multiplatform 的 UI 框架
-- [mediamp](https://github.com/open-ani/mediamp) -  适用于 Compose Multiplatform 的音视频播放器
-- [animeko](https://github.com/open-ani/animeko) - 集找番、追番、看番的一站式弹幕追番平台
-- [coil](https://github.com/coil-kt/coil) - 适用于 Compose Multiplatform 的图片加载器
-- [koin](https://github.com/InsertKoinIO/koin) - 适用于 Kotlin Multiplatform 的实用轻量级依赖注入框架
-- [ktor](https://github.com/ktorio/ktor) - 使用 Kotlin 编写的 web 服务异步框架
-- [kermit](https://github.com/touchlab/Kermit) - 适用于 Kotlin Multiplatform 的日志记录工具
+- [MediaMP](https://github.com/open-ani/mediamp) -  适用于 Compose Multiplatform 的音视频播放器
+- [Animeko](https://github.com/open-ani/animeko) - 集找番、追番、看番的一站式弹幕追番平台
+- [Coil](https://github.com/coil-kt/coil) - 适用于 Compose Multiplatform 的图片加载器
+- [Koin](https://github.com/InsertKoinIO/koin) - 适用于 Kotlin Multiplatform 的实用轻量级依赖注入框架
+- [Ktor](https://github.com/ktorio/ktor) - 使用 Kotlin 编写的 web 服务异步框架
+- [Kermit](https://github.com/touchlab/Kermit) - 适用于 Kotlin Multiplatform 的日志记录工具
 - [jSystemThemeDetector](https://github.com/Dansoftowner/jSystemThemeDetector) - 用于检测（桌面）操作系统是否使用深色 UI 主题的 Java 库
 - [fntv-electron](https://github.com/QiaoKes/fntv-electron) - 飞牛影视PC版 electron 封装
 - [fnos-tv](https://github.com/thshu/fnos-tv) - 基于飞牛影视接口开发的网页端

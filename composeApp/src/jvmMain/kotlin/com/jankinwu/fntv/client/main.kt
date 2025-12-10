@@ -17,6 +17,7 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import co.touchlab.kermit.Logger
 import com.jankinwu.fntv.client.data.network.apiModule
 import com.jankinwu.fntv.client.manager.LoginStateManager
 import com.jankinwu.fntv.client.manager.PreferencesManager
@@ -28,6 +29,9 @@ import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.jankinwu.fntv.client.ui.screen.LoginScreen
 import com.jankinwu.fntv.client.ui.screen.PlayerManager
 import com.jankinwu.fntv.client.ui.screen.PlayerOverlay
+import com.jankinwu.fntv.client.utils.ConsoleLogWriter
+import com.jankinwu.fntv.client.utils.ExecutableDirectoryDetector
+import com.jankinwu.fntv.client.utils.FileLogWriter
 import com.jankinwu.fntv.client.viewmodel.UiState
 import com.jankinwu.fntv.client.viewmodel.UserInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.viewModelModule
@@ -39,8 +43,13 @@ import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
 import org.openani.mediamp.compose.rememberMediampPlayer
 import java.awt.Dimension
+import java.io.File
 
 fun main() = application {
+    val logDir = initializeLoggingDirectory()
+    Logger.setLogWriters(ConsoleLogWriter(), FileLogWriter(logDir))
+    Logger.withTag("main").i { "Application started. Logs directory: ${logDir.absolutePath}" }
+
     DisposableEffect(Unit) {
         ProxyManager.start()
         onDispose {
@@ -131,6 +140,39 @@ fun main() = application {
             }
         }
     }
+}
+
+/**
+ * 初始化日志目录
+ * 根据应用程序运行模式（开发模式或打包模式）确定日志目录位置
+ */
+private fun initializeLoggingDirectory(): File {
+    val userDirStr = System.getProperty("user.dir")
+    val userDirFile = File(userDirStr)
+    
+    // Check if we are running in development mode (via Gradle/IDE)
+    // We assume dev mode if build.gradle.kts exists in user.dir or user.dir/composeApp
+    val isDev = System.getProperty("compose.application.resources.dir") == null ||
+            File(userDirFile, "build.gradle.kts").exists()
+
+    val logDir = if (isDev) {
+        // Dev mode: try to find project root to place logs there
+        if (File(userDirFile.parentFile, "settings.gradle.kts").exists()) {
+            File(userDirFile.parentFile, "logs")
+        } else {
+            File(userDirFile, "logs")
+        }
+    } else {
+        // Packaged mode: use app dir / logs
+        val appDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
+        File(appDir, "logs")
+    }
+
+    if (!logDir.exists()) {
+        logDir.mkdirs()
+    }
+    
+    return logDir
 }
 
 /**

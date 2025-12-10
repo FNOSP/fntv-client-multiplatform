@@ -87,6 +87,8 @@ import io.github.composefluent.icons.regular.MoreHorizontal
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
+private val logger = Logger.withTag("TvDetailScreen")
+
 @Composable
 fun TvDetailScreen(
     guid: String,
@@ -171,7 +173,7 @@ fun TvDetailScreen(
         }
     }
     LaunchedEffect(seasonListState) {
-        Logger.i("seasonListState: $seasonListState")
+        logger.i("seasonListState: $seasonListState")
         if (seasonListState is UiState.Success) {
             seasonList = (seasonListState as UiState.Success<List<SeasonListResponse>>).data
         }

@@ -59,6 +59,8 @@ import io.github.composefluent.component.Text
 import io.github.composefluent.component.rememberScrollbarAdapter
 import org.koin.compose.viewmodel.koinViewModel
 
+private val logger = Logger.withTag("HomePageScreen")
+
 @Composable
 fun HomePageScreen(navigator: ComponentNavigator) {
     val mediaDbListViewModel: MediaDbListViewModel = koinViewModel<MediaDbListViewModel>()
@@ -385,7 +387,7 @@ fun FntvProxy(toastManager: ToastManager) {
                 }
 
                 is UiState.Error -> {
-                    Logger.e { "代理设置失败, cause: ${(proxyUiState as UiState.Error).message}" }
+                    logger.e { "代理设置失败, cause: ${(proxyUiState as UiState.Error).message}" }
                     toastManager.showToast("代理设置失败, cause: ${(proxyUiState as UiState.Error).message}")
                 }
 

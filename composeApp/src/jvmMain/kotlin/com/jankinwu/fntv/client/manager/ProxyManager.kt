@@ -6,19 +6,23 @@ import java.io.File
 import java.util.Locale
 
 object ProxyManager {
+    private val logger = Logger.withTag("ProxyManager")
     private var proxyProcess: Process? = null
 
     fun start() {
         if (proxyProcess != null && proxyProcess!!.isAlive) {
             return
         }
+        
+        // Try to kill existing proxy process to avoid port conflict (especially in dev mode)
+        killExistingProxy()
 
         val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
         val osArch = System.getProperty("os.arch").lowercase(Locale.getDefault())
 
         val platformDir = getPlatformDir(osName, osArch)
         if (platformDir == null) {
-            Logger.i("ProxyManager: Unsupported platform: $osName / $osArch")
+            logger.i("Unsupported platform: $osName / $osArch")
             return
         }
 
@@ -66,7 +70,7 @@ object ProxyManager {
                     proxyDir = exeProxyDir
                 }
             } catch (e: Exception) {
-                Logger.w("ProxyManager: Failed to get executable directory: ${e.message}")
+                logger.w("Failed to get executable directory: ${e.message}")
             }
         }
         
@@ -93,7 +97,7 @@ object ProxyManager {
                     // Copy if not exists or size differs (simple check)
                     // Ideally check version or hash, but here we just ensure it exists
                     if (!targetFile.exists()) {
-                        Logger.i("ProxyManager: Extracting proxy to ${targetFile.absolutePath}")
+                        logger.i("Extracting proxy to ${targetFile.absolutePath}")
                         targetFile.outputStream().use { output ->
                             resourceStream.copyTo(output)
                         }
@@ -103,17 +107,17 @@ object ProxyManager {
                     }
                     proxyDir = extractDir
                 } else {
-                    Logger.i("ProxyManager: Resource not found in classpath: $resourcePath")
+                    logger.i("Resource not found in classpath: $resourcePath")
                 }
             } catch (e: Exception) {
-                Logger.e("ProxyManager: Failed to extract proxy: ${e.message}", e)
+                logger.e("Failed to extract proxy: ${e.message}", e)
             }
         }
 
         val executableFile = File(proxyDir, "$platformDir/$executableName")
         
         if (!executableFile.exists()) {
-            Logger.w("ProxyManager: Executable not found at ${executableFile.absolutePath}")
+            logger.w("Executable not found at ${executableFile.absolutePath}")
             return
         }
 
@@ -127,7 +131,7 @@ object ProxyManager {
             
             // Start process
             proxyProcess = pb.start()
-            Logger.i("ProxyManager: Started proxy at ${executableFile.absolutePath}")
+            logger.i("Started proxy at ${executableFile.absolutePath}")
 
             // Consume output streams to prevent blocking
             Thread {
@@ -145,7 +149,7 @@ object ProxyManager {
             Thread {
                 try {
                     proxyProcess?.errorStream?.bufferedReader()?.forEachLine {
-                        Logger.e("ProxyManager Error: $it")
+                        logger.e("Proxy Error: $it")
                     }
                 } catch (_: Exception) {
                      // Ignore stream close errors
@@ -161,7 +165,7 @@ object ProxyManager {
             })
 
         } catch (e: Exception) {
-            Logger.e("ProxyManager: Failed to start proxy: ${e.message}", e)
+            logger.e("Failed to start proxy: ${e.message}", e)
         }
     }
 
@@ -170,10 +174,10 @@ object ProxyManager {
             try {
                 if (proxyProcess!!.isAlive) {
                     proxyProcess!!.destroy()
-                    Logger.i("ProxyManager: Proxy stopped")
+                    logger.i("Proxy stopped")
                 }
             } catch (e: Exception) {
-                Logger.e("ProxyManager: Failed to stop the proxy, case: ", e)
+                logger.e("Failed to stop the proxy, case: ", e)
             } finally {
                 proxyProcess = null
             }
@@ -196,6 +200,20 @@ object ProxyManager {
                 if (osArch.contains("aarch64") || osArch.contains("arm")) "linux_aarch64" else "linux_amd64"
             }
             else -> null
+        }
+    }
+
+    private fun killExistingProxy() {
+        try {
+            val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
+            if (osName.contains("win")) {
+                Runtime.getRuntime().exec("taskkill /F /IM fntv-proxy.exe").waitFor()
+            } else {
+                Runtime.getRuntime().exec(arrayOf("pkill", "-f", "fntv-proxy")).waitFor()
+            }
+        } catch (e: Exception) {
+            // Ignore errors (e.g. process not found)
+            logger.w("Failed to kill existing proxy: ${e.message}")
         }
     }
 }

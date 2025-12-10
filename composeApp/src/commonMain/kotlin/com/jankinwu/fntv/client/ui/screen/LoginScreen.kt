@@ -97,6 +97,8 @@ import io.github.composefluent.component.rememberScrollbarAdapter
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.viewmodel.koinViewModel
 
+private val logger = Logger.withTag("LoginScreen")
+
 // 自定义颜色以匹配图片风格
 val CardBackgroundColor = Color(0xFF1A1D26).copy(alpha = 1f)
 val PrimaryBlue = Color(0xFF3A7BFF)
@@ -147,7 +149,7 @@ fun LoginScreen(navigator: ComponentNavigator) {
                 AccountDataCache.authorization = state.data.token
                 AccountDataCache.isLoggedIn = true
                 AccountDataCache.insertCookie("Trim-MC-token" to state.data.token)
-                Logger.i("登录成功，cookie: ${AccountDataCache.cookieState}")
+                logger.i("登录成功，cookie: ${AccountDataCache.cookieState}")
                 val preferencesManager = PreferencesManager.getInstance()
                 preferencesManager.saveToken(state.data.token)
                 loginViewModel.clearError()
@@ -176,12 +178,12 @@ fun LoginScreen(navigator: ComponentNavigator) {
             is UiState.Error -> {
                 // 登录失败，可以显示错误信息
                 toastManager.showToast("登录失败，${state.message}", false)
-                Logger.e("登录失败: ${state.message}")
+                logger.e("登录失败: ${state.message}")
 
                 // 检查是否是证书错误
                 if (state.message.contains("PKIX path building failed") || state.message.contains("unable to find valid certification path")) {
                     // Todo 这里应该显示一个对话框询问用户是否信任证书
-                    Logger.w ("检测到SSL证书错误，需要用户确认是否信任证书")
+                    logger.w("检测到SSL证书错误，需要用户确认是否信任证书")
                 }
             }
 

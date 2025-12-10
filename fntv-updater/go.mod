@@ -1,4 +1,4 @@
-module ani_update_go
+module fntv_updater
 
 go 1.25.4
 

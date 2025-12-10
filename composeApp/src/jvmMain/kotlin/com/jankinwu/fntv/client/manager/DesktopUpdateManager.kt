@@ -32,6 +32,7 @@ import java.util.Locale
 import kotlin.math.max
 
 class DesktopUpdateManager : UpdateManager {
+    private val logger = Logger.withTag("DesktopUpdateManager")
     private val scope = CoroutineScope(Dispatchers.IO)
     private var downloadJob: Job? = null
     private val _status = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
@@ -49,22 +50,16 @@ class DesktopUpdateManager : UpdateManager {
         scope.launch {
             _status.value = UpdateStatus.Checking
             try {
-                val baseUrl = if (proxyUrl.isNotBlank()) {
-                    if (proxyUrl.endsWith("/")) proxyUrl else "$proxyUrl/"
-                } else {
-                    ""
-                }
-                
                 val targetUrl = "https://api.github.com/repos/FNOSP/fntv-client-multiplatform/releases/latest"
 
-                Logger.i("Checking update from: $targetUrl")
+                logger.i("Checking update from: $targetUrl")
                 
                 val release: GitHubRelease = client.get(targetUrl).body()
                 val currentVersion = BuildConfig.VERSION_NAME
                 
                 val remoteVersion = release.name.removePrefix("v").trim()
                 
-                Logger.i("Current version: $currentVersion, Remote version: $remoteVersion")
+                logger.i("Current version: $currentVersion, Remote version: $remoteVersion")
 
                 if (compareVersions(remoteVersion, currentVersion) > 0) {
                     val arch = getSystemArch()
@@ -88,11 +83,10 @@ class DesktopUpdateManager : UpdateManager {
                              size = asset.size
                          )
                          
-                         val executableDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
-                         val file = File(executableDir, asset.name)
+                         val file = findUpdateFile(asset.name)
                          
                          if (file.exists() && file.length() == asset.size) {
-                             _status.value = UpdateStatus.Downloaded(updateInfo, file.absolutePath)
+                             _status.value = UpdateStatus.ReadyToInstall(updateInfo, file.absolutePath)
                          } else {
                              _status.value = UpdateStatus.Available(updateInfo)
                          }
@@ -104,10 +98,23 @@ class DesktopUpdateManager : UpdateManager {
                     _status.value = UpdateStatus.UpToDate
                 }
             } catch (e: Exception) {
-                Logger.e("Update check failed", e)
+                logger.e("Update check failed", e)
                 _status.value = UpdateStatus.Error("Update check failed: ${e.message}")
             }
         }
+    }
+
+    private fun findUpdateFile(fileName: String): File {
+        val executableDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
+        val fileInExeDir = File(executableDir, fileName)
+        if (fileInExeDir.exists()) return fileInExeDir
+        
+        // Fallback to user.dir (current working directory)
+        val workingDir = File(System.getProperty("user.dir"))
+        val fileInWorkingDir = File(workingDir, fileName)
+        if (fileInWorkingDir.exists()) return fileInWorkingDir
+        
+        return fileInExeDir
     }
 
     override fun downloadUpdate(proxyUrl: String, info: UpdateInfo) {
@@ -128,7 +135,7 @@ class DesktopUpdateManager : UpdateManager {
                     info.downloadUrl
                 }
                 
-                Logger.i("Downloading update from: $url")
+                logger.i("Downloading update from: $url")
 
                 client.prepareGet(url).execute { httpResponse ->
                     val channel = httpResponse.bodyAsChannel()
@@ -153,14 +160,14 @@ class DesktopUpdateManager : UpdateManager {
                     }
                 }
                 _status.value = UpdateStatus.Downloaded(info, file.absolutePath)
-            } catch (e: CancellationException) {
-                Logger.i("Download cancelled")
+            } catch (_: CancellationException) {
+                logger.i("Download cancelled")
                 if (file.exists()) {
                     file.delete()
                 }
                 _status.value = UpdateStatus.Idle
             } catch (e: Exception) {
-                Logger.e("Download failed", e)
+                logger.e("Download failed", e)
                 _status.value = UpdateStatus.Error("Download failed: ${e.message}")
                 if (file.exists()) {
                     file.delete()
@@ -170,8 +177,7 @@ class DesktopUpdateManager : UpdateManager {
     }
     
     override fun installUpdate(info: UpdateInfo) {
-        val executableDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
-        val file = File(executableDir, info.fileName)
+        val file = findUpdateFile(info.fileName)
         
         val systemPath = file.toKtPath().inSystem
         

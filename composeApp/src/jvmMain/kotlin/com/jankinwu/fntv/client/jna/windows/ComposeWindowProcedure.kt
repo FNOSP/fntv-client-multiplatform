@@ -64,6 +64,8 @@ internal class ComposeWindowProcedure(
     private val hitTest: (x: Float, y: Float) -> Int,
     private val onWindowInsetUpdate: (WindowInsets) -> Unit
 ) : WindowProcedure {
+    private val logger = Logger.withTag("ComposeWindowProcedure")
+
     private val windowPointer = (this.window as? ComposeWindow)
         ?.windowHandle
         ?.let(::Pointer)
@@ -318,7 +320,7 @@ internal class ComposeWindowProcedure(
      */
     private fun enableResizability() {
         // Enable window resizing and remove standard caption bar
-        User32Extend.Companion.instance?.updateWindowStyle(windowHandle) { oldStyle ->
+        User32Extend.instance?.updateWindowStyle(windowHandle) { oldStyle ->
             (oldStyle or WS_CAPTION) and WS_SYSMENU.inv()
         }
     }
@@ -330,11 +332,11 @@ internal class ComposeWindowProcedure(
     private fun enableBorderAndShadow() {
         val dwmApi = "dwmapi"
             .runCatching(NativeLibrary::getInstance)
-            .onFailure { Logger.e("Could not load dwmapi library") }
+            .onFailure { logger.e("Could not load dwmapi library") }
             .getOrNull()
         dwmApi
             ?.runCatching { getFunction("DwmExtendFrameIntoClientArea") }
-            ?.onFailure { Logger.e("Could not enable window native decorations (border/shadow/rounded corners)") }
+            ?.onFailure { logger.e("Could not enable window native decorations (border/shadow/rounded corners)") }
             ?.getOrNull()
             ?.invoke(arrayOf(windowHandle, margins))
 

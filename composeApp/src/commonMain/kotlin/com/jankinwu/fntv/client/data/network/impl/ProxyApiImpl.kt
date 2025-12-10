@@ -17,7 +17,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 
 class ProxyApiImpl(): ProxyApi {
-
+    private val logger = Logger.withTag("ProxyApiImpl")
     override suspend fun setProxyInfo(request: ProxyInfoRequest): Boolean {
         return post("/proxy/info", request)
     }
@@ -33,7 +33,7 @@ class ProxyApiImpl(): ProxyApi {
                 throw IllegalArgumentException("飞牛影视代理 URL 未配置")
             }
 
-            Logger.i { "proxy POST request, url: ${AccountDataCache.getProxyBaseUrl()}$url, body: $body" }
+            logger.i { "proxy POST request, url: ${AccountDataCache.getProxyBaseUrl()}$url, body: $body" }
 
             val response = fnOfficialClient.post("${AccountDataCache.getProxyBaseUrl()}$url") {
                 header(HttpHeaders.ContentType, "application/json; charset=utf-8")
@@ -44,12 +44,12 @@ class ProxyApiImpl(): ProxyApi {
             }
 
             val responseString = response.bodyAsText()
-            Logger.i { "url: $url POST response content: $responseString" }
+            logger.i { "url: $url POST response content: $responseString" }
 
             // 解析为对象
             val responseBody = mapper.readValue<FnBaseResponse<T>>(responseString)
             if (responseBody.code != 0) {
-                Logger.e { "请求异常: ${responseBody.msg}, url: $url, request body: $body" }
+                logger.e { "请求异常: ${responseBody.msg}, url: $url, request body: $body" }
                 throw Exception("请求失败, url: $url, code: ${responseBody.code}, msg: ${responseBody.msg}")
             }
 
@@ -63,7 +63,7 @@ class ProxyApiImpl(): ProxyApi {
         } catch (e: Exception) {
             if (e.message?.contains("302") == true) {
                 val response = fnOfficialClient.get("${AccountDataCache.getFnOfficialBaseUrl()}/v")
-                Logger.e(e) { "302 response: ${response.bodyAsText()}" }
+                logger.e(e) { "302 response: ${response.bodyAsText()}" }
             }
             throw Exception("请求失败: ${e.message}", e)
         }
