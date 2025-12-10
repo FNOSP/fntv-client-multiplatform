@@ -125,6 +125,8 @@ import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.viewmodel.koinViewModel
 
+private val logger = Logger.withTag("MovieDetailScreen")
+
 @Composable
 fun MovieDetailScreen(
     guid: String,
@@ -208,7 +210,7 @@ fun MovieDetailScreen(
             }
 
             is UiState.Error -> {
-                Logger.i("message: ${(itemUiState as UiState.Error).message}")
+                logger.i("message: ${(itemUiState as UiState.Error).message}")
             }
 
             else -> {}
@@ -221,7 +223,7 @@ fun MovieDetailScreen(
             }
 
             is UiState.Error -> {
-                Logger.i("message: ${(streamUiState as UiState.Error).message}")
+                logger.i("message: ${(streamUiState as UiState.Error).message}")
             }
 
             else -> {}
@@ -232,11 +234,11 @@ fun MovieDetailScreen(
             is UiState.Success -> {
                 personList = (personListState as UiState.Success<PersonListResponse>).data.list
                 castScrollRowItemList = convertPersonToScrollRowItemData(personList)
-                Logger.i("scrollRowItemList: $castScrollRowItemList")
+                logger.i("scrollRowItemList: $castScrollRowItemList")
             }
 
             is UiState.Error -> {
-                Logger.e("message: ${(personListState as UiState.Error).message}")
+                logger.e("message: ${(personListState as UiState.Error).message}")
             }
 
             else -> {}
@@ -249,7 +251,7 @@ fun MovieDetailScreen(
             }
 
             is UiState.Error -> {
-                Logger.e("message: ${(playInfoUiState as UiState.Error).message}")
+                logger.e("message: ${(playInfoUiState as UiState.Error).message}")
             }
 
             else -> {}
@@ -258,7 +260,7 @@ fun MovieDetailScreen(
     LaunchedEffect(currentMediaGuid) {
         val streamData = streamData
         if (currentMediaGuid.isNotBlank() && streamData != null) {
-            Logger.i("currentGuid: $currentMediaGuid, streamData: $streamData")
+            logger.i("currentGuid: $currentMediaGuid, streamData: $streamData")
             val currentFileInfo = streamData.files?.firstOrNull {
                 it.guid == currentMediaGuid
             }

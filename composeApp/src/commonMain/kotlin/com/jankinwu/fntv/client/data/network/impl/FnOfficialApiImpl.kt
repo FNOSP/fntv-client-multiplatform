@@ -67,6 +67,7 @@ import kotlin.time.ExperimentalTime
 
 
 class FnOfficialApiImpl() : FnOfficialApi {
+    private val logger = Logger.withTag("FnOfficialApiImpl")
 
     companion object {
         private const val API_KEY = "NDzZTVxnRKP8Z0jXg1VAMonaG8akvh"
@@ -250,7 +251,7 @@ class FnOfficialApiImpl() : FnOfficialApi {
                 throw IllegalArgumentException("飞牛官方URL未配置")
             }
             val authx = genAuthx(url, parameters)
-            Logger.i { "GET request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, parameters: $parameters" }
+            logger.i { "GET request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, parameters: $parameters" }
             val response = fnOfficialClient.get("${AccountDataCache.getFnOfficialBaseUrl()}$url") {
                 header("Authx", authx)
                 parameters?.forEach { (key, value) ->
@@ -261,10 +262,10 @@ class FnOfficialApiImpl() : FnOfficialApi {
                 block?.invoke(this)
             }
             val responseString = response.bodyAsText()
-            Logger.i { "url: $url Get response content: $responseString" }
+            logger.i { "url: $url Get response content: $responseString" }
             val body = mapper.readValue<FnBaseResponse<T>>(responseString)
             if (body.code != 0) {
-                Logger.e { "请求异常: ${body.msg}, url: $url" }
+                logger.e { "请求异常: ${body.msg}, url: $url" }
                 throw Exception("请求失败, url: $url, code: ${body.code}, msg: ${body.msg}")
             }
 
@@ -292,7 +293,7 @@ class FnOfficialApiImpl() : FnOfficialApi {
             }
 
             val authx = genAuthx(url, data = body)
-            Logger.i { "POST request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, body: $body" }
+            logger.i { "POST request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, body: $body" }
             val response = fnOfficialClient.post("${AccountDataCache.getFnOfficialBaseUrl()}$url") {
                 header(HttpHeaders.ContentType, "application/json; charset=utf-8")
                 header("Authx", authx)
@@ -303,11 +304,11 @@ class FnOfficialApiImpl() : FnOfficialApi {
             }
 
             val responseString = response.bodyAsText()
-            Logger.i { "url: $url POST response content: $responseString" }
+            logger.i { "url: $url POST response content: $responseString" }
             // 解析为对象
             val responseBody = mapper.readValue<FnBaseResponse<T>>(responseString)
             if (responseBody.code != 0) {
-                Logger.e { "请求异常: ${responseBody.msg}, url: $url, request body: $body" }
+                logger.e { "请求异常: ${responseBody.msg}, url: $url, request body: $body" }
                 throw Exception("请求失败, url: $url, code: ${responseBody.code}, msg: ${responseBody.msg}")
             }
 
@@ -321,7 +322,7 @@ class FnOfficialApiImpl() : FnOfficialApi {
         } catch (e: Exception) {
             if (e.message?.contains("302") == true) {
                 val response = fnOfficialClient.get("${AccountDataCache.getFnOfficialBaseUrl()}/v")
-                Logger.e(e) { "302 response: ${response.bodyAsText()}" }
+                logger.e(e) { "302 response: ${response.bodyAsText()}" }
             }
             throw Exception("请求失败: ${e.message}", e)
         }
@@ -340,7 +341,7 @@ class FnOfficialApiImpl() : FnOfficialApi {
             }
 
             val authx = genAuthx(url)
-            Logger.i { "POST multipart file request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx" }
+            logger.i { "POST multipart file request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx" }
             val response = fnOfficialClient.submitFormWithBinaryData(
                 url = "${AccountDataCache.getFnOfficialBaseUrl()}$url",
                 formData = formData {
@@ -362,7 +363,7 @@ class FnOfficialApiImpl() : FnOfficialApi {
             }
 
             val responseString = response.bodyAsText()
-            Logger.i { "url: $url POST multipart file response content: $responseString" }
+            logger.i { "url: $url POST multipart file response content: $responseString" }
 
             val responseBody = mapper.readValue<FnBaseResponse<T>>(responseString)
             if (responseBody.code != 0) {
@@ -387,7 +388,7 @@ class FnOfficialApiImpl() : FnOfficialApi {
             }
 
             val authx = genAuthx(url, data = body)
-            Logger.i { "url: $url PUT request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, body: $body" }
+            logger.i { "url: $url PUT request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, body: $body" }
             val response = fnOfficialClient.put("${AccountDataCache.getFnOfficialBaseUrl()}$url") {
                 header(HttpHeaders.ContentType, "application/json; charset=utf-8")
                 header("Authx", authx)
@@ -398,12 +399,12 @@ class FnOfficialApiImpl() : FnOfficialApi {
             }
 
             val responseString = response.bodyAsText()
-            Logger.i { "PUT response content: $responseString" }
+            logger.i { "PUT response content: $responseString" }
 
             // 解析为对象
             val responseBody = mapper.readValue<FnBaseResponse<T>>(responseString)
             if (responseBody.code != 0) {
-                Logger.e { "请求异常: ${responseBody.msg}, url: $url, request body: $body" }
+                logger.e { "请求异常: ${responseBody.msg}, url: $url, request body: $body" }
                 throw Exception("请求失败, url: $url, code: ${responseBody.code}, msg: ${responseBody.msg}")
             }
 
@@ -431,7 +432,7 @@ class FnOfficialApiImpl() : FnOfficialApi {
             }
 
             val authx = genAuthx(url, data = body)
-            Logger.i { "DELETE request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, body: $body" }
+            logger.i { "DELETE request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, body: $body" }
             val response =
                 fnOfficialClient.delete("${AccountDataCache.getFnOfficialBaseUrl()}$url") {
                     header(HttpHeaders.ContentType, "application/json; charset=utf-8")
@@ -443,12 +444,12 @@ class FnOfficialApiImpl() : FnOfficialApi {
                 }
 
             val responseString = response.bodyAsText()
-            Logger.i { "url: $url Delete response content: $responseString" }
+            logger.i { "url: $url Delete response content: $responseString" }
 
             // 解析为对象
             val responseBody = mapper.readValue<FnBaseResponse<T>>(responseString)
             if (responseBody.code != 0) {
-                Logger.e { "请求异常: ${responseBody.msg}, url: $url, request body: $body" }
+                logger.e { "请求异常: ${responseBody.msg}, url: $url, request body: $body" }
                 throw Exception("请求失败, url: $url, code: ${responseBody.code}, msg: ${responseBody.msg}")
             }
 

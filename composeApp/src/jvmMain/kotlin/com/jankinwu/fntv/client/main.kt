@@ -17,7 +17,6 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import co.touchlab.kermit.CommonWriter
 import co.touchlab.kermit.Logger
 import com.jankinwu.fntv.client.data.network.apiModule
 import com.jankinwu.fntv.client.manager.LoginStateManager
@@ -30,6 +29,7 @@ import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.jankinwu.fntv.client.ui.screen.LoginScreen
 import com.jankinwu.fntv.client.ui.screen.PlayerManager
 import com.jankinwu.fntv.client.ui.screen.PlayerOverlay
+import com.jankinwu.fntv.client.utils.ConsoleLogWriter
 import com.jankinwu.fntv.client.utils.ExecutableDirectoryDetector
 import com.jankinwu.fntv.client.utils.FileLogWriter
 import com.jankinwu.fntv.client.viewmodel.UiState
@@ -47,8 +47,8 @@ import java.io.File
 
 fun main() = application {
     val logDir = initializeLoggingDirectory()
-    Logger.setLogWriters(CommonWriter(), FileLogWriter(logDir))
-    Logger.i("Main") { "Application started. Logs directory: ${logDir.absolutePath}" }
+    Logger.setLogWriters(ConsoleLogWriter(), FileLogWriter(logDir))
+    Logger.withTag("main").i { "Application started. Logs directory: ${logDir.absolutePath}" }
 
     DisposableEffect(Unit) {
         ProxyManager.start()

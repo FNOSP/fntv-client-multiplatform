@@ -80,9 +80,9 @@ func CleanInstallDir(dir string, installerPath string) error {
 		}
 
 		// Delete
-		logger.Info("Deleting: %s", path)
+		logger.Info("Installer", "Deleting: %s", path)
 		if err := os.RemoveAll(path); err != nil {
-			logger.Warn("Failed to delete %s: %v", path, err)
+			logger.Warn("Installer", "Failed to delete %s: %v", path, err)
 		}
 	}
 	return nil

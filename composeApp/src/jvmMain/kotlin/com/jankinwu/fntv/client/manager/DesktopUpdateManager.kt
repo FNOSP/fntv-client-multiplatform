@@ -32,6 +32,7 @@ import java.util.Locale
 import kotlin.math.max
 
 class DesktopUpdateManager : UpdateManager {
+    private val logger = Logger.withTag("DesktopUpdateManager")
     private val scope = CoroutineScope(Dispatchers.IO)
     private var downloadJob: Job? = null
     private val _status = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
@@ -51,14 +52,14 @@ class DesktopUpdateManager : UpdateManager {
             try {
                 val targetUrl = "https://api.github.com/repos/FNOSP/fntv-client-multiplatform/releases/latest"
 
-                Logger.i("Checking update from: $targetUrl")
+                logger.i("Checking update from: $targetUrl")
                 
                 val release: GitHubRelease = client.get(targetUrl).body()
                 val currentVersion = BuildConfig.VERSION_NAME
                 
                 val remoteVersion = release.name.removePrefix("v").trim()
                 
-                Logger.i("Current version: $currentVersion, Remote version: $remoteVersion")
+                logger.i("Current version: $currentVersion, Remote version: $remoteVersion")
 
                 if (compareVersions(remoteVersion, currentVersion) > 0) {
                     val arch = getSystemArch()
@@ -97,7 +98,7 @@ class DesktopUpdateManager : UpdateManager {
                     _status.value = UpdateStatus.UpToDate
                 }
             } catch (e: Exception) {
-                Logger.e("Update check failed", e)
+                logger.e("Update check failed", e)
                 _status.value = UpdateStatus.Error("Update check failed: ${e.message}")
             }
         }
@@ -134,7 +135,7 @@ class DesktopUpdateManager : UpdateManager {
                     info.downloadUrl
                 }
                 
-                Logger.i("Downloading update from: $url")
+                logger.i("Downloading update from: $url")
 
                 client.prepareGet(url).execute { httpResponse ->
                     val channel = httpResponse.bodyAsChannel()
@@ -160,13 +161,13 @@ class DesktopUpdateManager : UpdateManager {
                 }
                 _status.value = UpdateStatus.Downloaded(info, file.absolutePath)
             } catch (_: CancellationException) {
-                Logger.i("Download cancelled")
+                logger.i("Download cancelled")
                 if (file.exists()) {
                     file.delete()
                 }
                 _status.value = UpdateStatus.Idle
             } catch (e: Exception) {
-                Logger.e("Download failed", e)
+                logger.e("Download failed", e)
                 _status.value = UpdateStatus.Error("Download failed: ${e.message}")
                 if (file.exists()) {
                     file.delete()

@@ -28,7 +28,7 @@ func InitLog() {
 
 	f, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Println("Failed to open log file:", err)
+		Info("Logger", "Failed to open log file: %v", err)
 		return
 	}
 	LogFile = f
@@ -67,9 +67,9 @@ func cleanOldLogs(logDir string) {
 			if days >= retentionDays {
 				err := os.Remove(filepath.Join(logDir, name))
 				if err != nil {
-					fmt.Println("Failed to delete old log:", name, err)
+					Info("Logger", "Failed to delete old log: %s %v", name, err)
 				} else {
-					fmt.Println("Deleted old log:", name)
+					Info("Logger", "Deleted old log: %s", name)
 				}
 			}
 		}
@@ -77,35 +77,39 @@ func cleanOldLogs(logDir string) {
 }
 
 // Logging
-func logMsg(level string, c *color.Color, format string, args ...interface{}) {
+func logMsg(tag string, level string, c *color.Color, format string, args ...interface{}) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	msg := fmt.Sprintf(format, args...)
 	levelStr := fmt.Sprintf("[%s]", strings.ToUpper(level))
+	tagStr := ""
+	if tag != "" {
+		tagStr = fmt.Sprintf("[%s]", tag)
+	}
 
 	// Print to console
-	fmt.Printf("[%s] %s\n", timestamp, c.Sprint(levelStr+" "+msg))
+	fmt.Printf("[%s] %s %s\n", timestamp, tagStr, c.Sprint(levelStr+" "+msg))
 
 	// Write to file
 	if LogFile != nil {
-		fullMsg := fmt.Sprintf("[%s] %s %s\n", timestamp, levelStr, msg)
+		fullMsg := fmt.Sprintf("[%s] %s %s %s\n", timestamp, tagStr, levelStr, msg)
 		LogFile.WriteString(fullMsg)
 	}
 }
 
-func Info(format string, args ...interface{}) {
-	logMsg("info", color.New(color.FgHiCyan), format, args...)
+func Info(tag string, format string, args ...interface{}) {
+	logMsg(tag, "info", color.New(color.FgHiCyan), format, args...)
 }
 
-func Success(format string, args ...interface{}) {
-	logMsg("success", color.New(color.FgHiGreen), format, args...)
+func Success(tag string, format string, args ...interface{}) {
+	logMsg(tag, "success", color.New(color.FgHiGreen), format, args...)
 }
 
-func Warn(format string, args ...interface{}) {
-	logMsg("warn", color.New(color.FgHiYellow), format, args...)
+func Warn(tag string, format string, args ...interface{}) {
+	logMsg(tag, "warn", color.New(color.FgHiYellow), format, args...)
 	ui.ShowMessageBox(fmt.Sprintf(format, args...), "FnMedia Updater - Warning", consts.MB_OK|consts.MB_ICONWARNING|consts.MB_SYSTEMMODAL)
 }
 
-func ErrorLog(format string, args ...interface{}) {
-	logMsg("error", color.New(color.FgHiRed), format, args...)
+func ErrorLog(tag string, format string, args ...interface{}) {
+	logMsg(tag, "error", color.New(color.FgHiRed), format, args...)
 	ui.ShowMessageBox(fmt.Sprintf(format, args...), "FnMedia Updater - Error", consts.MB_OK|consts.MB_ICONERROR|consts.MB_SYSTEMMODAL)
 }

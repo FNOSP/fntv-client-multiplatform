@@ -49,6 +49,7 @@ internal interface User32Extend : User32 {
 
 
     companion object {
+        private val logger = Logger.withTag("User32Extend")
 
         val instance by lazy {
             runCatching {
@@ -58,7 +59,7 @@ internal interface User32Extend : User32 {
                     W32APIOptions.DEFAULT_OPTIONS
                 )
             }
-                .onFailure { Logger.e("Could not load user32 library") }
+                .onFailure { logger.e("Could not load user32 library") }
                 .getOrNull()
         }
     }
