@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.WindowPlacement
 import co.touchlab.kermit.Logger
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.SerializationFeature
@@ -61,13 +62,18 @@ import com.jankinwu.fntv.client.icons.Back10S
 import com.jankinwu.fntv.client.icons.Forward10S
 import com.jankinwu.fntv.client.icons.Pause
 import com.jankinwu.fntv.client.icons.Play
+import com.jankinwu.fntv.client.icons.ExitFullScreen
+import com.jankinwu.fntv.client.icons.FullScreen
+import com.jankinwu.fntv.client.icons.Volume
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.VideoPlayerProgressBar
 import com.jankinwu.fntv.client.ui.component.player.VolumeControl
 import com.jankinwu.fntv.client.ui.component.player.formatDuration
 import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
+import com.jankinwu.fntv.client.ui.providable.LocalStore
 import com.jankinwu.fntv.client.ui.providable.LocalTypography
+import com.jankinwu.fntv.client.ui.providable.LocalWindowState
 import com.jankinwu.fntv.client.ui.providable.defaultVariableFamily
 import com.jankinwu.fntv.client.viewmodel.PlayInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayPlayViewModel
@@ -301,12 +307,15 @@ fun PlayerOverlay(
                 true
             )
     ) {
-        // 添加标题栏占位区域，允许窗口拖动
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp) // 与标题栏高度一致
-        )
+        val windowState = LocalWindowState.current
+        if (windowState.placement != WindowPlacement.Fullscreen) {
+            // 添加标题栏占位区域，允许窗口拖动
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp) // 与标题栏高度一致
+            )
+        }
 
         // 视频层 - 从标题栏下方开始显示
         MediampPlayerSurface(
@@ -363,6 +372,9 @@ fun PlayerOverlay(
                             // 清除缓存
                             playingInfoCache = null
                             onBack()
+                            if (windowState.placement == WindowPlacement.Fullscreen) {
+                                windowState.placement = WindowPlacement.Floating
+                            }
                         })
                 )
                 if (isEpisode) {
@@ -591,6 +603,28 @@ fun PlayerControlRow(
                 },
                 onHoverStateChanged = onVolumeControlHoverChanged,
                 modifier = Modifier.size(35.dp)
+            )
+            // 全屏
+            val windowState = LocalWindowState.current
+            val store = LocalStore.current
+            Icon(
+                imageVector = if (windowState.placement == WindowPlacement.Fullscreen) ExitFullScreen else FullScreen,
+                contentDescription = "全屏/退出全屏",
+                tint = Color.White,
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = {
+                            if (windowState.placement == WindowPlacement.Fullscreen) {
+                                windowState.placement = WindowPlacement.Floating
+                            } else {
+                                windowState.placement = WindowPlacement.Fullscreen
+//                                store.darkMode = true
+                            }
+                        }
+                    )
             )
         }
     }
