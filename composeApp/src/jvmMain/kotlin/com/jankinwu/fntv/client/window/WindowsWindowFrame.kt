@@ -150,7 +150,7 @@ fun FrameWindowScope.WindowsWindowFrame(
         )
     }
     Box(
-        modifier = Modifier.windowInsetsPadding(paddingInset)
+        modifier = Modifier.windowInsetsPadding(if (isFullscreen) WindowInsets(0) else paddingInset)
     ) {
         if (isFullscreen) {
              content(WindowInsets(0), WindowInsets(0))

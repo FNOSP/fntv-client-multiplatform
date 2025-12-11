@@ -59,12 +59,11 @@ import com.jankinwu.fntv.client.data.store.AccountDataCache
 import com.jankinwu.fntv.client.enums.FnTvMediaType
 import com.jankinwu.fntv.client.icons.ArrowLeft
 import com.jankinwu.fntv.client.icons.Back10S
+import com.jankinwu.fntv.client.icons.ExitFullScreen
 import com.jankinwu.fntv.client.icons.Forward10S
+import com.jankinwu.fntv.client.icons.FullScreen
 import com.jankinwu.fntv.client.icons.Pause
 import com.jankinwu.fntv.client.icons.Play
-import com.jankinwu.fntv.client.icons.ExitFullScreen
-import com.jankinwu.fntv.client.icons.FullScreen
-import com.jankinwu.fntv.client.icons.Volume
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.VideoPlayerProgressBar
@@ -321,7 +320,7 @@ fun PlayerOverlay(
         MediampPlayerSurface(
             mediaPlayer, Modifier
                 .fillMaxSize()
-                .padding(top = 48.dp)
+                .padding(top = if (windowState.placement != WindowPlacement.Fullscreen) 48.dp else 0.dp)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -355,7 +354,7 @@ fun PlayerOverlay(
         if (uiVisible) {
             Row(
                 modifier = Modifier
-                    .padding(top = 48.dp)
+                    .padding(top = if (windowState.placement != WindowPlacement.Fullscreen) 48.dp else 12.dp)
                     .align(Alignment.TopStart)
                     .padding(start = 20.dp, top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
