@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.icons.UpdateNoBorder
-import com.jankinwu.fntv.client.manager.UpdateStatus
 import com.jankinwu.fntv.client.viewmodel.UpdateViewModel
 import io.github.composefluent.FluentTheme
 import io.github.composefluent.component.Icon
@@ -23,9 +22,9 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun HasNewVersionTag(modifier: Modifier = Modifier) {
     val updateViewModel: UpdateViewModel = koinViewModel()
-    val updateStatus by updateViewModel.status.collectAsState()
+    val latestVersion by updateViewModel.latestVersion.collectAsState()
 
-    if (updateStatus is UpdateStatus.Available || updateStatus is UpdateStatus.ReadyToInstall) {
+    if (latestVersion != null) {
         Row(
             modifier = modifier
                 .padding(start = 8.dp)

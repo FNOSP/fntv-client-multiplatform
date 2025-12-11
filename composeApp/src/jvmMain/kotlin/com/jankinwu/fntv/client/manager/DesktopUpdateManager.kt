@@ -38,6 +38,9 @@ class DesktopUpdateManager : UpdateManager {
     private val _status = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
     override val status: StateFlow<UpdateStatus> = _status.asStateFlow()
 
+    private val _latestVersion = MutableStateFlow<UpdateInfo?>(null)
+    override val latestVersion: StateFlow<UpdateInfo?> = _latestVersion.asStateFlow()
+
     private val client = HttpClient(OkHttp) {
         install(ContentNegotiation) {
             jackson {
@@ -83,6 +86,8 @@ class DesktopUpdateManager : UpdateManager {
                              size = asset.size
                          )
                          
+                         _latestVersion.value = updateInfo
+
                          val file = findUpdateFile(asset.name)
                          
                          if (file.exists() && file.length() == asset.size) {
