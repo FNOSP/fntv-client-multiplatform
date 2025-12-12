@@ -81,6 +81,7 @@ import com.jankinwu.fntv.client.ui.providable.LocalStore
 import com.jankinwu.fntv.client.ui.providable.LocalTypography
 import com.jankinwu.fntv.client.ui.providable.LocalWindowState
 import com.jankinwu.fntv.client.ui.providable.defaultVariableFamily
+import com.jankinwu.fntv.client.utils.HiddenPointerIcon
 import com.jankinwu.fntv.client.viewmodel.MediaPViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayPlayViewModel
@@ -373,7 +374,7 @@ fun PlayerOverlay(
 //                isCursorVisible = true
 //            }
             .pointerHoverIcon(
-                if (isCursorVisible) PointerIcon.Hand else PointerIcon.Default,
+                if (isCursorVisible) PointerIcon.Hand else HiddenPointerIcon,
                 true
             )
     ) {
