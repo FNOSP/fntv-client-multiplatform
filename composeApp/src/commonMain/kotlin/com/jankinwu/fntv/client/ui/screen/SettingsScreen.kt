@@ -79,7 +79,7 @@ fun SettingsScreen(componentNavigator: ComponentNavigator) {
     val updateViewModel: UpdateViewModel = koinViewModel()
     val updateStatus by updateViewModel.status.collectAsState()
     val latestVersion by updateViewModel.latestVersion.collectAsState()
-    var proxyUrl by remember { mutableStateOf(AppSettings.updateProxyUrl) }
+    var proxyUrl by remember { mutableStateOf(AppSettings.githubResourceProxyUrl) }
     val scrollState = rememberScrollState()
     val uriHandler = LocalUriHandler.current
     val focusManager = LocalFocusManager.current
@@ -304,7 +304,7 @@ fun SettingsScreen(componentNavigator: ComponentNavigator) {
                             value = proxyUrl,
                             onValueChange = {
                                 proxyUrl = it
-                                AppSettings.updateProxyUrl = it
+                                AppSettings.githubResourceProxyUrl = it
                             },
                             modifier = Modifier.width(200.dp),
                             singleLine = true,

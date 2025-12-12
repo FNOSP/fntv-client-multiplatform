@@ -129,7 +129,7 @@ class PlayerManager {
     }
 }
 
-object PlayerScreen{
+object PlayerScreen {
 
     val mapper = jacksonObjectMapper().apply {
         // 禁止格式化输出
@@ -592,9 +592,11 @@ fun PlayerControlRow(
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier
             )
-            val audioLevelController = remember(mediaPlayer) { mediaPlayer.features[AudioLevelController] }
-            val volume by audioLevelController?.volume?.collectAsState() ?: remember { mutableFloatStateOf(1f) }
-
+            val audioLevelController =
+                remember(mediaPlayer) { mediaPlayer.features[AudioLevelController] }
+            val volume by audioLevelController?.volume?.collectAsState()
+                ?: remember { mutableFloatStateOf(1f) }
+            // 音量控制
             VolumeControl(
                 volume = volume,
                 onVolumeChange = {
@@ -651,7 +653,16 @@ fun rememberPlayMediaFunction(
     val playRecordViewModel: PlayRecordViewModel = koinInject()
     val scope = rememberCoroutineScope()
     val playerManager = LocalPlayerManager.current
-    return remember(streamViewModel, playPlayViewModel, guid, player, playerManager, mediaGuid, currentAudioGuid, currentSubtitleGuid) {
+    return remember(
+        streamViewModel,
+        playPlayViewModel,
+        guid,
+        player,
+        playerManager,
+        mediaGuid,
+        currentAudioGuid,
+        currentSubtitleGuid
+    ) {
         {
             scope.launch {
                 playMedia(
@@ -693,13 +704,14 @@ private suspend fun playMedia(
         // 获取流信息
         val streamInfo = fetchStreamInfo(playInfoResponse, userInfoViewModel, streamViewModel)
         val videoStream = streamInfo.videoStream
-        val audioStream = streamInfo.audioStreams.first { audioStream -> audioStream.guid == playInfoResponse.audioGuid }
+        val audioStream =
+            streamInfo.audioStreams.first { audioStream -> audioStream.guid == playInfoResponse.audioGuid }
         val audioGuid = currentAudioGuid ?: audioStream.guid
 //        val subtitleStream = streamInfo.subtitleStreams?.first{ it.guid == playInfoResponse.subtitleGuid}
         val subtitleStream = streamInfo.subtitleStreams?.find {
             it.guid == playInfoResponse.subtitleGuid
         }
-        val subtitleGuid = currentSubtitleGuid?: subtitleStream?.guid
+        val subtitleGuid = currentSubtitleGuid ?: subtitleStream?.guid
         val fileStream = streamInfo.fileStream
         // 显示播放器
         val videoDuration = videoStream.duration * 1000L
@@ -724,8 +736,12 @@ private suspend fun playMedia(
             )
         }
 
+        // VLC 播放器对 HDR 颜色空间有兼容问题，强制使用 SDR
+        val forcedSdr = if (videoStream.colorRangeType != "SDR") 1 else 0
+
         // 构造播放请求
-        val playRequest = createPlayRequest(videoStream, fileStream, audioGuid, subtitleGuid)
+        val playRequest =
+            createPlayRequest(videoStream, fileStream, audioGuid, subtitleGuid, forcedSdr)
 
         var playLink = ""
         // 获取播放链接
@@ -741,15 +757,22 @@ private suspend fun playMedia(
 
         // 缓存播放信息
         playingInfoCache = PlayingInfoCache(
-            streamInfo, playLink, fileStream,
-            videoStream, audioStream, subtitleStream, playInfoResponse.item.guid
+            streamInfo,
+            playLink,
+            fileStream,
+            videoStream,
+            audioStream,
+            subtitleStream,
+            playInfoResponse.item.guid,
+            streamInfo.qualities
         )
+
         logger.i("startPosition: $startPosition")
         // 设置字幕
         val extraFiles = subtitleStream?.let {
             val mediaExtraFiles = getMediaExtraFiles(it)
             mediaExtraFiles
-        }?: MediaExtraFiles()
+        } ?: MediaExtraFiles()
         // 启动播放器
         startPlayback(player, playLink, startPosition, extraFiles)
         // 记录播放数据
@@ -765,15 +788,16 @@ private suspend fun playMedia(
             },
         )
     } catch (e: Exception) {
-        logger.e("播放失败: ${e.message}",  e)
+        logger.e("播放失败: ${e.message}", e)
     }
 }
 
 private fun getMediaExtraFiles(
     subtitleStream: SubtitleStream
-) : MediaExtraFiles {
+): MediaExtraFiles {
     if (subtitleStream.isExternal == 1 && subtitleStream.format in listOf("srt", "ass")) {
-        val subtitleLink = "${AccountDataCache.getProxyBaseUrl()}/v/api/v1/subtitle/dl/${subtitleStream.guid}"
+        val subtitleLink =
+            "${AccountDataCache.getProxyBaseUrl()}/v/api/v1/subtitle/dl/${subtitleStream.guid}"
         val subtitle = Subtitle(subtitleLink)
         return MediaExtraFiles(listOf(subtitle))
     }
@@ -807,7 +831,8 @@ private fun createPlayRequest(
     videoStream: VideoStream,
     fileStream: FileInfo,
     audioGuid: String,
-    subtitleGuid: String?
+    subtitleGuid: String?,
+    forcedSdr: Int
 ): PlayPlayRequest {
     return PlayPlayRequest(
         videoGuid = videoStream.guid,
@@ -816,10 +841,10 @@ private fun createPlayRequest(
         audioGuid = audioGuid,
         bitrate = videoStream.bps,
         channels = 2,
-        forcedSdr = 0,
+        forcedSdr = forcedSdr,
         resolution = videoStream.resolutionType,
         startTimestamp = 0,
-        subtitleGuid = subtitleGuid?: "",
+        subtitleGuid = subtitleGuid ?: "",
         videoEncoder = videoStream.codecName,
     )
 }
