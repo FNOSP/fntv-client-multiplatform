@@ -157,7 +157,7 @@ fun VolumeControl(
             imageVector = Volume,
             contentDescription = "音量",
             tint = Color.White,
-            modifier = Modifier.size(35.dp)
+            modifier = Modifier.size(40.dp)
         )
     }
 }
