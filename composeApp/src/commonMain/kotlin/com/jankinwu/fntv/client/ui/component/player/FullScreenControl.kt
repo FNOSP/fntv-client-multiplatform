@@ -41,7 +41,7 @@ fun FullScreenControl(
             val fsBytes = Res.readBytes("files/full_screen_lottie.json")
             fullScreenSpec = LottieCompositionSpec.JsonString(fsBytes.decodeToString())
             
-            val qfsBytes = Res.readBytes("files/quit_full_screen.json")
+            val qfsBytes = Res.readBytes("files/quit_full_screen_lottie.json")
             quitFullScreenSpec = LottieCompositionSpec.JsonString(qfsBytes.decodeToString())
         } catch (e: Exception) {
             Logger.e { "Failed to load lottie: $e" }

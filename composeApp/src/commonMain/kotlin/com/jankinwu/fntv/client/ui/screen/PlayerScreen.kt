@@ -686,7 +686,7 @@ fun PlayerControlRow(
         Row(
             modifier = Modifier
                 .padding(horizontal = 16.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 倍速
@@ -699,7 +699,7 @@ fun PlayerControlRow(
             )
             if (qualities != null) {
                 QualityControlFlyout(
-                    modifier = Modifier.padding(start = 4.dp),
+                    modifier = Modifier,
                     qualities = qualities,
                     currentResolution = currentResolution,
                     currentBitrate = currentBitrate,
@@ -716,7 +716,7 @@ fun PlayerControlRow(
                     color = Color.White.copy(alpha = 0.7843f),
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Normal,
-                    modifier = Modifier.padding(start = 4.dp)
+                    modifier = Modifier
                 )
             }
             Icon(
@@ -724,7 +724,7 @@ fun PlayerControlRow(
                 contentDescription = "字幕",
                 tint = Color.White,
                 modifier = Modifier
-                    .padding(start = 12.dp)
+                    .padding(start = 8.dp)
                     .size(24.dp)
             )
             var compositionSpec by remember { mutableStateOf<LottieCompositionSpec?>(null) }
@@ -751,7 +751,7 @@ fun PlayerControlRow(
                     contentDescription = "设置",
 //                    tint = Color.White,
                     modifier = Modifier
-                        .padding(start = 12.dp)
+                        .padding(start = 8.dp)
                         .size(24.dp)
                         .onPointerEvent(PointerEventType.Enter) {
                             isPlaying = true
@@ -766,7 +766,7 @@ fun PlayerControlRow(
                     contentDescription = "设置",
                     tint = Color.White,
                     modifier = Modifier
-                        .padding(start = 12.dp)
+                        .padding(start = 8.dp)
                         .size(24.dp)
                 )
             }
@@ -782,7 +782,7 @@ fun PlayerControlRow(
                     PlayingSettingsStore.saveVolume(it)
                 },
                 onHoverStateChanged = onVolumeControlHoverChanged,
-                modifier = Modifier.size(40.dp).padding(start = 4.dp)
+                modifier = Modifier.size(40.dp)
             )
             // 全屏
             val windowState = LocalWindowState.current
