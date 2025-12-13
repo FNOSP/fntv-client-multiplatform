@@ -21,7 +21,16 @@ data class MediaPRequest(
     val startTimestamp: Int?,
 
     @param:JsonProperty("clearCache")
-    val clearCache: Boolean?
+    val clearCache: Boolean?,
+
+    @param:JsonProperty("audioEncoder")
+    val audioEncoder: String? = null,
+
+    @param:JsonProperty("channels")
+    val channels: Int? = null,
+
+    @param:JsonProperty("audioIndex")
+    val audioIndex: Int? = null
 ) {
     @Immutable
     data class Quality(

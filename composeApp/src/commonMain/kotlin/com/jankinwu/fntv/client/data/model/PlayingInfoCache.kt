@@ -17,9 +17,10 @@ data class PlayingInfoCache(
     val playLink: String,
     val currentFileStream: FileInfo,
     val currentVideoStream: VideoStream,
-    val currentAudioStream: AudioStream? = null,
+    var currentAudioStream: AudioStream? = null,
     val currentSubtitleStream: SubtitleStream? = null,
     val itemGuid: String,
     val currentQualities: List<QualityResponse>? = null,
-    val currentQuality: QualityResponse? = null
+    val currentQuality: QualityResponse? = null,
+    val currentAudioStreamList: List<AudioStream>? = null,
 )

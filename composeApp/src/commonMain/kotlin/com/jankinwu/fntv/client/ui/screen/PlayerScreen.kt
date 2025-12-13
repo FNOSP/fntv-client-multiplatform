@@ -2,7 +2,6 @@
 
 package com.jankinwu.fntv.client.ui.screen
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -54,6 +53,7 @@ import com.jankinwu.fntv.client.data.model.request.MediaPRequest
 import com.jankinwu.fntv.client.data.model.request.PlayPlayRequest
 import com.jankinwu.fntv.client.data.model.request.PlayRecordRequest
 import com.jankinwu.fntv.client.data.model.request.StreamRequest
+import com.jankinwu.fntv.client.data.model.response.AudioStream
 import com.jankinwu.fntv.client.data.model.response.FileInfo
 import com.jankinwu.fntv.client.data.model.response.MediaResetQualityResponse
 import com.jankinwu.fntv.client.data.model.response.PlayInfoResponse
@@ -70,10 +70,10 @@ import com.jankinwu.fntv.client.icons.Back10S
 import com.jankinwu.fntv.client.icons.Forward10S
 import com.jankinwu.fntv.client.icons.Pause
 import com.jankinwu.fntv.client.icons.Play
-import com.jankinwu.fntv.client.icons.Setting
 import com.jankinwu.fntv.client.icons.Subtitle
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.component.player.FullScreenControl
+import com.jankinwu.fntv.client.ui.component.player.PlayerSettingsMenu
 import com.jankinwu.fntv.client.ui.component.player.QualityControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.VideoPlayerProgressBar
@@ -90,13 +90,11 @@ import com.jankinwu.fntv.client.viewmodel.PlayInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayPlayViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayRecordViewModel
 import com.jankinwu.fntv.client.viewmodel.StreamViewModel
+import com.jankinwu.fntv.client.data.model.response.QueryTagResponse
+import com.jankinwu.fntv.client.ui.providable.IsoTagData
+import com.jankinwu.fntv.client.viewmodel.TagViewModel
 import com.jankinwu.fntv.client.viewmodel.UiState
 import com.jankinwu.fntv.client.viewmodel.UserInfoViewModel
-import fntv_client_multiplatform.composeapp.generated.resources.Res
-import io.github.alexzhirkevich.compottie.LottieCompositionSpec
-import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
-import io.github.alexzhirkevich.compottie.rememberLottieComposition
-import io.github.alexzhirkevich.compottie.rememberLottiePainter
 import korlibs.crypto.MD5
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
@@ -164,7 +162,7 @@ object PlayerScreen {
 }
 
 // 全局播放信息缓存，生命周期跟随播放器
-var playingInfoCache: PlayingInfoCache? = null
+var playingInfoCache by mutableStateOf<PlayingInfoCache?>(null)
 
 private fun createPlayRecordRequest(
     ts: Int,
@@ -225,12 +223,66 @@ fun PlayerOverlay(
     var isSpeedControlHovered by remember { mutableStateOf(false) }
     var isVolumeControlHovered by remember { mutableStateOf(false) }
     var isQualityControlHovered by remember { mutableStateOf(false) }
-    val isPlayControlHovered = isSpeedControlHovered || isVolumeControlHovered || isQualityControlHovered
+    var isSettingsMenuHovered by remember { mutableStateOf(false) }
+    val isPlayControlHovered = isSpeedControlHovered || isVolumeControlHovered || isQualityControlHovered || isSettingsMenuHovered
     val currentPosition by mediaPlayer.currentPositionMillis.collectAsState()
     val playerManager = LocalPlayerManager.current
     val windowState = LocalWindowState.current
     val mediaPViewModel: MediaPViewModel = koinInject()
+    val tagViewModel: TagViewModel = koinInject()
     val resetQualityState by mediaPViewModel.resetQualityState.collectAsState()
+
+    val iso6391State by tagViewModel.iso6391State.collectAsState()
+    val iso6392State by tagViewModel.iso6392State.collectAsState()
+    val iso3166State by tagViewModel.iso3166State.collectAsState()
+
+    var isoTagData by remember {
+        mutableStateOf(
+            IsoTagData(
+                iso6391Map = emptyMap(),
+                iso6392Map = emptyMap(),
+                iso3166Map = emptyMap()
+            )
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        if (iso6392State !is UiState.Success) {
+            tagViewModel.loadIso6392Tags()
+        }
+        if (iso6391State !is UiState.Success) {
+            tagViewModel.loadIso6391Tags()
+        }
+        if (iso3166State !is UiState.Success) {
+            tagViewModel.loadIso3166Tags()
+        }
+    }
+
+    LaunchedEffect(iso6391State, iso6392State, iso3166State) {
+        val newIso6391Map = if (iso6391State is UiState.Success) {
+            (iso6391State as UiState.Success<List<QueryTagResponse>>).data.associateBy { it.key }
+        } else {
+            emptyMap()
+        }
+
+        val newIso6392Map = if (iso6392State is UiState.Success) {
+            (iso6392State as UiState.Success<List<QueryTagResponse>>).data.associateBy { it.key }
+        } else {
+            emptyMap()
+        }
+
+        val newIso3166Map = if (iso3166State is UiState.Success) {
+            (iso3166State as UiState.Success<List<QueryTagResponse>>).data.associateBy { it.key }
+        } else {
+            emptyMap()
+        }
+
+        isoTagData = IsoTagData(
+            iso6391Map = newIso6391Map,
+            iso6392Map = newIso6392Map,
+            iso3166Map = newIso3166Map
+        )
+    }
 
     val audioLevelController = remember(mediaPlayer) { mediaPlayer.features[AudioLevelController] }
     LaunchedEffect(audioLevelController) {
@@ -280,7 +332,7 @@ fun PlayerOverlay(
                 if (cache != null) {
                     val startPos = mediaPlayer.getCurrentPositionMillis()
                     val extraFiles = cache.currentSubtitleStream?.let { getMediaExtraFiles(it) } ?: MediaExtraFiles()
-                    mediaPlayer.stopPlayback()
+//                    mediaPlayer.stopPlayback()
                     startPlayback(mediaPlayer, cache.playLink, startPos, extraFiles)
                 }
                 mediaPViewModel.clearError()
@@ -359,7 +411,7 @@ fun PlayerOverlay(
         isPlayControlHovered,
         isQualityControlHovered
     ) {
-        if (uiVisible && !isProgressBarHovered && !isPlayControlHovered && !isQualityControlHovered && playState == PlaybackState.PLAYING) {
+        if (uiVisible && !isProgressBarHovered && !isPlayControlHovered && !isQualityControlHovered && !isSettingsMenuHovered && playState == PlaybackState.PLAYING) {
             launch {
                 while (true) {
                     delay(100) // 每100ms检查一次
@@ -528,6 +580,7 @@ fun PlayerOverlay(
                         mediaPlayer,
                         videoProgress,
                         totalDuration,
+                        playingInfoCache = playingInfoCache,
                         qualities = playingInfoCache?.currentQualities,
                         currentResolution = currentResolution,
                         currentBitrate = currentBitrate,
@@ -549,7 +602,7 @@ fun PlayerOverlay(
                             if (cache != null) {
                                 val request = MediaPRequest(
                                     req = "media.resetQuality",
-                                    reqId = "1234567890ABCDEF2s",
+                                    reqId = "${System.currentTimeMillis()}",
                                     playLink = cache.playLink,
                                     quality = MediaPRequest.Quality(quality.resolution, quality.bitrate),
                                     startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
@@ -557,6 +610,27 @@ fun PlayerOverlay(
                                 )
                                 mediaPViewModel.resetQuality(request)
                             }
+                        },
+                        isoTagData = isoTagData,
+                        onAudioSelected = { audio ->
+                            val cache = playingInfoCache
+                            if (cache != null) {
+                                val request = MediaPRequest(
+                                    req = "media.resetAudio",
+                                    reqId = "1234567890ABCDEF2s",
+                                    playLink = cache.playLink,
+                                    quality = null,
+                                    startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
+                                    clearCache = true,
+                                    audioEncoder = "aac",
+                                    channels = 2,
+                                    audioIndex = audio.index
+                                )
+                                mediaPViewModel.resetAudio(request)
+                            }
+                        },
+                        onSettingsMenuHoverChanged = { isHovered ->
+                            isSettingsMenuHovered = isHovered
                         }
                     )
                 }
@@ -608,13 +682,17 @@ fun PlayerControlRow(
     mediaPlayer: MediampPlayer,
     videoProgress: Float,
     totalDuration: Long,
+    playingInfoCache: PlayingInfoCache? = null,
     qualities: List<QualityResponse>? = null,
     currentResolution: String = "",
     currentBitrate: Int? = null,
     onSpeedControlHoverChanged: ((Boolean) -> Unit)? = null,
     onVolumeControlHoverChanged: ((Boolean) -> Unit)? = null,
     onQualityControlHoverChanged: ((Boolean) -> Unit)? = null,
-    onQualitySelected: ((QualityResponse) -> Unit)? = null
+    onQualitySelected: ((QualityResponse) -> Unit)? = null,
+    isoTagData: IsoTagData? = null,
+    onAudioSelected: ((AudioStream) -> Unit)? = null,
+    onSettingsMenuHoverChanged: ((Boolean) -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     Row(
@@ -728,61 +806,15 @@ fun PlayerControlRow(
                     .padding(start = 8.dp)
                     .size(24.dp)
             )
-            var compositionSpec by remember { mutableStateOf<LottieCompositionSpec?>(null) }
-            LaunchedEffect(Unit) {
-                try {
-                    val bytes = Res.readBytes("files/settings_lottie.json")
-                    compositionSpec = LottieCompositionSpec.JsonString(bytes.decodeToString())
-                } catch (e: Exception) {
-                    Logger.e { "Failed to load lottie: $e" }
-                }
-            }
-            val composition = if (compositionSpec != null) {
-                val c by rememberLottieComposition { compositionSpec!! }
-                c
-            } else {
-                null
-            }
-
-            var isPlaying by remember { mutableStateOf(false) }
-
-            if (composition != null) {
-                val progress by animateLottieCompositionAsState(
-                    composition = composition,
-                    isPlaying = isPlaying,
-                    iterations = 1,
-                    restartOnPlay = true
-                )
-                LaunchedEffect(progress) {
-                    if (progress == 1f && isPlaying) {
-                        isPlaying = false
-                    }
-                }
-
-                Image(
-                    painter = rememberLottiePainter(composition, progress = { progress }),
-                    contentDescription = "设置",
-//                    tint = Color.White,
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .size(24.dp)
-                        .onPointerEvent(PointerEventType.Enter) {
-                            isPlaying = true
-                        }
-                        .onPointerEvent(PointerEventType.Exit) {
-                            // isPlaying = false
-                        },
-                )
-            } else {
-                Icon(
-                    imageVector = Setting,
-                    contentDescription = "设置",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .size(24.dp)
-                )
-            }
+            PlayerSettingsMenu(
+                playingInfoCache = playingInfoCache,
+                isoTagData = isoTagData,
+                onAudioSelected = { audio ->
+                    onAudioSelected?.invoke(audio)
+                },
+                modifier = Modifier.padding(start = 8.dp),
+                onHoverStateChanged = onSettingsMenuHoverChanged
+            )
             val audioLevelController =
                 remember(mediaPlayer) { mediaPlayer.features[AudioLevelController] }
             val volume by audioLevelController?.volume?.collectAsState()
@@ -959,7 +991,8 @@ private suspend fun playMedia(
             audioStream,
             subtitleStream,
             playInfoResponse.item.guid,
-            streamInfo.qualities
+            streamInfo.qualities,
+            currentAudioStreamList = streamInfo.audioStreams
         )
 
         logger.i("startPosition: $startPosition")
