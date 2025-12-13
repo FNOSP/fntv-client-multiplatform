@@ -195,7 +195,7 @@ compose.desktop {
 //            configurationFiles.from("compose-desktop.pro")
         }
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Deb, TargetFormat.Exe, TargetFormat.Rpm)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Deb, TargetFormat.Exe, TargetFormat.Rpm, TargetFormat.Pkg)
             // 使用英文作为包名，避免Windows下打包乱码和路径问题
             // Use English package name to avoid garbled text on Windows
             packageName = "FnMedia"
