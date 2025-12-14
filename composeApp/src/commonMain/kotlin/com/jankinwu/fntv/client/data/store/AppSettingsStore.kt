@@ -17,4 +17,8 @@ object AppSettingsStore {
     var darkMode: Boolean
         get() = settings.getBoolean("dark_mode", true)
         set(value) = settings.set("dark_mode", value)
+
+    var includePrerelease: Boolean
+        get() = settings.getBoolean("include_prerelease", false)
+        set(value) = settings.set("include_prerelease", value)
 }

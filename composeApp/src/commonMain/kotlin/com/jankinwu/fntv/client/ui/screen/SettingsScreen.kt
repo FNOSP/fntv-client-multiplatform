@@ -85,6 +85,7 @@ fun SettingsScreen(componentNavigator: ComponentNavigator) {
     val updateStatus by updateViewModel.status.collectAsState()
     val latestVersion by updateViewModel.latestVersion.collectAsState()
     var proxyUrl by remember { mutableStateOf(AppSettingsStore.githubResourceProxyUrl) }
+    var includePrerelease by remember { mutableStateOf(AppSettingsStore.includePrerelease) }
     val scrollState = rememberScrollState()
     val uriHandler = LocalUriHandler.current
     val focusManager = LocalFocusManager.current
@@ -348,6 +349,24 @@ fun SettingsScreen(componentNavigator: ComponentNavigator) {
                             modifier = Modifier.width(200.dp),
                             singleLine = true,
                             placeholder = { Text("Proxy URL") },
+                        )
+                    }
+                )
+
+                CardExpanderItem(
+                    heading = { Text("预发布版本") },
+                    caption = { Text("是否检查预发布版本 (Alpha, Beta)") },
+                    icon = { Icon(Icons.Regular.Navigation, null, modifier = Modifier.size(18.dp)) },
+                    trailing = {
+                        Switcher(
+                            checked = includePrerelease,
+                            text = if (includePrerelease) "开启" else "关闭",
+                            textBefore = true,
+                            onCheckStateChange = {
+                                includePrerelease = it
+                                AppSettingsStore.includePrerelease = it
+                                updateViewModel.onIncludePrereleaseChanged()
+                            }
                         )
                     }
                 )
