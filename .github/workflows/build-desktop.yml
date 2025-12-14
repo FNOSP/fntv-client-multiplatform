@@ -1,25 +1,17 @@
 name: Build Desktop Apps
 
 on:
-  workflow_dispatch: # 允许手动触发
+  workflow_dispatch:
   push:
-    branches: [ "main", "master" ] # 推送到主分支时触发
-  pull_request:
-    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+
+permissions:
+  contents: write
 
 jobs:
-  build-macos:
-    name: Build MacOS
-    strategy:
-      matrix:
-        include:
-          - os: macos-14
-            arch: arm64
-            name: Apple Silicon
-          - os: macos-13
-            arch: x64
-            name: Intel
-    runs-on: ${{ matrix.os }}
+  build-macos-arm64:
+    name: Build MacOS (Apple Silicon)
+    runs-on: macos-26
     
     steps:
       - name: Checkout code
@@ -37,19 +29,51 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build MacOS DMG (${{ matrix.name }})
+      - name: Build MacOS DMG (Apple Silicon)
         # 执行 Compose Desktop 的打包任务
         run: ./gradlew :composeApp:packageReleaseDmg
 
       - name: Upload DMG Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MacOS-App-DMG-${{ matrix.arch }}
+          name: MacOS-App-DMG-arm64
           # 上传生成的 DMG 文件
           path: composeApp/build/compose/binaries/**/*.dmg
           if-no-files-found: error
 
-  build-linux:
+  build-macos-x64:
+    name: Build MacOS (Intel)
+    runs-on: macos-15-intel
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build MacOS DMG (Intel)
+        # 执行 Compose Desktop 的打包任务
+        run: ./gradlew :composeApp:packageReleaseDmg
+
+      - name: Upload DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MacOS-App-DMG-amd64
+          # 上传生成的 DMG 文件
+          path: composeApp/build/compose/binaries/**/*.dmg
+          if-no-files-found: error
+
+  build-linux-deb-x64:
     name: Build Linux Deb
     runs-on: ubuntu-latest
     
@@ -85,3 +109,116 @@ jobs:
           # 上传生成的 Deb 文件
           path: composeApp/build/compose/binaries/**/*.deb
           if-no-files-found: error
+
+  build-windows-x64:
+    name: Build Windows (x64)
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Create Release Distributable
+        run: ./gradlew :composeApp:createReleaseDistributable
+
+      - name: Setup Inno Setup
+        run: |
+          choco install innosetup
+
+      - name: Build Installer with Inno Setup
+        # 显式传入 amd64 架构参数
+        run: iscc /DMyAppArch=amd64 installer/setup.iss
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-App-Exe-amd64
+          path: installer/*_amd64_*.exe
+          if-no-files-found: error
+
+#  build-windows-arm64:
+#    name: Build Windows (ARM64)
+#    runs-on: windows-latest # 注意：目前 GitHub Hosted Runner 主要是 x64，这里生成的包可能仍然包含 x64 JVM，除非手动配置交叉编译
+#
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v4
+#
+#      - name: Set up JDK 17
+#        uses: actions/setup-java@v4
+#        with:
+#          java-version: '17'
+#          distribution: 'temurin'
+#
+#      - name: Setup Gradle
+#        uses: gradle/actions/setup-gradle@v3
+#
+#      - name: Create Release Distributable
+#        run: ./gradlew :composeApp:createReleaseDistributable
+#
+#      - name: Setup Inno Setup
+#        run: |
+#          choco install innosetup
+#
+#      - name: Build Installer with Inno Setup
+#        # 显式传入 aarch64 架构参数，这将影响生成的安装包文件名
+#        run: iscc /DMyAppArch=aarch64 installer/setup.iss
+#
+#      - name: Upload Windows Artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: Windows-App-Exe-arm64
+#          path: installer/*_aarch64_*.exe
+#          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: [build-macos-arm64, build-macos-x64, build-linux-deb-x64, build-windows-x64]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Generate Release Body
+        id: release_body
+        shell: bash
+        run: |
+          WARNING_MSG="> ⚠️ **运行此应用程序前请保证本地已安装 VLC 播放器，否则会导致此应用程序无法正常运行**"
+          if [[ "${{ github.ref }}" =~ [Aa]lpha ]]; then
+            echo "WARNING_TEXT=⚠️ **此版本为开发中的版本，请酌情下载安装**" >> $GITHUB_ENV
+            echo "VLC_WARNING=$WARNING_MSG" >> $GITHUB_ENV
+          else
+            echo "WARNING_TEXT=" >> $GITHUB_ENV
+            echo "VLC_WARNING=$WARNING_MSG" >> $GITHUB_ENV
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          # 如果 tag 包含 '-' (如 v1.0.0-alpha)，则标记为预发布 (Pre-release)
+          prerelease: ${{ contains(github.ref, '-') }}
+          body: |
+            ${{ env.WARNING_TEXT }}
+            
+            ${{ env.VLC_WARNING }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

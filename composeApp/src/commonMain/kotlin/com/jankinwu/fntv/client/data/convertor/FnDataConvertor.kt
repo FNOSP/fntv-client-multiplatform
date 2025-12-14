@@ -185,6 +185,23 @@ object FnDataConvertor {
         }
     }
 
+    /**
+     * 将毫秒数格式化为 mm:ss 或 HH:mm:ss 格式的字符串
+     * 当时间不满一小时时，不显示小时位
+     */
+    @Suppress("DefaultLocale")
+    fun formatDurationToDateTime(millis: Long): String {
+        val totalSeconds = TimeUnit.MILLISECONDS.toSeconds(millis)
+        val hours = TimeUnit.SECONDS.toHours(totalSeconds)
+        val minutes = TimeUnit.SECONDS.toMinutes(totalSeconds) % 60
+        val seconds = totalSeconds % 60
+        return if (hours > 0) {
+            String.format("%02d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format("%02d:%02d", minutes, seconds)
+        }
+    }
+
     fun convertToMediaDetails(
         currentStreamData: CurrentStreamData,
         isoTagData: IsoTagData,

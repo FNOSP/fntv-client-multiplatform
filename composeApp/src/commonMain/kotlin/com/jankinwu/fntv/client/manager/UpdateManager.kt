@@ -13,7 +13,8 @@ data class GitHubRelease(
     val tagName: String,
     val name: String,
     val assets: List<GitHubAsset>,
-    val body: String
+    val body: String,
+    val prerelease: Boolean = false
 )
 
 data class GitHubAsset(
@@ -46,7 +47,7 @@ sealed class UpdateStatus {
 interface UpdateManager {
     val status: StateFlow<UpdateStatus>
     val latestVersion: StateFlow<UpdateInfo?>
-    fun checkUpdate(proxyUrl: String)
+    fun checkUpdate(proxyUrl: String, includePrerelease: Boolean)
     fun downloadUpdate(proxyUrl: String, info: UpdateInfo)
     fun installUpdate(info: UpdateInfo)
     fun cancelDownload()

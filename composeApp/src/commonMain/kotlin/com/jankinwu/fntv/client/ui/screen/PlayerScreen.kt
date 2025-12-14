@@ -4,6 +4,7 @@ package com.jankinwu.fntv.client.ui.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +32,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.onPointerEvent
@@ -44,11 +53,13 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowState
 import co.touchlab.kermit.Logger
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.jankinwu.fntv.client.data.constants.Colors
+import com.jankinwu.fntv.client.data.convertor.FnDataConvertor
 import com.jankinwu.fntv.client.data.model.PlayingInfoCache
 import com.jankinwu.fntv.client.data.model.request.MediaPRequest
 import com.jankinwu.fntv.client.data.model.request.PlayPlayRequest
@@ -74,6 +85,8 @@ import com.jankinwu.fntv.client.icons.Pause
 import com.jankinwu.fntv.client.icons.Play
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
+import com.jankinwu.fntv.client.ui.component.common.ToastManager
+import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.ui.component.common.dialog.AddNasSubtitleDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.CustomContentDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.SubtitleSearchDialog
@@ -85,7 +98,6 @@ import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SubtitleControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.VideoPlayerProgressBar
 import com.jankinwu.fntv.client.ui.component.player.VolumeControl
-import com.jankinwu.fntv.client.ui.component.player.formatDuration
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
 import com.jankinwu.fntv.client.ui.providable.LocalFileInfo
 import com.jankinwu.fntv.client.ui.providable.LocalFrameWindowScope
@@ -512,6 +524,12 @@ fun PlayerOverlay(
             }
         }
     }
+    val windowState = LocalWindowState.current
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
     CompositionLocalProvider(
         LocalIsoTagData provides isoTagData,
         LocalToastManager provides toastManager,
@@ -522,6 +540,20 @@ fun PlayerOverlay(
                 .fillMaxSize()
                 .hoverable(interactionSource)
                 .background(Color.Black)
+                .onKeyEvent { event ->
+                    handlePlayerKeyEvent(
+                        event,
+                        mediaPlayer,
+                        playingInfoCache,
+                        playRecordViewModel,
+                        playerManager,
+                        audioLevelController,
+                        windowState,
+                        toastManager
+                    )
+                }
+                .focusRequester(focusRequester)
+                .focusable()
 //            .onPointerEvent(PointerEventType.Move) {
 //                // 鼠标移动时更新时间并显示UI
 //                lastMouseMoveTime = System.currentTimeMillis()
@@ -533,7 +565,6 @@ fun PlayerOverlay(
                     true
                 )
         ) {
-            val windowState = LocalWindowState.current
             if (windowState.placement != WindowPlacement.Fullscreen) {
                 // 添加标题栏占位区域，允许窗口拖动
                 Box(
@@ -581,7 +612,7 @@ fun PlayerOverlay(
             if (uiVisible) {
                 Row(
                     modifier = Modifier
-                        .padding(top = if (windowState.placement != WindowPlacement.Fullscreen) 48.dp else 12.dp)
+                        .padding(top = 12.dp)
                         .align(Alignment.TopStart)
                         .padding(start = 20.dp, top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
@@ -994,8 +1025,8 @@ fun PlayerControlRow(
             )
             // 当前播放时间 / 总时间
             Text(
-                text = "${formatDuration((videoProgress * totalDuration).toLong())} / ${
-                    formatDuration(totalDuration)
+                text = "${FnDataConvertor.formatDurationToDateTime((videoProgress * totalDuration).toLong())} / ${
+                    FnDataConvertor.formatDurationToDateTime(totalDuration)
                 }",
                 color = Color.White,
                 fontSize = 14.sp,
@@ -1360,4 +1391,77 @@ private suspend fun startPlayback(
 
     logger.i("startPlayback startPosition: $startPosition")
     player.seekTo(startPosition)
+}
+
+private fun handlePlayerKeyEvent(
+    event: KeyEvent,
+    mediaPlayer: MediampPlayer,
+    playingInfoCache: PlayingInfoCache?,
+    playRecordViewModel: PlayRecordViewModel,
+    playerManager: PlayerManager,
+    audioLevelController: AudioLevelController?,
+    windowState: WindowState,
+    toastManager: ToastManager
+): Boolean {
+    if (event.type == KeyEventType.KeyDown) {
+        var handled = true
+        when (event.key) {
+            Key.DirectionLeft -> {
+                val seekPosition = (mediaPlayer.currentPositionMillis.value - 10000).coerceAtLeast(0)
+                mediaPlayer.seekTo(seekPosition)
+                val dateTime = FnDataConvertor.formatDurationToDateTime(seekPosition)
+                toastManager.showToast("快退至：$dateTime", ToastType.Info)
+                callPlayRecord(
+                    ts = (seekPosition / 1000).toInt(),
+                    playingInfoCache = playingInfoCache,
+                    playRecordViewModel = playRecordViewModel,
+                    onSuccess = { logger.i("Seek时调用playRecord成功") },
+                    onError = { logger.i("Seek时调用playRecord失败：缓存为空") }
+                )
+            }
+            Key.DirectionRight -> {
+                val seekPosition = (mediaPlayer.currentPositionMillis.value + 10000).coerceAtMost(playerManager.playerState.duration)
+                mediaPlayer.seekTo(seekPosition)
+                val dateTime = FnDataConvertor.formatDurationToDateTime(seekPosition)
+                toastManager.showToast("快进至：$dateTime", ToastType.Info)
+                callPlayRecord(
+                    ts = (seekPosition / 1000).toInt(),
+                    playingInfoCache = playingInfoCache,
+                    playRecordViewModel = playRecordViewModel,
+                    onSuccess = { logger.i("Seek时调用playRecord成功") },
+                    onError = { logger.i("Seek时调用playRecord失败：缓存为空") }
+                )
+            }
+            Key.DirectionUp -> {
+                audioLevelController?.let {
+                    val newVolume = (it.volume.value + 0.1f).coerceIn(0f, 1f)
+                    it.setVolume(newVolume)
+                    toastManager.showToast("当前音量：${(newVolume * 100).toInt()}%", ToastType.Info)
+                    PlayingSettingsStore.saveVolume(newVolume)
+                }
+            }
+            Key.DirectionDown -> {
+                audioLevelController?.let {
+                    val newVolume = (it.volume.value - 0.1f).coerceIn(0f, 1f)
+                    it.setVolume(newVolume)
+                    toastManager.showToast("当前音量：${(newVolume * 100).toInt()}%", ToastType.Info)
+                    PlayingSettingsStore.saveVolume(newVolume)
+                }
+            }
+            Key.Spacebar -> {
+                mediaPlayer.togglePause()
+            }
+            Key.F -> {
+                if (windowState.placement == WindowPlacement.Fullscreen) {
+                    windowState.placement = WindowPlacement.Floating
+                } else {
+                    windowState.placement = WindowPlacement.Fullscreen
+                }
+            }
+            else -> handled = false
+        }
+        return handled
+    } else {
+        return false
+    }
 }

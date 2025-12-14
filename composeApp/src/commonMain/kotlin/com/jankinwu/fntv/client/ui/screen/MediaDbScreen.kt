@@ -53,6 +53,7 @@ import com.jankinwu.fntv.client.ui.component.common.FilterItem
 import com.jankinwu.fntv.client.ui.component.common.MoviePoster
 import com.jankinwu.fntv.client.ui.component.common.SortFlyout
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
+import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.providable.LocalToastManager
 import com.jankinwu.fntv.client.ui.providable.LocalUserInfo
@@ -582,7 +583,7 @@ fun MediaDbScreen(
                             // 显示错误信息
                             toastManager.showToast(
                                 "获取媒体列表失败, cause: ${state.message}",
-                                false,
+                                ToastType.Failed,
                                 10000
                             )
                         }

@@ -73,6 +73,7 @@ import com.jankinwu.fntv.client.manager.PreferencesManager
 import com.jankinwu.fntv.client.ui.component.common.ComponentNavigator
 import com.jankinwu.fntv.client.ui.component.common.NumberInput
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
+import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.ui.component.common.dialog.ForgotPasswordDialog
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.customSelectedCheckBoxColors
@@ -174,7 +175,7 @@ fun LoginScreen(navigator: ComponentNavigator) {
 
             is UiState.Error -> {
                 // 登录失败，可以显示错误信息
-                toastManager.showToast("登录失败，${state.message}", false)
+                toastManager.showToast("登录失败，${state.message}", ToastType.Failed)
                 logger.e("登录失败: ${state.message}")
 
                 // 检查是否是证书错误

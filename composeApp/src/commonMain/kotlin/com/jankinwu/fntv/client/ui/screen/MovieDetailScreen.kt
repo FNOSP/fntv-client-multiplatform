@@ -87,6 +87,7 @@ import com.jankinwu.fntv.client.ui.component.common.ImgLoadingError
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
+import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.ui.component.detail.DetailPlayButton
 import com.jankinwu.fntv.client.ui.component.detail.DetailTags
 import com.jankinwu.fntv.client.ui.component.detail.MediaDescription
@@ -788,13 +789,13 @@ fun MiddleControls(
         when (val state = favoriteUiState) {
             is UiState.Success -> {
                 isFavorite = !isFavorite
-                toastManager.showToast(state.data.message, state.data.success)
+                toastManager.showToast(state.data.message, if (state.data.success) ToastType.Success else ToastType.Failed)
 
             }
 
             is UiState.Error -> {
                 // 显示错误提示
-                toastManager.showToast("操作失败，${state.message}", false)
+                toastManager.showToast("操作失败，${state.message}", ToastType.Failed)
             }
 
             else -> {}
@@ -813,12 +814,12 @@ fun MiddleControls(
             is UiState.Success -> {
                 streamListViewModel.loadData(guid)
                 itemViewModel.loadData(guid)
-                toastManager.showToast(state.data.message, state.data.success)
+                toastManager.showToast(state.data.message, if (state.data.success) ToastType.Success else ToastType.Failed)
             }
 
             is UiState.Error -> {
                 // 显示错误提示
-                toastManager.showToast("操作失败，${state.message}", false)
+                toastManager.showToast("操作失败，${state.message}", ToastType.Failed)
             }
 
             else -> {}

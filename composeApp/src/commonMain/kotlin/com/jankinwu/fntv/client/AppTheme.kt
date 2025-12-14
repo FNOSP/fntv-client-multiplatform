@@ -17,6 +17,7 @@ import androidx.compose.ui.window.WindowState
 import com.jankinwu.fntv.client.data.store.AppSettingsStore
 import com.jankinwu.fntv.client.data.store.Store
 import com.jankinwu.fntv.client.manager.LoginStateManager
+import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.jankinwu.fntv.client.ui.providable.LocalRefreshState
 import com.jankinwu.fntv.client.ui.providable.LocalStore
 import com.jankinwu.fntv.client.ui.providable.LocalTypography
@@ -48,14 +49,20 @@ fun AppTheme(
         )
     }
     val isLoggedIn by LoginStateManager.isLoggedIn.collectAsState()
-    LaunchedEffect(systemDarkMode, store.isFollowingSystemTheme, AppSettingsStore.darkMode, isLoggedIn) {
+    val playerManager = LocalPlayerManager.current
+    val playerVisible = playerManager.playerState.isVisible
+    LaunchedEffect(systemDarkMode, store.isFollowingSystemTheme, AppSettingsStore.darkMode, isLoggedIn, playerVisible) {
         if (!isLoggedIn) {
             store.darkMode = true
         } else {
-            if (store.isFollowingSystemTheme) {
-                store.darkMode = systemDarkMode
+            if (playerVisible) {
+                store.darkMode = true
             } else {
-                store.darkMode = AppSettingsStore.darkMode
+                if (store.isFollowingSystemTheme) {
+                    store.darkMode = systemDarkMode
+                } else {
+                    store.darkMode = AppSettingsStore.darkMode
+                }
             }
         }
     }

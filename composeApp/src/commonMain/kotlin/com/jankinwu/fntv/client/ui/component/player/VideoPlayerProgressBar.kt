@@ -8,7 +8,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -28,8 +35,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
+import com.jankinwu.fntv.client.data.convertor.FnDataConvertor
 import org.openani.mediamp.MediampPlayer
-import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
 private const val LAYOUT_ID_PROGRESS_BAR = "progressBar"
@@ -190,7 +197,7 @@ fun VideoPlayerProgressBarImpl(
                     val hoverProgress = (hoverPositionX / layoutSize.width).coerceIn(0f, 1f)
                     val hoverTimeMillis = (hoverProgress * totalDuration).toLong()
                     Text(
-                        text = formatDuration(hoverTimeMillis),
+                        text = FnDataConvertor.formatDurationToDateTime(hoverTimeMillis),
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
@@ -233,22 +240,5 @@ fun VideoPlayerProgressBarImpl(
                 }
             }
         }
-    }
-}
-
-/**
- * 将毫秒数格式化为 mm:ss 或 HH:mm:ss 格式的字符串
- * 当时间不满一小时时，不显示小时位
- */
-@Suppress("DefaultLocale")
-fun formatDuration(millis: Long): String {
-    val totalSeconds = TimeUnit.MILLISECONDS.toSeconds(millis)
-    val hours = TimeUnit.SECONDS.toHours(totalSeconds)
-    val minutes = TimeUnit.SECONDS.toMinutes(totalSeconds) % 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) {
-        String.format("%02d:%02d:%02d", hours, minutes, seconds)
-    } else {
-        String.format("%02d:%02d", minutes, seconds)
     }
 }

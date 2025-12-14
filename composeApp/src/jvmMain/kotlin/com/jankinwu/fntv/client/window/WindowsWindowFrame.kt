@@ -58,6 +58,7 @@ import androidx.compose.ui.zIndex
 import com.jankinwu.fntv.client.icons.RefreshCircle
 import com.jankinwu.fntv.client.jna.windows.ComposeWindowProcedure
 import com.jankinwu.fntv.client.ui.component.common.HasNewVersionTag
+import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.mayakapps.compose.windowstyler.WindowBackdrop
 import com.mayakapps.compose.windowstyler.WindowStyle
 import com.sun.jna.platform.win32.User32
@@ -194,21 +195,25 @@ fun FrameWindowScope.WindowsWindowFrame(
                         Spacer(modifier = Modifier.width(14.dp).height(36.dp))
                     }
                 }
-                if (icon != null) {
-                    Image(
-                        painter = icon,
-                        contentDescription = null,
-                        modifier = Modifier.padding(start = 6.dp).size(16.dp)
-                    )
-                }
-                if (title.isNotEmpty()) {
-                    Text(
-                        text = title,
-                        style = FluentTheme.typography.caption,
-                        modifier = Modifier.padding(start = 16.dp)
-                    )
-                    HasNewVersionTag()
-                }
+                 val playerManager = LocalPlayerManager.current
+                 val playerVisible = playerManager.playerState.isVisible
+                 if (!playerVisible) {
+                     if (icon != null) {
+                         Image(
+                             painter = icon,
+                             contentDescription = null,
+                             modifier = Modifier.padding(start = 6.dp).size(16.dp)
+                         )
+                     }
+                     if (title.isNotEmpty()) {
+                         Text(
+                             text = title,
+                             style = FluentTheme.typography.caption,
+                             modifier = Modifier.padding(start = 16.dp)
+                         )
+                         HasNewVersionTag()
+                     }
+                 }
                 Spacer(modifier = Modifier.weight(1f))
                 window.CaptionButtonRow(
                     windowHandle = procedure.windowHandle,

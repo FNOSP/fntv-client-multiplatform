@@ -17,10 +17,10 @@ class ToastManager {
     private val _toasts = mutableStateListOf<ToastMessage>()
     val toasts: SnapshotStateList<ToastMessage> = _toasts
 
-    fun showToast(message: String, isSuccess: Boolean = true, duration: Long = 2000L) {
+    fun showToast(message: String, type: Int = ToastType.Success, duration: Long = 2000L) {
         val toast = ToastMessage(
             message = message,
-            isSuccess = isSuccess,
+            type = type,
             duration = duration
         )
         _toasts.add(toast)
@@ -52,7 +52,7 @@ fun ToastHost(
             toastManager.toasts.forEach { toast ->
                 Toast(
                     message = toast.message,
-                    isSuccess = toast.isSuccess,
+                    type = toast.type,
                     duration = toast.duration
                 ) {
                     toastManager.removeToast(toast.id)
