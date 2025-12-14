@@ -200,10 +200,13 @@ jobs:
         id: release_body
         shell: bash
         run: |
+          WARNING_MSG="> ⚠️ **运行此应用程序前请保证本地已安装 VLC 播放器，否则会导致此应用程序无法正常运行**"
           if [[ "${{ github.ref }}" =~ [Aa]lpha ]]; then
             echo "WARNING_TEXT=⚠️ **此版本为开发中的版本，请酌情下载安装**" >> $GITHUB_ENV
+            echo "VLC_WARNING=$WARNING_MSG" >> $GITHUB_ENV
           else
             echo "WARNING_TEXT=" >> $GITHUB_ENV
+            echo "VLC_WARNING=$WARNING_MSG" >> $GITHUB_ENV
           fi
 
       - name: Create Release
@@ -212,7 +215,10 @@ jobs:
           files: artifacts/**/*
           # 如果 tag 包含 '-' (如 v1.0.0-alpha)，则标记为预发布 (Pre-release)
           prerelease: ${{ contains(github.ref, '-') }}
-          body: ${{ env.WARNING_TEXT }}
+          body: |
+            ${{ env.WARNING_TEXT }}
+            
+            ${{ env.VLC_WARNING }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
