@@ -110,5 +110,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
+          # 如果 tag 包含 '-' (如 v1.0.0-alpha)，则标记为预发布 (Pre-release)
+          prerelease: ${{ contains(github.ref, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
