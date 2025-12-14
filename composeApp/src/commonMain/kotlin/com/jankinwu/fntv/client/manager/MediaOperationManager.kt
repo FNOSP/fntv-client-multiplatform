@@ -3,6 +3,7 @@ package com.jankinwu.fntv.client.manager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import com.jankinwu.fntv.client.ui.component.common.ToastManager
+import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.viewmodel.FavoriteViewModel.FavoriteActionResult
 import com.jankinwu.fntv.client.viewmodel.UiState
 import com.jankinwu.fntv.client.viewmodel.WatchedViewModel.WatchedActionResult
@@ -18,13 +19,13 @@ fun HandleFavoriteResult(
     LaunchedEffect(favoriteUiState) {
         when (val state = favoriteUiState) {
             is UiState.Success -> {
-                toastManager.showToast(state.data.message, state.data.success)
+                toastManager.showToast(state.data.message, if (state.data.success) ToastType.Success else ToastType.Failed)
                 pendingCallbacks[state.data.guid]?.invoke(state.data.success)
                 onPendingCallbackHandled(state.data.guid)
             }
 
             is UiState.Error -> {
-                toastManager.showToast("操作失败，${state.message}", false)
+                toastManager.showToast("操作失败，${state.message}", ToastType.Failed)
                 state.operationId?.let {
                     pendingCallbacks[state.operationId]?.invoke(false)
                     onPendingCallbackHandled(state.operationId)
@@ -52,13 +53,13 @@ fun HandleWatchedResult(
     LaunchedEffect(watchedUiState) {
         when (val state = watchedUiState) {
             is UiState.Success -> {
-                toastManager.showToast(state.data.message, state.data.success)
+                toastManager.showToast(state.data.message, if (state.data.success) ToastType.Success else ToastType.Failed)
                 pendingCallbacks[state.data.guid]?.invoke(state.data.success)
                 onPendingCallbackHandled(state.data.guid)
             }
 
             is UiState.Error -> {
-                toastManager.showToast("操作失败，${state.message}", false)
+                toastManager.showToast("操作失败，${state.message}", ToastType.Failed)
                 state.operationId?.let {
                     pendingCallbacks[state.operationId]?.invoke(false)
                     onPendingCallbackHandled(state.operationId)

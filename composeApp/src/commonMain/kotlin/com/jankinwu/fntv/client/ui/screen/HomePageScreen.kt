@@ -38,6 +38,7 @@ import com.jankinwu.fntv.client.ui.component.common.MediaLibGallery
 import com.jankinwu.fntv.client.ui.component.common.RecentlyWatched
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
 import com.jankinwu.fntv.client.ui.component.common.ToastManager
+import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.jankinwu.fntv.client.ui.providable.LocalRefreshState
@@ -254,7 +255,7 @@ fun HomePageScreen(navigator: ComponentNavigator) {
                                     is UiState.Error -> {
                                         toastManager.showToast(
                                             "获取最近观看列表失败，cause: ${playListState.message}",
-                                            false,
+                                            ToastType.Failed,
                                             10000
                                         )
                                     }
@@ -344,7 +345,7 @@ fun HomePageScreen(navigator: ComponentNavigator) {
                                 item {
                                     toastManager.showToast(
                                         "获取媒体库列表失败, cause: ${mediaDbState.message}",
-                                        false,
+                                        ToastType.Failed,
                                         10000
                                     )
                                 }
@@ -389,7 +390,7 @@ fun FntvProxy(toastManager: ToastManager) {
 
                 is UiState.Error -> {
                     logger.e { "VLC 代理设置失败, cause: ${(proxyUiState as UiState.Error).message}" }
-                    toastManager.showToast("VLC 代理设置失败, cause: ${(proxyUiState as UiState.Error).message}")
+                    toastManager.showToast("VLC 代理设置失败, cause: ${(proxyUiState as UiState.Error).message}", ToastType.Failed)
                 }
 
                 else -> {

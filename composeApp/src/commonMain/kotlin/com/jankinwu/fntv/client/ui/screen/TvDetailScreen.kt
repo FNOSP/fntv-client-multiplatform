@@ -57,6 +57,7 @@ import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.component.common.MoviePoster
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
+import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.ui.component.detail.DetailPlayButton
 import com.jankinwu.fntv.client.ui.component.detail.DetailTags
 import com.jankinwu.fntv.client.ui.component.detail.ImdbLink
@@ -237,7 +238,7 @@ fun TvDetailBody(
     LaunchedEffect(watchedUiState) {
         when (val state = watchedUiState) {
             is UiState.Success -> {
-                toastManager.showToast(state.data.message, state.data.success)
+                toastManager.showToast(state.data.message, if (state.data.success) ToastType.Success else ToastType.Failed)
                 // 调用对应的回调函数
                 pendingCallbacks[state.data.guid]?.invoke(state.data.success)
                 // 从 pendingCallbacks 中移除已处理的回调
@@ -248,7 +249,7 @@ fun TvDetailBody(
 
             is UiState.Error -> {
                 // 显示错误提示
-                toastManager.showToast("操作失败，${state.message}", false)
+                toastManager.showToast("操作失败，${state.message}", ToastType.Failed)
                 state.operationId?.let {
                     pendingCallbacks[state.operationId]?.invoke(false)
                     // 从 pendingCallbacks 中移除已处理的回调
@@ -270,13 +271,13 @@ fun TvDetailBody(
     LaunchedEffect(favoriteUiState) {
         when (val state = favoriteUiState) {
             is UiState.Success -> {
-                toastManager.showToast(state.data.message, state.data.success)
+                toastManager.showToast(state.data.message, if (state.data.success) ToastType.Success else ToastType.Failed)
                 itemViewModel.loadData(guid)
             }
 
             is UiState.Error -> {
                 // 显示错误提示
-                toastManager.showToast("操作失败，${state.message}", false)
+                toastManager.showToast("操作失败，${state.message}", ToastType.Failed)
             }
 
             else -> {}

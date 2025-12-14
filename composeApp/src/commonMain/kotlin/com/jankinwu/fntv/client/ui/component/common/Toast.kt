@@ -26,6 +26,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jankinwu.fntv.client.icons.Completed
+import com.jankinwu.fntv.client.icons.InfoHint
 import com.jankinwu.fntv.client.icons.Warning
 import io.github.composefluent.FluentTheme
 import kotlinx.coroutines.coroutineScope
@@ -33,17 +34,23 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+object ToastType {
+    const val Success = 0
+    const val Failed = 1
+    const val Info = 2
+}
+
 data class ToastMessage(
     val id: String = UUID.randomUUID().toString(), // 唯一标识符
     val message: String, // 提示文字
     val duration: Long = 2000L, // 显示时长（毫秒）
-    val isSuccess: Boolean = true
+    val type: Int = ToastType.Success
 )
 
 @Composable
 fun Toast(
     message: String,
-    isSuccess: Boolean = true,
+    type: Int = ToastType.Success,
     duration: Long = 2000L,
     onDismiss: () -> Unit
 ) {
@@ -112,10 +119,22 @@ fun Toast(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val icon = when (type) {
+                    ToastType.Success -> Completed
+                    ToastType.Failed -> Warning
+                    ToastType.Info -> InfoHint
+                    else -> Completed
+                }
+                val tint = when (type) {
+                    ToastType.Success -> Color(0xFF5BA85A)
+                    ToastType.Failed -> Color(0xFFFF0421)
+                    ToastType.Info -> Color(0xFF54A9FF)
+                    else -> Color(0xFF5BA85A)
+                }
                 Icon(
-                    imageVector = if (isSuccess) Completed else Warning,
+                    imageVector = icon,
                     contentDescription = null,
-                    tint = if (isSuccess) Color(0xFF5BA85A) else Color(0xFFFF0421),
+                    tint = tint,
                     modifier = Modifier
                         .size(28.dp)
                         .padding(end = 8.dp)

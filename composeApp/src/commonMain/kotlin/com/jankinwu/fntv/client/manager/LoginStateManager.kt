@@ -2,6 +2,7 @@ package com.jankinwu.fntv.client.manager
 
 import com.jankinwu.fntv.client.data.store.AccountDataCache
 import com.jankinwu.fntv.client.ui.component.common.ToastManager
+import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.utils.DomainIpValidator
 import com.jankinwu.fntv.client.viewmodel.LoginViewModel
 import com.jankinwu.fntv.client.viewmodel.LogoutViewModel
@@ -71,7 +72,7 @@ object LoginStateManager {
     ) {
 //    val loginState by loginViewModel.uiState.collectAsState()
         if (host.isBlank() || username.isBlank() || password.isBlank()) {
-            toastManager.showToast("请填写完整的登录信息", false)
+            toastManager.showToast("请填写完整的登录信息", ToastType.Failed)
             return
         }
         if (isHttps) {
@@ -81,7 +82,7 @@ object LoginStateManager {
         }
         val isValidDomainOrIP = DomainIpValidator.isValidDomainOrIP(host)
         if (!isValidDomainOrIP) {
-            toastManager.showToast("请填写正确的ip地址或域名", false)
+            toastManager.showToast("请填写正确的ip地址或域名", ToastType.Failed)
             return
         }
         AccountDataCache.host = host

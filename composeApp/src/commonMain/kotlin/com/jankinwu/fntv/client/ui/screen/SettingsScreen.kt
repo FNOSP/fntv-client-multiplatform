@@ -44,6 +44,7 @@ import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.constants.Constants
 import com.jankinwu.fntv.client.data.store.AppSettingsStore
 import com.jankinwu.fntv.client.icons.Logout
+import com.jankinwu.fntv.client.icons.PreRelease
 import com.jankinwu.fntv.client.icons.VersionInfo
 import com.jankinwu.fntv.client.manager.LoginStateManager
 import com.jankinwu.fntv.client.ui.component.common.ComponentItem
@@ -354,9 +355,9 @@ fun SettingsScreen(componentNavigator: ComponentNavigator) {
                 )
 
                 CardExpanderItem(
-                    heading = { Text("预发布版本") },
-                    caption = { Text("是否检查预发布版本 (Alpha, Beta)") },
-                    icon = { Icon(Icons.Regular.Navigation, null, modifier = Modifier.size(18.dp)) },
+                    heading = { Text("抢先体验") },
+                    caption = { Text("检测更新时是否包括预发布版本 (Alpha, Beta)") },
+                    icon = { Icon(PreRelease, null, modifier = Modifier.size(18.dp)) },
                     trailing = {
                         Switcher(
                             checked = includePrerelease,

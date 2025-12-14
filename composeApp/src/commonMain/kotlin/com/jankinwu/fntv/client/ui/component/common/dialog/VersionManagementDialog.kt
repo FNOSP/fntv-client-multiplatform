@@ -40,6 +40,7 @@ import com.jankinwu.fntv.client.data.model.response.MediaItemResponse
 import com.jankinwu.fntv.client.ui.LargeDialogSize
 import com.jankinwu.fntv.client.ui.component.common.AnimatedScrollbarLazyColumn
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
+import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.ui.customAccentButtonColors
 import com.jankinwu.fntv.client.ui.customSelectedCheckBoxColors
 import com.jankinwu.fntv.client.ui.providable.LocalToastManager
@@ -94,7 +95,7 @@ fun VersionManagementDialog(
                 onDismiss()
             }
             is UiState.Error -> {
-                toastManager.showToast("解除匹配失败：" + (scrapState as UiState.Error).message, false)
+                toastManager.showToast("解除匹配失败：" + (scrapState as UiState.Error).message, ToastType.Failed)
             }
             else -> {}
         }

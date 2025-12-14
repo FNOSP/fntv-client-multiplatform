@@ -48,6 +48,7 @@ import com.jankinwu.fntv.client.ui.component.common.AnimatedScrollbarLazyColumn
 import com.jankinwu.fntv.client.ui.component.common.EmptyFolder
 import com.jankinwu.fntv.client.ui.component.common.FlyoutButton
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
+import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.ui.providable.LocalToastManager
 import com.jankinwu.fntv.client.viewmodel.SubtitleDownloadViewModel
 import com.jankinwu.fntv.client.viewmodel.SubtitleSearchViewModel
@@ -242,7 +243,7 @@ fun SubtitleResultList(results: List<SubtitleItemData>,
                 (subtitleDownloadState as UiState.Error).message
             val operationId: String? = (subtitleDownloadState as UiState.Error).operationId
             downloadStatusMap[operationId as String] = 0
-            toastManager.showToast(subtitleDownloadError, false)
+            toastManager.showToast(subtitleDownloadError, ToastType.Failed)
             onSubtitleDownloadFailed(subtitleDownloadError)
             subtitleDownloadViewModel.clearError()
         }
