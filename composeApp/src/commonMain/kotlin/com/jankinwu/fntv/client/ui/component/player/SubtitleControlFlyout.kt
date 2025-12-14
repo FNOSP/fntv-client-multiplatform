@@ -64,6 +64,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+import com.jankinwu.fntv.client.icons.Delete
+
 private val FlyoutBackgroundColor = Color.Black.copy(alpha = 0.9f)
 private val FlyoutBorderColor = Color.Gray.copy(alpha = 0.5f)
 private val SelectedTextColor = Color(0xFF2073DF)
@@ -84,7 +86,8 @@ fun SubtitleControlFlyout(
     onOpenAddNasSubtitle: () -> Unit,
     onOpenAddLocalSubtitle: () -> Unit,
     modifier: Modifier = Modifier,
-    onHoverStateChanged: ((Boolean) -> Unit)? = null
+    onHoverStateChanged: ((Boolean) -> Unit)? = null,
+    onRequestDelete: ((SubtitleStream) -> Unit)? = null
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -99,6 +102,8 @@ fun SubtitleControlFlyout(
         hideJob?.cancel()
         isExpanded = true
         showPopup = true
+        isAddMenuHovered = false
+        popupHovered = false
         onHoverStateChanged?.invoke(true)
     }
 
@@ -198,7 +203,12 @@ fun SubtitleControlFlyout(
                                 } else {
                                     hideFlyoutWithDelay()
                                 }
-                            }
+                            },
+                            onRequestDelete = { subtitle ->
+                                onRequestDelete?.invoke(subtitle)
+                                isExpanded = false
+                            },
+                            isExpanded = isExpanded
                         )
                     }
                 }
@@ -256,7 +266,9 @@ fun SubtitleFlyoutContent(
     onOpenSubtitleSearch: () -> Unit,
     onOpenAddNasSubtitle: () -> Unit,
     onOpenAddLocalSubtitle: () -> Unit,
-    onAddMenuHoverChanged: (Boolean) -> Unit
+    onAddMenuHoverChanged: (Boolean) -> Unit,
+    onRequestDelete: (SubtitleStream) -> Unit,
+    isExpanded: Boolean = false
 ) {
     val currentSubtitle = playingInfoCache?.currentSubtitleStream
     val subtitleList = playingInfoCache?.currentSubtitleStreamList ?: emptyList()
@@ -339,8 +351,18 @@ fun SubtitleFlyoutContent(
                 modifier = Modifier.padding(vertical = 12.dp),
                 color = Color.White.copy(alpha = 0.1f)
             )
-
             val lazyListState = rememberLazyListState()
+            LaunchedEffect(isExpanded) {
+                if (isExpanded) {
+                    val index = subtitleList.indexOfFirst { it.guid == currentSubtitle?.guid }
+                    if (index != -1) {
+                        // 加1是因为有一个"关闭"选项在列表头部
+                        lazyListState.scrollToItem(index + 1)
+                    } else if (currentSubtitle == null) {
+                        lazyListState.scrollToItem(0)
+                    }
+                }
+            }
             AnimatedScrollbarLazyColumn(
                 listState = lazyListState,
                 modifier = Modifier.height(300.dp),
@@ -375,7 +397,9 @@ fun SubtitleFlyoutContent(
                         title = "",
                         isDefault = subtitle.isDefault == 1,
                         isSelected = isSelected,
-                        onClick = { onSubtitleSelected(subtitle) }
+                        onClick = { onSubtitleSelected(subtitle) },
+                        isExternal = subtitle.isExternal == 1,
+                        onDelete = { onRequestDelete(subtitle) }
                     )
                 }
             }
@@ -482,7 +506,9 @@ fun SubtitleOptionItem(
     title: String,
     isDefault: Boolean,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isExternal: Boolean = false,
+    onDelete: (() -> Unit)? = null
 ) {
     val textColor = if (isSelected) SelectedTextColor else DefaultTextColor
     var isHovered by remember { mutableStateOf(false) }
@@ -529,8 +555,25 @@ fun SubtitleOptionItem(
             }
         }
 
-        // No checkmark in the screenshot for subtitle list, just blue text. 
-        // But QualityControlFlyout uses checkmark. The screenshot shows blue text and highlighted background.
-        // I will keep it simple as per screenshot.
+        if (isExternal && isHovered) {
+            var isIconHovered by remember { mutableStateOf(false) }
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (isIconHovered) HoverBackgroundColor else Color.Transparent)
+                    .clickable { onDelete?.invoke() }
+                    .onPointerEvent(PointerEventType.Enter) { isIconHovered = true }
+                    .onPointerEvent(PointerEventType.Exit) { isIconHovered = false },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Delete,
+                    contentDescription = "删除字幕",
+                    tint = DefaultTextColor,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
     }
 }

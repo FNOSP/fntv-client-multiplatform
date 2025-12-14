@@ -75,6 +75,7 @@ import com.jankinwu.fntv.client.icons.Play
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
 import com.jankinwu.fntv.client.ui.component.common.dialog.AddNasSubtitleDialog
+import com.jankinwu.fntv.client.ui.component.common.dialog.CustomContentDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.SubtitleSearchDialog
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.component.player.FullScreenControl
@@ -98,19 +99,23 @@ import com.jankinwu.fntv.client.viewmodel.MediaPViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayPlayViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayRecordViewModel
+import com.jankinwu.fntv.client.viewmodel.PlayerViewModel
 import com.jankinwu.fntv.client.viewmodel.StreamViewModel
+import com.jankinwu.fntv.client.viewmodel.SubtitleDeleteViewModel
 import com.jankinwu.fntv.client.viewmodel.SubtitleMarkViewModel
 import com.jankinwu.fntv.client.viewmodel.TagViewModel
 import com.jankinwu.fntv.client.viewmodel.UiState
 import com.jankinwu.fntv.client.viewmodel.UserInfoViewModel
+import io.github.composefluent.FluentTheme
 import io.github.composefluent.component.ContentDialogButton
+import io.github.composefluent.component.DialogSize
 import korlibs.crypto.MD5
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 import org.openani.mediamp.MediampPlayer
 import org.openani.mediamp.PlaybackState
 import org.openani.mediamp.compose.MediampPlayerSurface
@@ -170,9 +175,6 @@ object PlayerScreen {
     }
 }
 
-// 全局播放信息缓存，生命周期跟随播放器
-var playingInfoCache by mutableStateOf<PlayingInfoCache?>(null)
-
 private fun createPlayRecordRequest(
     ts: Int,
     cache: PlayingInfoCache
@@ -201,6 +203,7 @@ private fun createPlayRecordRequest(
  */
 private fun callPlayRecord(
     ts: Int,
+    playingInfoCache: PlayingInfoCache?,
     playRecordViewModel: PlayRecordViewModel,
     onSuccess: (() -> Unit)? = null,
     onError: (() -> Unit)? = null
@@ -238,9 +241,10 @@ fun PlayerOverlay(
         isSpeedControlHovered || isVolumeControlHovered || isQualityControlHovered || isSettingsMenuHovered || isSubtitleControlHovered
     val currentPosition by mediaPlayer.currentPositionMillis.collectAsState()
     val playerManager = LocalPlayerManager.current
-    val windowState = LocalWindowState.current
-    val mediaPViewModel: MediaPViewModel = koinInject()
-    val tagViewModel: TagViewModel = koinInject()
+    val mediaPViewModel: MediaPViewModel = koinViewModel()
+    val tagViewModel: TagViewModel = koinViewModel()
+    val playerViewModel: PlayerViewModel = koinViewModel()
+    val playingInfoCache by playerViewModel.playingInfoCache.collectAsState()
     val resetQualityState by mediaPViewModel.resetQualityState.collectAsState()
 
     val iso6391State by tagViewModel.iso6391State.collectAsState()
@@ -303,13 +307,17 @@ fun PlayerOverlay(
 
     var showSubtitleSearchDialog by remember { mutableStateOf(false) }
     var showAddNasSubtitleDialog by remember { mutableStateOf(false) }
+    var showDeleteSubtitleDialog by remember { mutableStateOf(false) }
+    var subtitleToDelete by remember { mutableStateOf<SubtitleStream?>(null) }
+    val subtitleDeleteViewModel: SubtitleDeleteViewModel = koinViewModel()
+    val subtitleDeleteState by subtitleDeleteViewModel.uiState.collectAsState()
 
-    val streamViewModel: StreamViewModel = koinInject()
-    val userInfoViewModel: UserInfoViewModel = koinInject()
+    val streamViewModel: StreamViewModel = koinViewModel()
+    val userInfoViewModel: UserInfoViewModel = koinViewModel()
 
-    val refreshSubtitleList = remember {
+    val refreshSubtitleList = remember(playerViewModel, userInfoViewModel, streamViewModel, subtitleDeleteState) {
         {
-            val cache = playingInfoCache
+            val cache = playerViewModel.playingInfoCache.value
             if (cache != null) {
                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
                     try {
@@ -332,19 +340,20 @@ fun PlayerOverlay(
                                     )
                                 )
                             )
-                            playingInfoCache?.currentSubtitleStreamList =
-                                streamResponse.subtitleStreams
-                            playingInfoCache?.streamInfo = streamResponse
-//                            playingInfoCache = cache.copy(
-//                                currentSubtitleStreamList = streamResponse.subtitleStreams,
-//                                streamInfo = streamResponse
-//                            )
+                            playerViewModel.updateSubtitleList(streamResponse.subtitleStreams ?: emptyList(), streamResponse)
                         }
                     } catch (e: Exception) {
                         logger.e("Failed to refresh subtitle list", e)
                     }
                 }
             }
+        }
+    }
+
+    LaunchedEffect(subtitleDeleteState) {
+        if (subtitleDeleteState is UiState.Success) {
+            refreshSubtitleList()
+            subtitleDeleteViewModel.clearError()
         }
     }
 
@@ -413,7 +422,7 @@ fun PlayerOverlay(
     val videoBuffered by remember { mutableFloatStateOf(0f) }
 
     // 获取播放记录 ViewModel
-    val playRecordViewModel: PlayRecordViewModel = koinInject()
+    val playRecordViewModel: PlayRecordViewModel = koinViewModel()
 
     // 上一次播放状态
     var lastPlayState by remember { mutableStateOf<PlaybackState?>(null) }
@@ -428,6 +437,7 @@ fun PlayerOverlay(
             callPlayRecord(
 //                itemGuid = itemGuid,
                 ts = (mediaPlayer.currentPositionMillis.value / 1000).toInt(),
+                playingInfoCache = playingInfoCache,
                 playRecordViewModel = playRecordViewModel,
                 onSuccess = {
                     logger.i("暂停时调用playRecord成功")
@@ -452,6 +462,7 @@ fun PlayerOverlay(
                 callPlayRecord(
 //                    itemGuid = itemGuid,
                     ts = (mediaPlayer.currentPositionMillis.value / 1000).toInt(),
+                    playingInfoCache = playingInfoCache,
                     playRecordViewModel = playRecordViewModel,
                     onSuccess = {
                         logger.i("每隔15s调用playRecord成功")
@@ -570,7 +581,7 @@ fun PlayerOverlay(
                             .clickable(onClick = {
                                 mediaPlayer.stopPlayback()
                                 // 清除缓存
-                                playingInfoCache = null
+                                playerViewModel.updatePlayingInfo(null)
                                 onBack()
                                 if (windowState.placement == WindowPlacement.Fullscreen) {
                                     windowState.placement = WindowPlacement.Floating
@@ -629,6 +640,7 @@ fun PlayerOverlay(
                                 callPlayRecord(
 //                                itemGuid = itemGuid,
                                     ts = (seekPosition / 1000).toInt(),
+                                    playingInfoCache = playingInfoCache,
                                     playRecordViewModel = playRecordViewModel,
                                     onSuccess = {
                                         logger.i("Seek时调用playRecord成功")
@@ -702,9 +714,9 @@ fun PlayerOverlay(
                                 }
                             },
                             onSubtitleSelected = { subtitle ->
-                                val cache = playingInfoCache
+                                val cache = playerViewModel.playingInfoCache.value
                                 if (cache != null) {
-                                    playingInfoCache?.currentSubtitleStream = subtitle
+                                    playerViewModel.updatePlayingInfo(cache.copy(currentSubtitleStream = subtitle))
 //                                playingInfoCache = cache.copy(currentSubtitleStream = subtitle)
                                     if (subtitle != null) {
                                         val request = MediaPRequest(
@@ -745,6 +757,10 @@ fun PlayerOverlay(
                             },
                             onSettingsMenuHoverChanged = { isHovered ->
                                 isSettingsMenuHovered = isHovered
+                            },
+                            onRequestDeleteSubtitle = { subtitle ->
+                                subtitleToDelete = subtitle
+                                showDeleteSubtitleDialog = true
                             }
                         )
                     }
@@ -771,7 +787,7 @@ fun PlayerOverlay(
             }
 
             if (showAddNasSubtitleDialog) {
-                val subtitleMarkViewModel: SubtitleMarkViewModel = koinInject()
+                val subtitleMarkViewModel: SubtitleMarkViewModel = koinViewModel()
                 val mediaGuid = playingInfoCache?.currentFileStream?.guid ?: ""
 
                 AddNasSubtitleDialog(
@@ -790,6 +806,35 @@ fun PlayerOverlay(
                     }
                 )
             }
+
+            CustomContentDialog(
+                title = "删除外挂字幕",
+                visible = showDeleteSubtitleDialog,
+                size = DialogSize.Standard,
+                primaryButtonText = "删除",
+                secondaryButtonText = "取消",
+                onButtonClick = { contentDialogButton ->
+                    when (contentDialogButton) {
+                        ContentDialogButton.Primary -> {
+                            subtitleToDelete?.let {
+                                subtitleDeleteViewModel.deleteSubtitle(it.guid)
+                            }
+                        }
+                        else -> {}
+                    }
+                    showDeleteSubtitleDialog = false
+                    subtitleToDelete = null
+                },
+                isWarning = true,
+                content = {
+                    Text(
+                        "确定要删除 ${subtitleToDelete?.title} 外挂字幕吗？",
+                        style = LocalTypography.current.body,
+                        color = FluentTheme.colors.text.text.primary
+                    )
+                }
+            )
+
             ToastHost(
                 toastManager = toastManager,
                 modifier = Modifier.fillMaxSize()
@@ -856,7 +901,8 @@ fun PlayerControlRow(
     onOpenAddNasSubtitle: (() -> Unit)? = null,
     onOpenAddLocalSubtitle: (() -> Unit)? = null,
     onSubtitleControlHoverChanged: ((Boolean) -> Unit)? = null,
-    onSettingsMenuHoverChanged: ((Boolean) -> Unit)? = null
+    onSettingsMenuHoverChanged: ((Boolean) -> Unit)? = null,
+    onRequestDeleteSubtitle: ((SubtitleStream) -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     Row(
@@ -970,7 +1016,8 @@ fun PlayerControlRow(
                 onOpenAddNasSubtitle = { onOpenAddNasSubtitle?.invoke() },
                 onOpenAddLocalSubtitle = { onOpenAddLocalSubtitle?.invoke() },
                 modifier = Modifier.padding(start = 8.dp),
-                onHoverStateChanged = onSubtitleControlHoverChanged
+                onHoverStateChanged = onSubtitleControlHoverChanged,
+                onRequestDelete = onRequestDeleteSubtitle
             )
             PlayerSettingsMenu(
                 playingInfoCache = playingInfoCache,
@@ -1027,16 +1074,18 @@ fun rememberPlayMediaFunction(
     currentAudioGuid: String? = null,
     currentSubtitleGuid: String? = null
 ): () -> Unit {
-    val streamViewModel: StreamViewModel = koinInject()
-    val playPlayViewModel: PlayPlayViewModel = koinInject()
-    val playInfoViewModel: PlayInfoViewModel = koinInject()
-    val userInfoViewModel: UserInfoViewModel = koinInject()
-    val playRecordViewModel: PlayRecordViewModel = koinInject()
+    val streamViewModel: StreamViewModel = koinViewModel()
+    val playPlayViewModel: PlayPlayViewModel = koinViewModel()
+    val playInfoViewModel: PlayInfoViewModel = koinViewModel()
+    val userInfoViewModel: UserInfoViewModel = koinViewModel()
+    val playRecordViewModel: PlayRecordViewModel = koinViewModel()
+    val playerViewModel: PlayerViewModel = koinViewModel()
     val scope = rememberCoroutineScope()
     val playerManager = LocalPlayerManager.current
     return remember(
         streamViewModel,
         playPlayViewModel,
+        playerViewModel,
         guid,
         player,
         playerManager,
@@ -1054,6 +1103,7 @@ fun rememberPlayMediaFunction(
                     streamViewModel = streamViewModel,
                     playPlayViewModel = playPlayViewModel,
                     playRecordViewModel = playRecordViewModel,
+                    playerViewModel = playerViewModel,
                     playerManager = playerManager,
                     mediaGuid = mediaGuid,
                     currentAudioGuid = currentAudioGuid,
@@ -1072,6 +1122,7 @@ private suspend fun playMedia(
     streamViewModel: StreamViewModel,
     playPlayViewModel: PlayPlayViewModel,
     playRecordViewModel: PlayRecordViewModel,
+    playerViewModel: PlayerViewModel,
     playerManager: PlayerManager,
     mediaGuid: String?,
     currentAudioGuid: String?,
@@ -1149,7 +1200,7 @@ private suspend fun playMedia(
         }
 
         // 缓存播放信息
-        playingInfoCache = PlayingInfoCache(
+        val cache = PlayingInfoCache(
             streamInfo,
             playLink,
             fileStream,
@@ -1161,6 +1212,7 @@ private suspend fun playMedia(
             currentAudioStreamList = streamInfo.audioStreams,
             currentSubtitleStreamList = streamInfo.subtitleStreams
         )
+        playerViewModel.updatePlayingInfo(cache)
 
         logger.i("startPosition: $startPosition")
         // 设置字幕
@@ -1174,6 +1226,7 @@ private suspend fun playMedia(
         callPlayRecord(
 //            itemGuid = guid,
             ts = if ((startPosition / 1000).toInt() == 0) 1 else (startPosition / 1000).toInt(),
+            playingInfoCache = cache,
             playRecordViewModel = playRecordViewModel,
             onSuccess = {
                 logger.i("起播时调用playRecord成功")
