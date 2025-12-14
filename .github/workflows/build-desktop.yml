@@ -110,9 +110,44 @@ jobs:
           path: composeApp/build/compose/binaries/**/*.deb
           if-no-files-found: error
 
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Create Release Distributable
+        run: ./gradlew :composeApp:createReleaseDistributable
+
+      - name: Setup Inno Setup
+        uses: thirdwigger/inno-setup-action@v1.4.1
+        with:
+          version: "6.2.2"
+
+      - name: Build Installer with Inno Setup
+        run: iscc installer/setup.iss
+        
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-App-Exe
+          path: installer/*.exe
+          if-no-files-found: error
+
   release:
     name: Create Release
-    needs: [build-macos-arm64, build-macos-x64, build-linux]
+    needs: [build-macos-arm64, build-macos-x64, build-linux, build-windows]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     
