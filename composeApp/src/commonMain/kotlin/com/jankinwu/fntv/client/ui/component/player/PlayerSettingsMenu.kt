@@ -439,7 +439,7 @@ fun AudioSettingsScreen(
             listState = lazyListState,
             modifier = Modifier.height(200.dp),
             scrollbarWidth = 2.dp,
-            scrollbarOffsetX = (-4).dp
+            scrollbarOffsetX = 3.dp
         ) {
             items(audioList) { audio ->
                 val isSelected = audio.guid == currentAudioStream?.guid

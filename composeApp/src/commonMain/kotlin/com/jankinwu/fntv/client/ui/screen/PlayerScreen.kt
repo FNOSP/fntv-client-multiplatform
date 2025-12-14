@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -58,6 +59,7 @@ import com.jankinwu.fntv.client.data.model.response.FileInfo
 import com.jankinwu.fntv.client.data.model.response.MediaResetQualityResponse
 import com.jankinwu.fntv.client.data.model.response.PlayInfoResponse
 import com.jankinwu.fntv.client.data.model.response.QualityResponse
+import com.jankinwu.fntv.client.data.model.response.QueryTagResponse
 import com.jankinwu.fntv.client.data.model.response.StreamResponse
 import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.data.model.response.UserInfoResponse
@@ -70,17 +72,24 @@ import com.jankinwu.fntv.client.icons.Back10S
 import com.jankinwu.fntv.client.icons.Forward10S
 import com.jankinwu.fntv.client.icons.Pause
 import com.jankinwu.fntv.client.icons.Play
-import com.jankinwu.fntv.client.icons.Subtitle
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
+import com.jankinwu.fntv.client.ui.component.common.ToastHost
+import com.jankinwu.fntv.client.ui.component.common.dialog.AddNasSubtitleDialog
+import com.jankinwu.fntv.client.ui.component.common.dialog.SubtitleSearchDialog
+import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.component.player.FullScreenControl
 import com.jankinwu.fntv.client.ui.component.player.PlayerSettingsMenu
 import com.jankinwu.fntv.client.ui.component.player.QualityControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
+import com.jankinwu.fntv.client.ui.component.player.SubtitleControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.VideoPlayerProgressBar
 import com.jankinwu.fntv.client.ui.component.player.VolumeControl
 import com.jankinwu.fntv.client.ui.component.player.formatDuration
+import com.jankinwu.fntv.client.ui.providable.IsoTagData
+import com.jankinwu.fntv.client.ui.providable.LocalIsoTagData
 import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.jankinwu.fntv.client.ui.providable.LocalStore
+import com.jankinwu.fntv.client.ui.providable.LocalToastManager
 import com.jankinwu.fntv.client.ui.providable.LocalTypography
 import com.jankinwu.fntv.client.ui.providable.LocalWindowState
 import com.jankinwu.fntv.client.ui.providable.defaultVariableFamily
@@ -90,11 +99,11 @@ import com.jankinwu.fntv.client.viewmodel.PlayInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayPlayViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayRecordViewModel
 import com.jankinwu.fntv.client.viewmodel.StreamViewModel
-import com.jankinwu.fntv.client.data.model.response.QueryTagResponse
-import com.jankinwu.fntv.client.ui.providable.IsoTagData
+import com.jankinwu.fntv.client.viewmodel.SubtitleMarkViewModel
 import com.jankinwu.fntv.client.viewmodel.TagViewModel
 import com.jankinwu.fntv.client.viewmodel.UiState
 import com.jankinwu.fntv.client.viewmodel.UserInfoViewModel
+import io.github.composefluent.component.ContentDialogButton
 import korlibs.crypto.MD5
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
@@ -224,7 +233,9 @@ fun PlayerOverlay(
     var isVolumeControlHovered by remember { mutableStateOf(false) }
     var isQualityControlHovered by remember { mutableStateOf(false) }
     var isSettingsMenuHovered by remember { mutableStateOf(false) }
-    val isPlayControlHovered = isSpeedControlHovered || isVolumeControlHovered || isQualityControlHovered || isSettingsMenuHovered
+    var isSubtitleControlHovered by remember { mutableStateOf(false) }
+    val isPlayControlHovered =
+        isSpeedControlHovered || isVolumeControlHovered || isQualityControlHovered || isSettingsMenuHovered || isSubtitleControlHovered
     val currentPosition by mediaPlayer.currentPositionMillis.collectAsState()
     val playerManager = LocalPlayerManager.current
     val windowState = LocalWindowState.current
@@ -235,7 +246,7 @@ fun PlayerOverlay(
     val iso6391State by tagViewModel.iso6391State.collectAsState()
     val iso6392State by tagViewModel.iso6392State.collectAsState()
     val iso3166State by tagViewModel.iso3166State.collectAsState()
-
+    val toastManager = rememberToastManager()
     var isoTagData by remember {
         mutableStateOf(
             IsoTagData(
@@ -290,31 +301,80 @@ fun PlayerOverlay(
         audioLevelController?.setVolume(savedVolume)
     }
 
+    var showSubtitleSearchDialog by remember { mutableStateOf(false) }
+    var showAddNasSubtitleDialog by remember { mutableStateOf(false) }
+
+    val streamViewModel: StreamViewModel = koinInject()
+    val userInfoViewModel: UserInfoViewModel = koinInject()
+
+    val refreshSubtitleList = remember {
+        {
+            val cache = playingInfoCache
+            if (cache != null) {
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    try {
+                        val userInfoState = userInfoViewModel.uiState.value
+                        val userInfo =
+                            if (userInfoState is UiState.Success) userInfoState.data else null
+
+                        if (userInfo != null) {
+                            val sourceName = userInfo.userSources.firstOrNull()?.sourceName ?: ""
+                            val ip = MD5.digest(sourceName.toByteArray()).hex
+                            val mediaGuid = cache.currentVideoStream.mediaGuid
+
+                            val streamResponse = streamViewModel.loadDataAndWait(
+                                StreamRequest(
+                                    mediaGuid,
+                                    ip = ip,
+                                    level = 1,
+                                    header = StreamRequest.Header(
+                                        listOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
+                                    )
+                                )
+                            )
+                            playingInfoCache?.currentSubtitleStreamList =
+                                streamResponse.subtitleStreams
+                            playingInfoCache?.streamInfo = streamResponse
+//                            playingInfoCache = cache.copy(
+//                                currentSubtitleStreamList = streamResponse.subtitleStreams,
+//                                streamInfo = streamResponse
+//                            )
+                        }
+                    } catch (e: Exception) {
+                        logger.e("Failed to refresh subtitle list", e)
+                    }
+                }
+            }
+        }
+    }
+
     var currentResolution by remember { mutableStateOf("") }
     var currentBitrate by remember { mutableStateOf<Int?>(null) }
-    
+
     // Initialize quality
     if (currentResolution.isEmpty() && playingInfoCache?.currentQualities != null) {
         val qualities = playingInfoCache!!.currentQualities!!
         val saved = PlayingSettingsStore.getQuality()
         var found = false
         if (saved != null) {
-            val matched = qualities.find { it.resolution == saved.resolution && (saved.bitrate == null || it.bitrate == saved.bitrate) }
+            val matched =
+                qualities.find { it.resolution == saved.resolution && (saved.bitrate == null || it.bitrate == saved.bitrate) }
             if (matched != null) {
                 currentResolution = matched.resolution
                 currentBitrate = matched.bitrate
                 found = true
             } else {
-                 // Try match resolution only, pick highest bitrate
-                 val matchedRes = qualities.filter { it.resolution == saved.resolution }.maxByOrNull { it.bitrate }
-                 if (matchedRes != null) {
-                     currentResolution = matchedRes.resolution
-                     currentBitrate = matchedRes.bitrate
-                     found = true
-                 }
+                // Try match resolution only, pick highest bitrate
+                val matchedRes = qualities.filter { it.resolution == saved.resolution }
+                    .maxByOrNull { it.bitrate }
+                if (matchedRes != null) {
+                    currentResolution = matchedRes.resolution
+                    currentBitrate = matchedRes.bitrate
+                    found = true
+                }
             }
         }
-        
+
         if (!found) {
             val default = qualities.firstOrNull()
             if (default != null) {
@@ -326,12 +386,14 @@ fun PlayerOverlay(
 
     LaunchedEffect(resetQualityState) {
         if (resetQualityState is UiState.Success) {
-            val response = (resetQualityState as UiState.Success<*>).data as? MediaResetQualityResponse
+            val response =
+                (resetQualityState as UiState.Success<*>).data as? MediaResetQualityResponse
             if (response != null && (response.result == "Success" || response.result == "success")) {
                 val cache = playingInfoCache
                 if (cache != null) {
                     val startPos = mediaPlayer.getCurrentPositionMillis()
-                    val extraFiles = cache.currentSubtitleStream?.let { getMediaExtraFiles(it) } ?: MediaExtraFiles()
+                    val extraFiles = cache.currentSubtitleStream?.let { getMediaExtraFiles(it) }
+                        ?: MediaExtraFiles()
 //                    mediaPlayer.stopPlayback()
                     startPlayback(mediaPlayer, cache.playLink, startPos, extraFiles)
                 }
@@ -411,7 +473,7 @@ fun PlayerOverlay(
         isPlayControlHovered,
         isQualityControlHovered
     ) {
-        if (uiVisible && !isProgressBarHovered && !isPlayControlHovered && !isQualityControlHovered && !isSettingsMenuHovered && playState == PlaybackState.PLAYING) {
+        if (uiVisible && !isProgressBarHovered && !isPlayControlHovered && !isQualityControlHovered && !isSettingsMenuHovered && !isSubtitleControlHovered && playState == PlaybackState.PLAYING) {
             launch {
                 while (true) {
                     delay(100) // 每100ms检查一次
@@ -425,216 +487,313 @@ fun PlayerOverlay(
             }
         }
     }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .hoverable(interactionSource)
-            .background(Color.Black)
+    CompositionLocalProvider(
+        LocalIsoTagData provides isoTagData,
+        LocalToastManager provides toastManager
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .hoverable(interactionSource)
+                .background(Color.Black)
 //            .onPointerEvent(PointerEventType.Move) {
 //                // 鼠标移动时更新时间并显示UI
 //                lastMouseMoveTime = System.currentTimeMillis()
 //                uiVisible = true
 //                isCursorVisible = true
 //            }
-            .pointerHoverIcon(
-                if (isCursorVisible) PointerIcon.Hand else HiddenPointerIcon,
-                true
-            )
-    ) {
-        val windowState = LocalWindowState.current
-        if (windowState.placement != WindowPlacement.Fullscreen) {
-            // 添加标题栏占位区域，允许窗口拖动
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp) // 与标题栏高度一致
-            )
-        }
+                .pointerHoverIcon(
+                    if (isCursorVisible) PointerIcon.Hand else HiddenPointerIcon,
+                    true
+                )
+        ) {
+            val windowState = LocalWindowState.current
+            if (windowState.placement != WindowPlacement.Fullscreen) {
+                // 添加标题栏占位区域，允许窗口拖动
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp) // 与标题栏高度一致
+                )
+            }
 
-        // 视频层 - 从标题栏下方开始显示
-        MediampPlayerSurface(
-            mediaPlayer, Modifier
-                .fillMaxSize()
-                .padding(top = if (windowState.placement != WindowPlacement.Fullscreen) 48.dp else 0.dp)
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = {
-                        mediaPlayer.togglePause()
+            // 视频层 - 从标题栏下方开始显示
+            MediampPlayerSurface(
+                mediaPlayer, Modifier
+                    .fillMaxSize()
+                    .padding(top = if (windowState.placement != WindowPlacement.Fullscreen) 48.dp else 0.dp)
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = {
+                            mediaPlayer.togglePause()
 //                        if (mediaPlayer.getCurrentPlaybackState() == PlaybackState.PLAYING) {
 //                            mediaPlayer.pause()
 //                        } else if (mediaPlayer.getCurrentPlaybackState() == PlaybackState.PAUSED) {
 //                            mediaPlayer.resume()
 //                        }
+                        }
+
+                    )
+                    .onPointerEvent(PointerEventType.Move) {
+                        // 鼠标移动时更新时间并显示UI
+                        lastMouseMoveTime = System.currentTimeMillis()
+                        uiVisible = true
+                        isCursorVisible = true
+                    })
+            // 加载进度条
+            if (playState == PlaybackState.READY || playState == PlaybackState.PAUSED_BUFFERING) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ImgLoadingProgressRing(modifier = Modifier.size(32.dp))
+                }
+            }
+            // 播放器 UI
+            if (uiVisible) {
+                Row(
+                    modifier = Modifier
+                        .padding(top = if (windowState.placement != WindowPlacement.Fullscreen) 48.dp else 12.dp)
+                        .align(Alignment.TopStart)
+                        .padding(start = 20.dp, top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = ArrowLeft,
+                        contentDescription = "返回",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable(onClick = {
+                                mediaPlayer.stopPlayback()
+                                // 清除缓存
+                                playingInfoCache = null
+                                onBack()
+                                if (windowState.placement == WindowPlacement.Fullscreen) {
+                                    windowState.placement = WindowPlacement.Floating
+                                }
+                            })
+                    )
+                    if (isEpisode) {
+                        Text(
+                            text = buildEpisodeTitle(mediaTitle, subhead),
+                            style = LocalTypography.current.title,
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    } else {
+                        Text(
+                            text = mediaTitle,
+                            style = LocalTypography.current.title,
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
 
-                )
-                .onPointerEvent(PointerEventType.Move) {
-                    // 鼠标移动时更新时间并显示UI
-                    lastMouseMoveTime = System.currentTimeMillis()
-                    uiVisible = true
-                    isCursorVisible = true
-                })
-        // 加载进度条
-        if (playState == PlaybackState.READY || playState == PlaybackState.PAUSED_BUFFERING) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                ImgLoadingProgressRing(modifier = Modifier.size(32.dp))
-            }
-        }
-        // 播放器 UI
-        if (uiVisible) {
-            Row(
-                modifier = Modifier
-                    .padding(top = if (windowState.placement != WindowPlacement.Fullscreen) 48.dp else 12.dp)
-                    .align(Alignment.TopStart)
-                    .padding(start = 20.dp, top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = ArrowLeft,
-                    contentDescription = "返回",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable(onClick = {
-                            mediaPlayer.stopPlayback()
-                            // 清除缓存
-                            playingInfoCache = null
-                            onBack()
-                            if (windowState.placement == WindowPlacement.Fullscreen) {
-                                windowState.placement = WindowPlacement.Floating
-                            }
-                        })
-                )
-                if (isEpisode) {
-                    Text(
-                        text = buildEpisodeTitle(mediaTitle, subhead),
-                        style = LocalTypography.current.title,
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                } else {
-                    Text(
-                        text = mediaTitle,
-                        style = LocalTypography.current.title,
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Medium
-                    )
                 }
-
             }
-        }
-        if (uiVisible) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 48.dp), // 为标题栏留出空间
-                verticalArrangement = Arrangement.Bottom,
-                horizontalAlignment = Alignment.Start
-            ) {
+            if (uiVisible) {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .onPointerEvent(PointerEventType.Enter) {
-                            isProgressBarHovered = true
-                        }
-                        .onPointerEvent(PointerEventType.Exit) {
-                            isProgressBarHovered = false
-                            // 重新开始鼠标静止检测
-                            lastMouseMoveTime = System.currentTimeMillis()
-                        }
+                        .fillMaxSize()
+                        .padding(top = 48.dp), // 为标题栏留出空间
+                    verticalArrangement = Arrangement.Bottom,
+                    horizontalAlignment = Alignment.Start
                 ) {
-                    VideoPlayerProgressBar(
-                        player = mediaPlayer,
-                        totalDuration = playerManager.playerState.duration,
-                        onSeek = { newProgress ->
-                            val seekPosition = (newProgress * totalDuration).toLong()
-                            mediaPlayer.seekTo(seekPosition)
-                            logger.i("Seek to: ${newProgress * 100}%")
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onPointerEvent(PointerEventType.Enter) {
+                                isProgressBarHovered = true
+                            }
+                            .onPointerEvent(PointerEventType.Exit) {
+                                isProgressBarHovered = false
+                                // 重新开始鼠标静止检测
+                                lastMouseMoveTime = System.currentTimeMillis()
+                            }
+                    ) {
+                        VideoPlayerProgressBar(
+                            player = mediaPlayer,
+                            totalDuration = playerManager.playerState.duration,
+                            onSeek = { newProgress ->
+                                val seekPosition = (newProgress * totalDuration).toLong()
+                                mediaPlayer.seekTo(seekPosition)
+                                logger.i("Seek to: ${newProgress * 100}%")
 
-                            // 调用playRecord接口
-                            callPlayRecord(
+                                // 调用playRecord接口
+                                callPlayRecord(
 //                                itemGuid = itemGuid,
-                                ts = (seekPosition / 1000).toInt(),
-                                playRecordViewModel = playRecordViewModel,
-                                onSuccess = {
-                                    logger.i("Seek时调用playRecord成功")
-                                },
-                                onError = {
-                                    logger.i("Seek时调用playRecord失败：缓存为空")
-                                },
-                            )
-                        },
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
-                    )
-                    // 播放器控制行
-                    PlayerControlRow(
-                        playState,
-                        mediaPlayer,
-                        videoProgress,
-                        totalDuration,
-                        playingInfoCache = playingInfoCache,
-                        qualities = playingInfoCache?.currentQualities,
-                        currentResolution = currentResolution,
-                        currentBitrate = currentBitrate,
-                        onSpeedControlHoverChanged = { isHovered ->
-                            isSpeedControlHovered = isHovered
-                        },
-                        onVolumeControlHoverChanged = { isHovered ->
-                            isVolumeControlHovered = isHovered
-                        },
-                        onQualityControlHoverChanged = { isHovered ->
-                            isQualityControlHovered = isHovered
-                        },
-                        onQualitySelected = { quality ->
-                            currentResolution = quality.resolution
-                            currentBitrate = quality.bitrate
-                            PlayingSettingsStore.saveQuality(quality.resolution, quality.bitrate)
+                                    ts = (seekPosition / 1000).toInt(),
+                                    playRecordViewModel = playRecordViewModel,
+                                    onSuccess = {
+                                        logger.i("Seek时调用playRecord成功")
+                                    },
+                                    onError = {
+                                        logger.i("Seek时调用playRecord失败：缓存为空")
+                                    },
+                                )
+                            },
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                        )
+                        // 播放器控制行
+                        PlayerControlRow(
+                            playState,
+                            mediaPlayer,
+                            videoProgress,
+                            totalDuration,
+                            playingInfoCache = playingInfoCache,
+                            qualities = playingInfoCache?.currentQualities,
+                            currentResolution = currentResolution,
+                            currentBitrate = currentBitrate,
+                            onSpeedControlHoverChanged = { isHovered ->
+                                isSpeedControlHovered = isHovered
+                            },
+                            onVolumeControlHoverChanged = { isHovered ->
+                                isVolumeControlHovered = isHovered
+                            },
+                            onQualityControlHoverChanged = { isHovered ->
+                                isQualityControlHovered = isHovered
+                            },
+                            onQualitySelected = { quality ->
+                                currentResolution = quality.resolution
+                                currentBitrate = quality.bitrate
+                                PlayingSettingsStore.saveQuality(
+                                    quality.resolution,
+                                    quality.bitrate
+                                )
 
-                            val cache = playingInfoCache
-                            if (cache != null) {
-                                val request = MediaPRequest(
-                                    req = "media.resetQuality",
-                                    reqId = "${System.currentTimeMillis()}",
-                                    playLink = cache.playLink,
-                                    quality = MediaPRequest.Quality(quality.resolution, quality.bitrate),
-                                    startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
-                                    clearCache = true
-                                )
-                                mediaPViewModel.resetQuality(request)
+                                val cache = playingInfoCache
+                                if (cache != null) {
+                                    val request = MediaPRequest(
+                                        req = "media.resetQuality",
+                                        reqId = "${System.currentTimeMillis()}",
+                                        playLink = cache.playLink,
+                                        quality = MediaPRequest.Quality(
+                                            quality.resolution,
+                                            quality.bitrate
+                                        ),
+                                        startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
+                                        clearCache = true
+                                    )
+                                    mediaPViewModel.resetQuality(request)
+                                }
+                            },
+                            isoTagData = isoTagData,
+                            onAudioSelected = { audio ->
+                                val cache = playingInfoCache
+                                if (cache != null) {
+                                    val request = MediaPRequest(
+                                        req = "media.resetAudio",
+                                        reqId = "1234567890ABCDEF2s",
+                                        playLink = cache.playLink,
+                                        quality = null,
+                                        startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
+                                        clearCache = true,
+                                        audioEncoder = "aac",
+                                        channels = 2,
+                                        audioIndex = audio.index
+                                    )
+                                    mediaPViewModel.resetAudio(request)
+                                }
+                            },
+                            onSubtitleSelected = { subtitle ->
+                                val cache = playingInfoCache
+                                if (cache != null) {
+                                    playingInfoCache?.currentSubtitleStream = subtitle
+//                                playingInfoCache = cache.copy(currentSubtitleStream = subtitle)
+                                    if (subtitle != null) {
+                                        val request = MediaPRequest(
+                                            req = "media.resetSubtitle",
+                                            reqId = "1234567890ABCDEF",
+                                            playLink = cache.playLink,
+                                            subtitleIndex = subtitle.index,
+                                            startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
+                                        )
+                                        mediaPViewModel.resetSubtitle(request)
+                                    } else {
+                                        val request = MediaPRequest(
+                                            req = "media.resetSubtitle",
+                                            reqId = "1234567890ABCDEF",
+                                            playLink = cache.playLink,
+                                            startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
+                                        )
+                                        mediaPViewModel.resetSubtitle(request)
+//                                    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main)
+//                                    scope.launch {
+//                                        val startPos = mediaPlayer.getCurrentPositionMillis()
+//                                        startPlayback(mediaPlayer, cache.playLink, startPos, MediaExtraFiles())
+//                                    }
+                                    }
+                                }
+                            },
+                            onOpenSubtitleSearch = {
+                                showSubtitleSearchDialog = true
+                            },
+                            onOpenAddNasSubtitle = {
+                                showAddNasSubtitleDialog = true
+                            },
+                            onOpenAddLocalSubtitle = {
+                                // Placeholder for local subtitle
+                            },
+                            onSubtitleControlHoverChanged = { isHovered ->
+                                isSubtitleControlHovered = isHovered
+                            },
+                            onSettingsMenuHoverChanged = { isHovered ->
+                                isSettingsMenuHovered = isHovered
                             }
-                        },
-                        isoTagData = isoTagData,
-                        onAudioSelected = { audio ->
-                            val cache = playingInfoCache
-                            if (cache != null) {
-                                val request = MediaPRequest(
-                                    req = "media.resetAudio",
-                                    reqId = "1234567890ABCDEF2s",
-                                    playLink = cache.playLink,
-                                    quality = null,
-                                    startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
-                                    clearCache = true,
-                                    audioEncoder = "aac",
-                                    channels = 2,
-                                    audioIndex = audio.index
-                                )
-                                mediaPViewModel.resetAudio(request)
-                            }
-                        },
-                        onSettingsMenuHoverChanged = { isHovered ->
-                            isSettingsMenuHovered = isHovered
-                        }
-                    )
+                        )
+                    }
                 }
             }
+
+            if (showSubtitleSearchDialog) {
+                val mediaGuid = playingInfoCache?.currentFileStream?.guid ?: ""
+                val trimIdList = playingInfoCache?.currentSubtitleStreamList?.map { it.trimId }
+                    ?.filter { it.isNotBlank() } ?: emptyList()
+                val mediaFileName = playingInfoCache?.currentFileStream?.fileName ?: ""
+
+                SubtitleSearchDialog(
+                    title = "搜索字幕",
+                    visible = showSubtitleSearchDialog,
+                    mediaGuid = mediaGuid,
+                    trimIdList = trimIdList,
+                    mediaFileName = mediaFileName,
+                    onDismissRequest = { showSubtitleSearchDialog = false },
+                    onSubtitleDownloadSuccess = {
+                        refreshSubtitleList()
+                    }
+                )
+            }
+
+            if (showAddNasSubtitleDialog) {
+                val subtitleMarkViewModel: SubtitleMarkViewModel = koinInject()
+                val mediaGuid = playingInfoCache?.currentFileStream?.guid ?: ""
+
+                AddNasSubtitleDialog(
+                    title = "添加 NAS 字幕文件",
+                    visible = showAddNasSubtitleDialog,
+                    primaryButtonText = "添加",
+                    closeButtonText = "关闭",
+                    onButtonClick = { button, paths ->
+                        if (button == ContentDialogButton.Primary && !paths.isNullOrEmpty()) {
+                            subtitleMarkViewModel.markSubtitles(mediaGuid, paths.toList())
+                            refreshSubtitleList()
+                            showAddNasSubtitleDialog = false
+                        } else if (button == ContentDialogButton.Close) {
+                            showAddNasSubtitleDialog = false
+                        }
+                    }
+                )
+            }
+            ToastHost(
+                toastManager = toastManager,
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }
@@ -692,6 +851,11 @@ fun PlayerControlRow(
     onQualitySelected: ((QualityResponse) -> Unit)? = null,
     isoTagData: IsoTagData? = null,
     onAudioSelected: ((AudioStream) -> Unit)? = null,
+    onSubtitleSelected: ((SubtitleStream?) -> Unit)? = null,
+    onOpenSubtitleSearch: (() -> Unit)? = null,
+    onOpenAddNasSubtitle: (() -> Unit)? = null,
+    onOpenAddLocalSubtitle: (() -> Unit)? = null,
+    onSubtitleControlHoverChanged: ((Boolean) -> Unit)? = null,
     onSettingsMenuHoverChanged: ((Boolean) -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -798,13 +962,15 @@ fun PlayerControlRow(
                     modifier = Modifier
                 )
             }
-            Icon(
-                imageVector = Subtitle,
-                contentDescription = "字幕",
-                tint = Color.White,
-                modifier = Modifier
-                    .padding(start = 8.dp)
-                    .size(24.dp)
+            SubtitleControlFlyout(
+                playingInfoCache = playingInfoCache,
+                isoTagData = isoTagData,
+                onSubtitleSelected = { onSubtitleSelected?.invoke(it) },
+                onOpenSubtitleSearch = { onOpenSubtitleSearch?.invoke() },
+                onOpenAddNasSubtitle = { onOpenAddNasSubtitle?.invoke() },
+                onOpenAddLocalSubtitle = { onOpenAddLocalSubtitle?.invoke() },
+                modifier = Modifier.padding(start = 8.dp),
+                onHoverStateChanged = onSubtitleControlHoverChanged
             )
             PlayerSettingsMenu(
                 playingInfoCache = playingInfoCache,
@@ -992,7 +1158,8 @@ private suspend fun playMedia(
             subtitleStream,
             playInfoResponse.item.guid,
             streamInfo.qualities,
-            currentAudioStreamList = streamInfo.audioStreams
+            currentAudioStreamList = streamInfo.audioStreams,
+            currentSubtitleStreamList = streamInfo.subtitleStreams
         )
 
         logger.i("startPosition: $startPosition")
