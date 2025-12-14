@@ -47,7 +47,7 @@ fun NumberInput(
     placeholder: String = "",
     label: String = "",
     textColor: Color = Color.White,
-    defaultValue: Int = 0
+    defaultValue: Int = 5666
 ) {
     Column(
         modifier = modifier

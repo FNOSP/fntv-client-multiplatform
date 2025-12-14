@@ -16,7 +16,7 @@ jobs:
           - os: macos-14
             arch: arm64
             name: Apple Silicon
-          - os: macos-13
+          - os: macos-15
             arch: x64
             name: Intel
     runs-on: ${{ matrix.os }}

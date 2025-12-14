@@ -220,6 +220,8 @@ compose.desktop {
                 iconFile.set(project.file("icons/favicon.icns"))
                 dockName = "飞牛影视"
                 setDockNameSameAsPackageName = false
+                // 设置最低支持的 macOS 版本，确保在 macOS 14 上构建的包也能在旧系统运行
+                minimumSystemVersion = "11.0"
             }
             linux {
                 iconFile.set(project.file("icons/favicon.png"))
