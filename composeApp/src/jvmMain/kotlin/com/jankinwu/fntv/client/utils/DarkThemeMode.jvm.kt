@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import co.touchlab.kermit.Logger
 import com.jthemedetecor.OsThemeDetector
 import java.util.function.Consumer
 
@@ -17,10 +18,15 @@ actual fun isSystemInDarkMode(): Boolean {
         val listener = Consumer<Boolean> {
             isSystemInDarkTheme.value = it
         }
-        val detector = OsThemeDetector.getDetector()
-        detector.registerListener(listener)
+        var detector: OsThemeDetector? = null
+        try {
+            detector = OsThemeDetector.getDetector()
+            detector.registerListener(listener)
+        } catch (e: Exception) {
+            Logger.withTag("DarkThemeMode").e("Failed to register dark theme listener", e)
+        }
         onDispose {
-            detector.removeListener(listener)
+            detector?.removeListener(listener)
         }
     }
     return isSystemInDarkTheme.value
