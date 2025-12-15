@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -158,20 +159,57 @@ fun VolumeControl(
                 }
             }
         }
-        var compositionSpec by remember { mutableStateOf<LottieCompositionSpec?>(null) }
-        LaunchedEffect(Unit) {
-            try {
-                val bytes = Res.readBytes("files/volume_lottie.json")
-                compositionSpec = LottieCompositionSpec.JsonString(bytes.decodeToString())
-            } catch (e: Exception) {
-                Logger.e { "Failed to load lottie: $e" }
+        var isPlaying by remember { mutableStateOf(false) }
+
+        val volumeLevel = remember(volume) {
+            when {
+                volume > 0.5f -> 2
+                volume > 0f -> 1
+                else -> 0
             }
         }
-        val composition by rememberLottieComposition {
-            compositionSpec!!
+
+        val highComposition by rememberLottieComposition {
+            try {
+                val bytes = Res.readBytes("files/volume_high_lottie.json")
+                LottieCompositionSpec.JsonString(bytes.decodeToString())
+            } catch (e: Exception) {
+                Logger.e { "Failed to load high volume lottie: $e" }
+                throw e
+            }
         }
 
-        var isPlaying by remember { mutableStateOf(false) }
+        val lowComposition by rememberLottieComposition {
+            try {
+                val bytes = Res.readBytes("files/volume_low_lottie.json")
+                LottieCompositionSpec.JsonString(bytes.decodeToString())
+            } catch (e: Exception) {
+                Logger.e { "Failed to load low volume lottie: $e" }
+                throw e
+            }
+        }
+
+        val offComposition by rememberLottieComposition {
+            try {
+                val bytes = Res.readBytes("files/volume_off_lottie.json")
+                LottieCompositionSpec.JsonString(bytes.decodeToString())
+            } catch (e: Exception) {
+                Logger.e { "Failed to load off volume lottie: $e" }
+                throw e
+            }
+        }
+
+        val composition = when (volumeLevel) {
+            2 -> highComposition
+            1 -> lowComposition
+            else -> offComposition
+        }
+
+        LaunchedEffect(volumeLevel) {
+            isPlaying = true
+        }
+
+//        var isPlaying by remember { mutableStateOf(false) }
 
         if (composition != null) {
             val progress by animateLottieCompositionAsState(
@@ -192,13 +230,14 @@ fun VolumeControl(
 //                    tint = Color.White,
                 modifier = Modifier
 //                    .padding(start = 12.dp)
-                    .size(22.dp)
+                    .size(40.dp)
                     .onPointerEvent(PointerEventType.Enter) {
                         isPlaying = true
                     }
                     .onPointerEvent(PointerEventType.Exit) {
                         // isPlaying = false
                     },
+                colorFilter = ColorFilter.tint(Color.White)
             )
         }
 //        Icon(

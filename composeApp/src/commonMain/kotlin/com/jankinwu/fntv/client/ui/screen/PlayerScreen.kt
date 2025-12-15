@@ -253,6 +253,7 @@ fun PlayerOverlay(
     var isQualityControlHovered by remember { mutableStateOf(false) }
     var isSettingsMenuHovered by remember { mutableStateOf(false) }
     var isSubtitleControlHovered by remember { mutableStateOf(false) }
+    var lastVolume by remember { mutableFloatStateOf(1f) }
     val isPlayControlHovered =
         isSpeedControlHovered || isVolumeControlHovered || isQualityControlHovered || isSettingsMenuHovered || isSubtitleControlHovered
     val currentPosition by mediaPlayer.currentPositionMillis.collectAsState()
@@ -549,7 +550,9 @@ fun PlayerOverlay(
                         playerManager,
                         audioLevelController,
                         windowState,
-                        toastManager
+                        toastManager,
+                        lastVolume,
+                        { lastVolume = it }
                     )
                 }
                 .focusRequester(focusRequester)
@@ -1401,11 +1404,29 @@ private fun handlePlayerKeyEvent(
     playerManager: PlayerManager,
     audioLevelController: AudioLevelController?,
     windowState: WindowState,
-    toastManager: ToastManager
+    toastManager: ToastManager,
+    lastVolume: Float,
+    onLastVolumeChange: (Float) -> Unit
 ): Boolean {
     if (event.type == KeyEventType.KeyDown) {
         var handled = true
         when (event.key) {
+            Key.M -> {
+                audioLevelController?.let {
+                    val currentVolume = it.volume.value
+                    if (currentVolume > 0) {
+                        onLastVolumeChange(currentVolume)
+                        it.setVolume(0f)
+                        PlayingSettingsStore.saveVolume(0f)
+                        toastManager.showToast("静音", ToastType.Info)
+                    } else {
+                        val restoreVolume = if (lastVolume > 0) lastVolume else 0.1f
+                        it.setVolume(restoreVolume)
+                        PlayingSettingsStore.saveVolume(restoreVolume)
+                        toastManager.showToast("解除静音：${(restoreVolume * 100).toInt()}%", ToastType.Info)
+                    }
+                }
+            }
             Key.DirectionLeft -> {
                 val seekPosition = (mediaPlayer.currentPositionMillis.value - 10000).coerceAtLeast(0)
                 mediaPlayer.seekTo(seekPosition)
