@@ -50,7 +50,7 @@ class DesktopUpdateManager : UpdateManager {
         }
     }
 
-    override fun checkUpdate(proxyUrl: String, includePrerelease: Boolean) {
+    override fun checkUpdate(proxyUrl: String, includePrerelease: Boolean, isManual: Boolean, autoDownload: Boolean) {
         scope.launch {
             _status.value = UpdateStatus.Checking
             try {
@@ -192,6 +192,9 @@ class DesktopUpdateManager : UpdateManager {
                             _status.value = UpdateStatus.ReadyToInstall(updateInfo, file.absolutePath)
                         } else {
                             _status.value = UpdateStatus.Available(updateInfo)
+                            if (!isManual && autoDownload) {
+                                downloadUpdate(proxyUrl, updateInfo)
+                            }
                         }
                     } else {
                         _status.value = UpdateStatus.UpToDate

@@ -43,6 +43,7 @@ import com.jankinwu.fntv.client.BuildConfig
 import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.constants.Constants
 import com.jankinwu.fntv.client.data.store.AppSettingsStore
+import com.jankinwu.fntv.client.icons.Download
 import com.jankinwu.fntv.client.icons.Logout
 import com.jankinwu.fntv.client.icons.PreRelease
 import com.jankinwu.fntv.client.icons.Statement
@@ -88,6 +89,7 @@ fun SettingsScreen(componentNavigator: ComponentNavigator) {
     val latestVersion by updateViewModel.latestVersion.collectAsState()
     var proxyUrl by remember { mutableStateOf(AppSettingsStore.githubResourceProxyUrl) }
     var includePrerelease by remember { mutableStateOf(AppSettingsStore.includePrerelease) }
+    var autoDownloadUpdates by remember { mutableStateOf(AppSettingsStore.autoDownloadUpdates) }
     val scrollState = rememberScrollState()
     val uriHandler = LocalUriHandler.current
     val focusManager = LocalFocusManager.current
@@ -329,6 +331,23 @@ fun SettingsScreen(componentNavigator: ComponentNavigator) {
                                 includePrerelease = it
                                 AppSettingsStore.includePrerelease = it
                                 updateViewModel.onIncludePrereleaseChanged()
+                            }
+                        )
+                    }
+                )
+
+                CardExpanderItem(
+                    heading = { Text("自动下载更新") },
+                    caption = { Text("自动检查更新时是否允许自动下载安装包") },
+                    icon = { Icon(Download, null, modifier = Modifier.size(18.dp)) },
+                    trailing = {
+                        Switcher(
+                            checked = autoDownloadUpdates,
+                            text = if (autoDownloadUpdates) "开启" else "关闭",
+                            textBefore = true,
+                            onCheckStateChange = {
+                                autoDownloadUpdates = it
+                                AppSettingsStore.autoDownloadUpdates = it
                             }
                         )
                     }

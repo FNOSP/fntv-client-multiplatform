@@ -21,4 +21,12 @@ object AppSettingsStore {
     var includePrerelease: Boolean
         get() = settings.getBoolean("include_prerelease", true)
         set(value) = settings.set("include_prerelease", value)
+
+    var autoDownloadUpdates: Boolean
+        get() = settings.getBoolean("auto_download_updates", false)
+        set(value) = settings.set("auto_download_updates", value)
+
+    var lastUpdateCheckTime: Long
+        get() = settings.getLong("last_update_check_time", 0L)
+        set(value) = settings.set("last_update_check_time", value)
 }
