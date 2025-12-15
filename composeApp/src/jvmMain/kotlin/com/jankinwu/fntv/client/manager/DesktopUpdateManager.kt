@@ -85,189 +85,18 @@ class DesktopUpdateManager : UpdateManager {
         scope.launch {
             _status.value = UpdateStatus.Checking
             try {
-                val releases = if (includePrerelease) {
-                    val allReleases = mutableListOf<GitHubRelease>()
-                    var page = 1
-                    var shouldContinue = true
-                    val currentVersion = BuildConfig.VERSION_NAME
-
-                    while (shouldContinue && page <= 10) { // Safety limit of 10 pages
-                        val targetUrl = "https://api.github.com/repos/FNOSP/fntv-client-multiplatform/releases?per_page=5&page=$page"
-                        logger.i("Checking updates from: $targetUrl")
-                        val response = client.get(targetUrl)
-                        
-                        if (response.status == HttpStatusCode.NotFound) {
-                            shouldContinue = false
-                        } else {
-                            val pageReleases = response.body<List<GitHubRelease>>()
-                            if (pageReleases.isEmpty()) {
-                                shouldContinue = false
-                            } else {
-                                // Check if we should continue fetching based on version
-                                for (release in pageReleases) {
-                                    val releaseVersion = release.name.removePrefix("v").trim()
-                                    // If we find a version <= current version, we can stop fetching further pages
-                                    // because releases are typically ordered by date/version descending.
-                                    // However, we still include this release in the list to be safe,
-                                    // as it might be the current version itself which is useful for comparison.
-                                    if (compareVersions(releaseVersion, currentVersion) <= 0) {
-                                        shouldContinue = false
-                                    }
-                                    allReleases.add(release)
-                                }
-                                
-                                // If we have found valid candidates in this page, we might stop?
-                                // User requirement: "if validReleases is empty, then request second page"
-                                // This implies we check validity per page.
-                                val osName = getSystemOS()
-                                val arch = getSystemArch()
-                                val targetExtension = when {
-                                    osName.equals("Windows", ignoreCase = true) -> ".exe"
-                                    osName.equals("MacOS", ignoreCase = true) -> ".dmg"
-                                    osName.equals("Linux", ignoreCase = true) -> getLinuxPackageExtension()
-                                    else -> null
-                                }
-                                
-                                val validInPage = pageReleases.any { release ->
-                                     release.assets.any { asset ->
-                                        asset.name.contains(osName, ignoreCase = true) &&
-                                        asset.name.contains(arch, ignoreCase = true) &&
-                                        (targetExtension == null || asset.name.endsWith(targetExtension, ignoreCase = true))
-                                    }
-                                }
-                                
-                                if (validInPage) {
-                                    shouldContinue = false
-                                }
-                                
-                                page++
-                            }
-                        }
-                    }
-                    allReleases
-                } else {
-                    val targetUrl = "https://api.github.com/repos/FNOSP/fntv-client-multiplatform/releases/latest"
-                    logger.i("Checking update from: $targetUrl")
-                    val response = client.get(targetUrl)
-                    if (response.status == HttpStatusCode.NotFound) {
-                        emptyList()
-                    } else {
-                        listOf(response.body<GitHubRelease>())
-                    }
-                }
-
+                val releases = fetchReleases(includePrerelease)
+                
                 if (releases.isEmpty()) {
-                    logger.i("No releases found")
-                    _status.value = UpdateStatus.UpToDate
-                    _latestVersion.value = null
+                    handleNoReleasesFound()
                     return@launch
                 }
 
-                val currentVersion = BuildConfig.VERSION_NAME
-                val arch = getSystemArch()
-                val osName = getSystemOS()
-                val targetExtension = when {
-                    osName.equals("Windows", ignoreCase = true) -> ".exe"
-                    osName.equals("MacOS", ignoreCase = true) -> ".dmg"
-                    osName.equals("Linux", ignoreCase = true) -> getLinuxPackageExtension()
-                    else -> null
-                }
-
-                val validReleases = releases.filter { release ->
-                    release.assets.any { asset ->
-                        asset.name.contains(osName, ignoreCase = true) &&
-                        asset.name.contains(arch, ignoreCase = true) &&
-                        (targetExtension == null || asset.name.endsWith(targetExtension, ignoreCase = true))
-                    }
-                }
-
-                if (validReleases.isEmpty()) {
-                    logger.i("No compatible releases found")
-                    _status.value = UpdateStatus.UpToDate
-                    _latestVersion.value = null
-                    return@launch
-                }
-
-                val sortedReleases = validReleases.sortedWith { r1, r2 ->
-                    val v1 = r1.name.removePrefix("v").trim()
-                    val v2 = r2.name.removePrefix("v").trim()
-                    compareVersions(v2, v1) // Descending
-                }
-
-                val skippedVersions = AppSettingsStore.skippedVersions
-                var bestRelease: GitHubRelease? = null
-                var remoteVersion = ""
-
-                for (release in sortedReleases) {
-                    val v = release.name.removePrefix("v").trim()
-                    if (skippedVersions.contains(v)) {
-                        logger.i("Skipping version: $v")
-                        continue
-                    }
-                    // Since sortedReleases is sorted descending, the first one we find
-                    // that is not skipped is potentially the best candidate.
-                    // But we still need to check if it's newer than current.
-                    // If it's not newer, then subsequent ones won't be either.
-                    if (compareVersions(v, currentVersion) > 0) {
-                        bestRelease = release
-                        remoteVersion = v
-                        break
-                    }
-                }
-
-                if (bestRelease != null) {
-                    logger.i("Current version: $currentVersion, Best remote version: $remoteVersion")
-
-                    val asset = bestRelease.assets.find {
-                        it.name.contains(osName, ignoreCase = true) &&
-                        it.name.contains(arch, ignoreCase = true) &&
-                        (targetExtension == null || it.name.endsWith(targetExtension, ignoreCase = true))
-                    }
-
-                    if (asset != null) {
-                        val updateInfo = UpdateInfo(
-                            version = remoteVersion,
-                            releaseNotes = bestRelease.body,
-                            downloadUrl = asset.browserDownloadUrl,
-                            fileName = asset.name,
-                            size = asset.size
-                        )
-
-                        _latestVersion.value = updateInfo
-
-                        val file = findUpdateFile(asset.name)
-
-                        if (file.exists() && file.length() == asset.size) {
-                            _status.value = UpdateStatus.ReadyToInstall(updateInfo, file.absolutePath)
-                        } else {
-                            if (downloadJob?.isActive == true && currentDownloadInfo?.version == updateInfo.version) {
-                                if (isManual) {
-                                    if (isUserInitiatedDownload.get()) {
-                                        suppressStatusUpdates.set(false)
-                                        lastDownloadStatus?.let { _status.value = it }
-                                    } else {
-                                        logger.i("Download already in progress, showing available status")
-                                        suppressStatusUpdates.set(true)
-                                        _status.value = UpdateStatus.Available(updateInfo)
-                                    }
-                                } else {
-                                    _status.value = UpdateStatus.Available(updateInfo)
-                                }
-                            } else {
-                                _status.value = UpdateStatus.Available(updateInfo)
-                                if (!isManual && autoDownload) {
-                                    logger.i("Auto downloading update")
-                                    startDownload(proxyUrl, updateInfo, isBackground = true)
-                                }
-                            }
-                        }
-                    } else {
-                        _status.value = UpdateStatus.UpToDate
-                        _latestVersion.value = null
-                    }
+                val bestReleaseInfo = findBestRelease(releases)
+                if (bestReleaseInfo != null) {
+                    processUpdateInfo(bestReleaseInfo, isManual, autoDownload, proxyUrl)
                 } else {
-                    _status.value = UpdateStatus.UpToDate
-                    _latestVersion.value = null
+                    handleNoCompatibleReleasesFound()
                 }
             } catch (e: Exception) {
                 logger.e("Update check failed", e)
@@ -275,6 +104,191 @@ class DesktopUpdateManager : UpdateManager {
             }
         }
     }
+
+    private suspend fun fetchReleases(includePrerelease: Boolean): List<GitHubRelease> {
+        return if (includePrerelease) {
+            fetchReleasesWithPagination()
+        } else {
+            fetchLatestRelease()
+        }
+    }
+
+    private suspend fun fetchReleasesWithPagination(): List<GitHubRelease> {
+        val allReleases = mutableListOf<GitHubRelease>()
+        var page = 1
+        var shouldContinue = true
+        val currentVersion = BuildConfig.VERSION_NAME
+
+        while (shouldContinue && page <= 10) { // Safety limit of 10 pages
+            val targetUrl = "https://api.github.com/repos/FNOSP/fntv-client-multiplatform/releases?per_page=5&page=$page"
+            logger.i("Checking updates from: $targetUrl")
+            val response = client.get(targetUrl)
+            
+            if (response.status == HttpStatusCode.NotFound) {
+                shouldContinue = false
+            } else {
+                val pageReleases = response.body<List<GitHubRelease>>()
+                if (pageReleases.isEmpty()) {
+                    shouldContinue = false
+                } else {
+                    if (shouldStopFetching(pageReleases, currentVersion)) {
+                        shouldContinue = false
+                    }
+                    allReleases.addAll(pageReleases)
+                    page++
+                }
+            }
+        }
+        return allReleases
+    }
+
+    private fun shouldStopFetching(pageReleases: List<GitHubRelease>, currentVersion: String): Boolean {
+        // Check if we should continue fetching based on version
+        for (release in pageReleases) {
+            val releaseVersion = release.name.removePrefix("v").trim()
+            if (compareVersions(releaseVersion, currentVersion) <= 0) {
+                return true
+            }
+        }
+        
+        // Also check if we found valid candidates in this page
+        val osName = getSystemOS()
+        val arch = getSystemArch()
+        val targetExtension = getTargetExtension(osName)
+        
+        return pageReleases.any { release ->
+            release.assets.any { asset ->
+                asset.name.contains(osName, ignoreCase = true) &&
+                asset.name.contains(arch, ignoreCase = true) &&
+                (targetExtension == null || asset.name.endsWith(targetExtension, ignoreCase = true))
+            }
+        }
+    }
+
+    private suspend fun fetchLatestRelease(): List<GitHubRelease> {
+        val targetUrl = "https://api.github.com/repos/FNOSP/fntv-client-multiplatform/releases/latest"
+        logger.i("Checking update from: $targetUrl")
+        val response = client.get(targetUrl)
+        return if (response.status == HttpStatusCode.NotFound) {
+            emptyList()
+        } else {
+            listOf(response.body<GitHubRelease>())
+        }
+    }
+
+    private fun handleNoReleasesFound() {
+        logger.i("No releases found")
+        _status.value = UpdateStatus.UpToDate
+        _latestVersion.value = null
+    }
+
+    private fun handleNoCompatibleReleasesFound() {
+        logger.i("No compatible releases found")
+        _status.value = UpdateStatus.UpToDate
+        _latestVersion.value = null
+    }
+
+    private fun findBestRelease(releases: List<GitHubRelease>): UpdateInfo? {
+        val currentVersion = BuildConfig.VERSION_NAME
+        val arch = getSystemArch()
+        val osName = getSystemOS()
+        val targetExtension = getTargetExtension(osName)
+
+        val validReleases = releases.filter { release ->
+            release.assets.any { asset ->
+                asset.name.contains(osName, ignoreCase = true) &&
+                asset.name.contains(arch, ignoreCase = true) &&
+                (targetExtension == null || asset.name.endsWith(targetExtension, ignoreCase = true))
+            }
+        }
+
+        if (validReleases.isEmpty()) return null
+
+        val sortedReleases = validReleases.sortedWith { r1, r2 ->
+            val v1 = r1.name.removePrefix("v").trim()
+            val v2 = r2.name.removePrefix("v").trim()
+            compareVersions(v2, v1) // Descending
+        }
+
+        val skippedVersions = AppSettingsStore.skippedVersions
+        var bestRelease: GitHubRelease? = null
+        var remoteVersion = ""
+
+        for (release in sortedReleases) {
+            val v = release.name.removePrefix("v").trim()
+            if (skippedVersions.contains(v)) {
+                logger.i("Skipping version: $v")
+                continue
+            }
+            if (compareVersions(v, currentVersion) > 0) {
+                bestRelease = release
+                remoteVersion = v
+                break
+            }
+        }
+
+        return bestRelease?.let { release ->
+            logger.i("Current version: $currentVersion, Best remote version: $remoteVersion")
+            val asset = release.assets.find {
+                it.name.contains(osName, ignoreCase = true) &&
+                it.name.contains(arch, ignoreCase = true) &&
+                (targetExtension == null || it.name.endsWith(targetExtension, ignoreCase = true))
+            }
+            asset?.let {
+                UpdateInfo(
+                    version = remoteVersion,
+                    releaseNotes = release.body,
+                    downloadUrl = it.browserDownloadUrl,
+                    fileName = it.name,
+                    size = it.size
+                )
+            }
+        }
+    }
+
+    private fun getTargetExtension(osName: String): String? {
+        return when {
+            osName.equals("Windows", ignoreCase = true) -> ".exe"
+            osName.equals("MacOS", ignoreCase = true) -> ".dmg"
+            osName.equals("Linux", ignoreCase = true) -> getLinuxPackageExtension()
+            else -> null
+        }
+    }
+
+    private fun processUpdateInfo(updateInfo: UpdateInfo, isManual: Boolean, autoDownload: Boolean, proxyUrl: String) {
+        _latestVersion.value = updateInfo
+        val file = findUpdateFile(updateInfo.fileName)
+
+        if (file.exists() && file.length() == updateInfo.size) {
+            _status.value = UpdateStatus.ReadyToInstall(updateInfo, file.absolutePath)
+        } else {
+            handleDownloadStatus(updateInfo, isManual, autoDownload, proxyUrl)
+        }
+    }
+
+    private fun handleDownloadStatus(updateInfo: UpdateInfo, isManual: Boolean, autoDownload: Boolean, proxyUrl: String) {
+        if (downloadJob?.isActive == true && currentDownloadInfo?.version == updateInfo.version) {
+            if (isManual) {
+                if (isUserInitiatedDownload.get()) {
+                    suppressStatusUpdates.set(false)
+                    lastDownloadStatus?.let { _status.value = it }
+                } else {
+                    logger.i("Download already in progress, showing available status")
+                    suppressStatusUpdates.set(true)
+                    _status.value = UpdateStatus.Available(updateInfo)
+                }
+            } else {
+                _status.value = UpdateStatus.Available(updateInfo)
+            }
+        } else {
+            _status.value = UpdateStatus.Available(updateInfo)
+            if (!isManual && autoDownload) {
+                logger.i("Auto downloading update")
+                startDownload(proxyUrl, updateInfo, isBackground = true)
+            }
+        }
+    }
+
 
     private fun getUpdateDirectory(): File {
         val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
@@ -318,6 +332,19 @@ class DesktopUpdateManager : UpdateManager {
     }
 
     private fun startDownload(proxyUrl: String, info: UpdateInfo, isBackground: Boolean) {
+        if (handleExistingDownload(info, isBackground)) return
+        if (checkFileExists(info)) return
+
+        downloadJob?.cancel()
+        currentDownloadInfo = info
+        isUserInitiatedDownload.set(!isBackground)
+        suppressStatusUpdates.set(isBackground)
+        lastDownloadStatus = null
+        
+        launchDownloadJob(proxyUrl, info, isBackground)
+    }
+
+    private fun handleExistingDownload(info: UpdateInfo, isBackground: Boolean): Boolean {
         if (downloadJob?.isActive == true && currentDownloadInfo?.version == info.version) {
             logger.i("Joining existing download for version ${info.version}")
             isUserInitiatedDownload.set(!isBackground)
@@ -326,22 +353,22 @@ class DesktopUpdateManager : UpdateManager {
             if (!isBackground) {
                 lastDownloadStatus?.let { _status.value = it }
             }
-            return
+            return true
         }
+        return false
+    }
 
+    private fun checkFileExists(info: UpdateInfo): Boolean {
         val existingFile = findUpdateFile(info.fileName)
         if (existingFile.exists() && existingFile.length() == info.size) {
             logger.i("Update file already exists and matches size. Skipping download.")
             _status.value = UpdateStatus.ReadyToInstall(info, existingFile.absolutePath)
-            return
+            return true
         }
+        return false
+    }
 
-        downloadJob?.cancel()
-        currentDownloadInfo = info
-        isUserInitiatedDownload.set(!isBackground)
-        suppressStatusUpdates.set(isBackground)
-        lastDownloadStatus = null
-        
+    private fun launchDownloadJob(proxyUrl: String, info: UpdateInfo, isBackground: Boolean) {
         downloadJob = scope.launch {
             if (!isBackground) {
                 _status.value = UpdateStatus.Downloading(0f, 0, info.size)
@@ -349,66 +376,86 @@ class DesktopUpdateManager : UpdateManager {
             val updateDir = getUpdateDirectory()
             val file = File(updateDir, info.fileName)
             try {
-                val baseUrl = if (proxyUrl.isNotBlank()) {
-                    if (proxyUrl.endsWith("/")) proxyUrl else "$proxyUrl/"
-                } else {
-                    ""
-                }
-                val url = if (baseUrl.isNotBlank()) {
-                    "$baseUrl${info.downloadUrl}"
-                } else {
-                    info.downloadUrl
-                }
-                
+                val url = prepareDownloadUrl(proxyUrl, info.downloadUrl)
                 logger.i("Downloading update from: $url")
-
-                client.prepareGet(url).execute { httpResponse ->
-                    val channel = httpResponse.bodyAsChannel()
-                    val totalSize = httpResponse.contentLength() ?: info.size
-                    
-                    var downloadedSize = 0L
-                    val buffer = ByteArray(1024 * 8)
-                    val output = FileOutputStream(file)
-                    
-                    try {
-                        while (!channel.isClosedForRead) {
-                            val read = channel.readAvailable(buffer, 0, buffer.size)
-                            if (read <= 0) break
-                            output.write(buffer, 0, read)
-                            downloadedSize += read
-                            if (totalSize > 0) {
-                                val status = UpdateStatus.Downloading(downloadedSize.toFloat() / totalSize, downloadedSize, totalSize)
-                                lastDownloadStatus = status
-                                if (!suppressStatusUpdates.get()) {
-                                    _status.value = status
-                                }
-                            }
-                        }
-                    } finally {
-                        output.close()
-                    }
-                }
+                
+                downloadFile(url, file, info)
+                
                 if (!suppressStatusUpdates.get()) {
                     _status.value = UpdateStatus.Downloaded(info, file.absolutePath)
                 }
             } catch (_: CancellationException) {
-                logger.i("Download cancelled")
-                if (file.exists()) {
-                    file.delete()
-                }
-                _status.value = UpdateStatus.Idle
-                currentDownloadInfo = null
-                lastDownloadStatus = null
+                handleDownloadCancellation(file)
             } catch (e: Exception) {
-                logger.e("Download failed", e)
-                _status.value = UpdateStatus.Error("Download failed: ${e.message}")
-                if (file.exists()) {
-                    file.delete()
-                }
-                currentDownloadInfo = null
-                lastDownloadStatus = null
+                handleDownloadError(e, file)
             }
         }
+    }
+
+    private fun prepareDownloadUrl(proxyUrl: String, downloadUrl: String): String {
+        val baseUrl = if (proxyUrl.isNotBlank()) {
+            if (proxyUrl.endsWith("/")) proxyUrl else "$proxyUrl/"
+        } else {
+            ""
+        }
+        return if (baseUrl.isNotBlank()) {
+            "$baseUrl${downloadUrl}"
+        } else {
+            downloadUrl
+        }
+    }
+
+    private suspend fun downloadFile(url: String, file: File, info: UpdateInfo) {
+        client.prepareGet(url).execute { httpResponse ->
+            val channel = httpResponse.bodyAsChannel()
+            val totalSize = httpResponse.contentLength() ?: info.size
+            
+            var downloadedSize = 0L
+            val buffer = ByteArray(1024 * 8)
+            val output = FileOutputStream(file)
+            
+            try {
+                while (!channel.isClosedForRead) {
+                    val read = channel.readAvailable(buffer, 0, buffer.size)
+                    if (read <= 0) break
+                    output.write(buffer, 0, read)
+                    downloadedSize += read
+                    if (totalSize > 0) {
+                        updateDownloadProgress(downloadedSize, totalSize)
+                    }
+                }
+            } finally {
+                output.close()
+            }
+        }
+    }
+
+    private fun updateDownloadProgress(downloadedSize: Long, totalSize: Long) {
+        val status = UpdateStatus.Downloading(downloadedSize.toFloat() / totalSize, downloadedSize, totalSize)
+        lastDownloadStatus = status
+        if (!suppressStatusUpdates.get()) {
+            _status.value = status
+        }
+    }
+
+    private fun handleDownloadCancellation(file: File) {
+        logger.i("Download cancelled")
+        if (file.exists()) {
+            file.delete()
+        }
+        _status.value = UpdateStatus.Idle
+        currentDownloadInfo = null
+        lastDownloadStatus = null
+    }
+
+    private fun handleDownloadError(e: Exception, file: File) {
+        logger.e("Download failed", e)
+        _status.value = UpdateStatus.Error("Download failed: ${e.message}")
+        if (file.exists()) {
+            file.delete()
+        }
+        currentDownloadInfo = null
+        lastDownloadStatus = null
     }
     
     override fun installUpdate(info: UpdateInfo) {
