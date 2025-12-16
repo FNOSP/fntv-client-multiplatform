@@ -98,6 +98,7 @@ import com.jankinwu.fntv.client.ui.component.player.PlayerSettingsMenu
 import com.jankinwu.fntv.client.ui.component.player.QualityControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SubtitleControlFlyout
+import io.github.composefluent.component.NavigationDefaults
 import com.jankinwu.fntv.client.ui.component.player.VideoPlayerProgressBar
 import com.jankinwu.fntv.client.ui.component.player.VolumeControl
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
@@ -128,6 +129,8 @@ import com.jankinwu.fntv.client.viewmodel.UserInfoViewModel
 import io.github.composefluent.FluentTheme
 import io.github.composefluent.component.ContentDialogButton
 import io.github.composefluent.component.DialogSize
+import io.github.composefluent.component.FontIconDefaults
+import io.github.composefluent.component.FontIconSize
 import korlibs.crypto.MD5
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
@@ -150,6 +153,7 @@ private val logger = Logger.withTag("PlayerScreen")
 
 data class PlayerState(
     val isVisible: Boolean = false,
+    val isUiVisible: Boolean = true,
     val itemGuid: String = "",
     val mediaTitle: String = "",
     val subhead: String = "",
@@ -169,6 +173,7 @@ class PlayerManager {
     ) {
         playerState = PlayerState(
             isVisible = true,
+            isUiVisible = true,
             itemGuid = itemGuid,
             mediaTitle = mediaTitle,
             subhead = subhead,
@@ -179,6 +184,12 @@ class PlayerManager {
 
     fun hidePlayer() {
         playerState = playerState.copy(isVisible = false)
+    }
+
+    fun setUiVisible(visible: Boolean) {
+        if (playerState.isVisible && playerState.isUiVisible != visible) {
+            playerState = playerState.copy(isUiVisible = visible)
+        }
     }
 }
 
@@ -248,6 +259,10 @@ fun PlayerOverlay(
 ) {
     // 控制UI可见性的状态
     var uiVisible by remember { mutableStateOf(true) }
+    val playerManager = LocalPlayerManager.current
+    LaunchedEffect(uiVisible) {
+        playerManager.setUiVisible(uiVisible)
+    }
     var isCursorVisible by remember { mutableStateOf(true) }
     var lastMouseMoveTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val interactionSource = remember { MutableInteractionSource() }
@@ -261,7 +276,6 @@ fun PlayerOverlay(
     val isPlayControlHovered =
         isSpeedControlHovered || isVolumeControlHovered || isQualityControlHovered || isSettingsMenuHovered || isSubtitleControlHovered
     val currentPosition by mediaPlayer.currentPositionMillis.collectAsState()
-    val playerManager = LocalPlayerManager.current
     val frameWindowScope = LocalFrameWindowScope.current
     val mediaPViewModel: MediaPViewModel = koinViewModel()
     val tagViewModel: TagViewModel = koinViewModel()
@@ -627,7 +641,8 @@ fun PlayerOverlay(
             MediampPlayerSurface(
                 mediaPlayer, Modifier
                     .fillMaxSize()
-                    .padding(top = if (windowState.placement != WindowPlacement.Fullscreen) 48.dp else 0.dp)
+//                    .padding(top = if (windowState.placement != WindowPlacement.Fullscreen) 48.dp else 0.dp)
+                    .padding(top = 0.dp)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null,
@@ -851,6 +866,42 @@ fun buildEpisodeTitle(mediaTitle: String, subhead: String): AnnotatedString {
     return annotatedString
 }
 
+fun buildMacOsEpisodeTitle(mediaTitle: String, subhead: String): AnnotatedString {
+    val annotatedString = buildAnnotatedString {
+        withStyle(
+            style = SpanStyle(
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = defaultVariableFamily
+            )
+        ) {
+            append(mediaTitle)
+        }
+        withStyle(
+            style = SpanStyle(
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraLight,
+                fontFamily = defaultVariableFamily
+            )
+        ) {
+            append(" / ")
+        }
+        withStyle(
+            style = SpanStyle(
+                color = Colors.TextSecondaryColor,
+                fontSize = 16.sp,
+                fontFamily = defaultVariableFamily,
+                fontWeight = FontWeight.Normal
+            )
+        ) {
+            append(subhead)
+        }
+    }
+    return annotatedString
+}
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun PlayerControlRow(
@@ -881,7 +932,8 @@ fun PlayerControlRow(
     val interactionSource = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
             modifier = Modifier
@@ -1638,45 +1690,98 @@ fun PlayerTopBar(
     windowState: WindowState,
     platform: Platform
 ) {
-    Row(
-        modifier = Modifier
-            .padding(top = if (platform is Platform.MacOS) 48.dp else 12.dp)
-            .padding(start = 20.dp, top = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = ArrowLeft,
-            contentDescription = "返回",
-            tint = Color.White,
+    if (platform is Platform.MacOS) {
+        Box(
             modifier = Modifier
-                .size(20.dp)
-                .clickable(onClick = {
-                    mediaPlayer.stopPlayback()
-                    // 清除缓存
-                    playerViewModel.updatePlayingInfo(null)
-                    onBack()
-                    if (windowState.placement == WindowPlacement.Fullscreen) {
-                        windowState.placement = WindowPlacement.Floating
+                .fillMaxWidth()
+//                .padding(top = 10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 80.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                val interaction = remember { MutableInteractionSource() }
+                NavigationDefaults.BackButton(
+                    onClick = {
+                        mediaPlayer.stopPlayback()
+                        playerViewModel.updatePlayingInfo(null)
+                        onBack()
+                        if (windowState.placement == WindowPlacement.Fullscreen) {
+                            windowState.placement = WindowPlacement.Floating
+                        }
+                    },
+                    interaction = interaction,
+                    icon = {
+                        FontIconDefaults.BackIcon(interaction, size = FontIconSize(16f))
                     }
-                })
-        )
-        if (isEpisode) {
-            Text(
-                text = buildEpisodeTitle(mediaTitle, subhead),
-                style = LocalTypography.current.title,
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium
+                )
+            }
+            Box(
+                modifier = Modifier.align(Alignment.Center),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isEpisode) {
+                    Text(
+                        text = buildMacOsEpisodeTitle(mediaTitle, subhead),
+                        style = LocalTypography.current.title,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                } else {
+                    Text(
+                        text = mediaTitle,
+                        style = LocalTypography.current.title,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier
+                .padding(top = 12.dp)
+                .padding(start = 20.dp, top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = ArrowLeft,
+                contentDescription = "返回",
+                tint = Color.White,
+                modifier = Modifier
+                    .size(20.dp)
+                    .clickable(onClick = {
+                        mediaPlayer.stopPlayback()
+                        // 清除缓存
+                        playerViewModel.updatePlayingInfo(null)
+                        onBack()
+                        if (windowState.placement == WindowPlacement.Fullscreen) {
+                            windowState.placement = WindowPlacement.Floating
+                        }
+                    })
             )
-        } else {
-            Text(
-                text = mediaTitle,
-                style = LocalTypography.current.title,
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium
-            )
+            if (isEpisode) {
+                Text(
+                    text = buildEpisodeTitle(mediaTitle, subhead),
+                    style = LocalTypography.current.title,
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            } else {
+                Text(
+                    text = mediaTitle,
+                    style = LocalTypography.current.title,
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }
