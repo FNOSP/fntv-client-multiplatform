@@ -98,6 +98,7 @@ import com.jankinwu.fntv.client.ui.component.player.PlayerSettingsMenu
 import com.jankinwu.fntv.client.ui.component.player.QualityControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SubtitleControlFlyout
+import io.github.composefluent.component.NavigationDefaults
 import com.jankinwu.fntv.client.ui.component.player.VideoPlayerProgressBar
 import com.jankinwu.fntv.client.ui.component.player.VolumeControl
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
@@ -852,6 +853,42 @@ fun buildEpisodeTitle(mediaTitle: String, subhead: String): AnnotatedString {
             style = SpanStyle(
                 color = Colors.TextSecondaryColor,
                 fontSize = 14.sp,
+                fontFamily = defaultVariableFamily,
+                fontWeight = FontWeight.Normal
+            )
+        ) {
+            append(subhead)
+        }
+    }
+    return annotatedString
+}
+
+fun buildMacOsEpisodeTitle(mediaTitle: String, subhead: String): AnnotatedString {
+    val annotatedString = buildAnnotatedString {
+        withStyle(
+            style = SpanStyle(
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = defaultVariableFamily
+            )
+        ) {
+            append(mediaTitle)
+        }
+        withStyle(
+            style = SpanStyle(
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraLight,
+                fontFamily = defaultVariableFamily
+            )
+        ) {
+            append(" / ")
+        }
+        withStyle(
+            style = SpanStyle(
+                color = Colors.TextSecondaryColor,
+                fontSize = 16.sp,
                 fontFamily = defaultVariableFamily,
                 fontWeight = FontWeight.Normal
             )
@@ -1650,45 +1687,93 @@ fun PlayerTopBar(
     windowState: WindowState,
     platform: Platform
 ) {
-    Row(
-        modifier = Modifier
-            .padding(top = if (platform is Platform.MacOS) 48.dp else 12.dp)
-            .padding(start = 20.dp, top = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = ArrowLeft,
-            contentDescription = "返回",
-            tint = Color.White,
+    if (platform is Platform.MacOS) {
+        Box(
             modifier = Modifier
-                .size(20.dp)
-                .clickable(onClick = {
-                    mediaPlayer.stopPlayback()
-                    // 清除缓存
-                    playerViewModel.updatePlayingInfo(null)
-                    onBack()
-                    if (windowState.placement == WindowPlacement.Fullscreen) {
-                        windowState.placement = WindowPlacement.Floating
+                .fillMaxWidth()
+                .padding(top = 10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 80.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                NavigationDefaults.BackButton(
+                    onClick = {
+                        mediaPlayer.stopPlayback()
+                        playerViewModel.updatePlayingInfo(null)
+                        onBack()
+                        if (windowState.placement == WindowPlacement.Fullscreen) {
+                            windowState.placement = WindowPlacement.Floating
+                        }
                     }
-                })
-        )
-        if (isEpisode) {
-            Text(
-                text = buildEpisodeTitle(mediaTitle, subhead),
-                style = LocalTypography.current.title,
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium
+                )
+            }
+            Box(
+                modifier = Modifier.align(Alignment.Center),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isEpisode) {
+                    Text(
+                        text = buildMacOsEpisodeTitle(mediaTitle, subhead),
+                        style = LocalTypography.current.title,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                } else {
+                    Text(
+                        text = mediaTitle,
+                        style = LocalTypography.current.title,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier
+                .padding(top = 12.dp)
+                .padding(start = 20.dp, top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = ArrowLeft,
+                contentDescription = "返回",
+                tint = Color.White,
+                modifier = Modifier
+                    .size(20.dp)
+                    .clickable(onClick = {
+                        mediaPlayer.stopPlayback()
+                        // 清除缓存
+                        playerViewModel.updatePlayingInfo(null)
+                        onBack()
+                        if (windowState.placement == WindowPlacement.Fullscreen) {
+                            windowState.placement = WindowPlacement.Floating
+                        }
+                    })
             )
-        } else {
-            Text(
-                text = mediaTitle,
-                style = LocalTypography.current.title,
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium
-            )
+            if (isEpisode) {
+                Text(
+                    text = buildEpisodeTitle(mediaTitle, subhead),
+                    style = LocalTypography.current.title,
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            } else {
+                Text(
+                    text = mediaTitle,
+                    style = LocalTypography.current.title,
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }
