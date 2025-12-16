@@ -119,45 +119,46 @@ fun FrameWindowScope.MacOSWindowFrame(
                             modifier = Modifier.padding(start = 16.dp)
                         )
                     }
-                }
-                HasNewVersionTag()
-                Spacer(modifier = Modifier.weight(1f))
-                // 添加刷新按钮
-                if (onRefreshClick != null) {
-                    val rotation = remember { Animatable(0f) }
-                    val coroutineScope = rememberCoroutineScope()
-                    Icon(
-                        imageVector = RefreshCircle,
-                        contentDescription = "Refresh",
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .size(16.dp)
-                            .clickable {
-                                // 启动旋转动画
-                                coroutineScope.launch {
-                                    rotation.animateTo(
-                                        targetValue = 360f,
-                                        animationSpec = tween(durationMillis = 1000)
-                                    )
-                                    // 重置旋转角度
-                                    rotation.snapTo(0f)
+
+                    HasNewVersionTag()
+                    // 添加刷新按钮
+                    if (onRefreshClick != null) {
+                        val rotation = remember { Animatable(0f) }
+                        val coroutineScope = rememberCoroutineScope()
+                        Icon(
+                            imageVector = RefreshCircle,
+                            contentDescription = "Refresh",
+                            modifier = Modifier
+                                .padding(start = 6.dp)
+                                .size(16.dp)
+                                .clickable {
+                                    // 启动旋转动画
+                                    coroutineScope.launch {
+                                        rotation.animateTo(
+                                            targetValue = 360f,
+                                            animationSpec = tween(durationMillis = 1000)
+                                        )
+                                        // 重置旋转角度
+                                        rotation.snapTo(0f)
+                                    }
+                                    // 执行刷新逻辑
+                                    onRefreshClick()
                                 }
-                                // 执行刷新逻辑
-                                onRefreshClick()
-                            }
-                            .graphicsLayer {
-                                rotationZ = rotation.value
-                            }
-                    )
+                                .graphicsLayer {
+                                    rotationZ = rotation.value
+                                }
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
+
         }
 
-    }
-
-    window.rootPane.apply {
-        rootPane.putClientProperty("apple.awt.fullWindowContent", true)
-        rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
-        rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
+        window.rootPane.apply {
+            rootPane.putClientProperty("apple.awt.fullWindowContent", true)
+            rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
+            rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
+        }
     }
 }
