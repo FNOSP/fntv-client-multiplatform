@@ -266,8 +266,11 @@ fun PlayerOverlay(
     val mediaPViewModel: MediaPViewModel = koinViewModel()
     val tagViewModel: TagViewModel = koinViewModel()
     val playerViewModel: PlayerViewModel = koinViewModel()
+    val playPlayViewModel: PlayPlayViewModel = koinViewModel()
+    val mp4Parser: Mp4Parser = koinInject()
     val playingInfoCache by playerViewModel.playingInfoCache.collectAsState()
     val resetQualityState by mediaPViewModel.resetQualityState.collectAsState()
+    val quitMediaState by mediaPViewModel.quitState.collectAsState()
     val iso6391State by tagViewModel.iso6391State.collectAsState()
     val iso6392State by tagViewModel.iso6392State.collectAsState()
     val iso3166State by tagViewModel.iso3166State.collectAsState()
@@ -339,40 +342,44 @@ fun PlayerOverlay(
     val streamViewModel: StreamViewModel = koinViewModel()
     val userInfoViewModel: UserInfoViewModel = koinViewModel()
 
-    val refreshSubtitleList = remember(playerViewModel, userInfoViewModel, streamViewModel, subtitleDeleteState) {
-        {
-            val cache = playerViewModel.playingInfoCache.value
-            if (cache != null) {
-                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                    try {
-                        val userInfoState = userInfoViewModel.uiState.value
-                        val userInfo =
-                            if (userInfoState is UiState.Success) userInfoState.data else null
+    val refreshSubtitleList =
+        remember(playerViewModel, userInfoViewModel, streamViewModel, subtitleDeleteState) {
+            {
+                val cache = playerViewModel.playingInfoCache.value
+                if (cache != null) {
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                        try {
+                            val userInfoState = userInfoViewModel.uiState.value
+                            val userInfo =
+                                if (userInfoState is UiState.Success) userInfoState.data else null
 
-                        if (userInfo != null) {
-                            val sourceName = userInfo.userSources.firstOrNull()?.sourceName ?: ""
-                            val ip = MD5.digest(sourceName.toByteArray()).hex
-                            val mediaGuid = cache.currentVideoStream.mediaGuid
+                            if (userInfo != null) {
+                                val sourceName =
+                                    userInfo.userSources.firstOrNull()?.sourceName ?: ""
+                                val ip = MD5.digest(sourceName.toByteArray()).hex
+                                val mediaGuid = cache.currentVideoStream.mediaGuid
 
-                            val streamResponse = streamViewModel.loadDataAndWait(
-                                StreamRequest(
-                                    mediaGuid,
-                                    ip = ip,
-                                    level = 1,
-                                    header = StreamRequest.Header(
-                                        listOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
+                                val streamResponse = streamViewModel.loadDataAndWait(
+                                    StreamRequest(
+                                        mediaGuid,
+                                        ip = ip,
+                                        level = 1,
+                                        header = StreamRequest.Header(
+                                            listOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
+                                        )
                                     )
                                 )
-                            )
-                            playerViewModel.updateSubtitleList(streamResponse.subtitleStreams ?: emptyList(), streamResponse)
+                                playerViewModel.updateSubtitleList(
+                                    streamResponse.subtitleStreams ?: emptyList(), streamResponse
+                                )
+                            }
+                        } catch (e: Exception) {
+                            logger.e("Failed to refresh subtitle list", e)
                         }
-                    } catch (e: Exception) {
-                        logger.e("Failed to refresh subtitle list", e)
                     }
                 }
             }
         }
-    }
 
     LaunchedEffect(subtitleDeleteState) {
         if (subtitleDeleteState is UiState.Success) {
@@ -423,19 +430,58 @@ fun PlayerOverlay(
             }
         }
     }
+    LaunchedEffect(quitMediaState) {
+        logger.i("Quality switch: Switching to Direct Link")
+        val cache = playingInfoCache
+        val startPos = mediaPlayer.getCurrentPositionMillis()
+        if (cache != null) {
+            mediaPViewModel.quit(MediaPRequest(playLink = cache.playLink ?: ""))
+            val (link, start) = getDirectPlayLink(
+                cache.currentVideoStream.mediaGuid,
+                startPos,
+                mp4Parser
+            )
+            val extraFiles = cache.currentSubtitleStream?.let { getMediaExtraFiles(it) }
+                ?: MediaExtraFiles()
+//                    mediaPlayer.stopPlayback()
+            startPlayback(mediaPlayer, link, start, extraFiles)
+        }
+    }
 
     LaunchedEffect(resetQualityState) {
         if (resetQualityState is UiState.Success) {
             val response =
                 (resetQualityState as UiState.Success<*>).data as? MediaResetQualityResponse
-            if (response != null && (response.result == "Success" || response.result == "success")) {
+            if (response != null && response.result == "succ") {
                 val cache = playingInfoCache
                 if (cache != null) {
                     val startPos = mediaPlayer.getCurrentPositionMillis()
+
+                    var newPlayLink = ""
+                    val videoStream = cache.currentVideoStream
+
+                    if (!cache.isUseDirectLink) {
+                        val forcedSdr = if (videoStream.colorRangeType != "SDR") 1 else 0
+                        val playRequest = createPlayRequest(
+                            videoStream,
+                            cache.currentFileStream,
+                            cache.currentAudioStream?.guid ?: "",
+                            cache.currentSubtitleStream?.guid,
+                            forcedSdr
+                        )
+                        try {
+                            val playResponse = playPlayViewModel.loadDataAndWait(playRequest)
+                            newPlayLink = playResponse.playLink
+                            playerViewModel.updatePlayingInfo(cache.copy(playLink = newPlayLink))
+                        } catch (e: Exception) {
+                            logger.e("Failed to fetch HLS link", e)
+                        }
+                    }
+
                     val extraFiles = cache.currentSubtitleStream?.let { getMediaExtraFiles(it) }
                         ?: MediaExtraFiles()
 //                    mediaPlayer.stopPlayback()
-                    startPlayback(mediaPlayer, cache.playLink, startPos, extraFiles)
+                    startPlayback(mediaPlayer, newPlayLink, startPos, extraFiles)
                 }
                 mediaPViewModel.clearError()
             }
@@ -620,7 +666,7 @@ fun PlayerOverlay(
             if (uiVisible) {
                 Row(
                     modifier = Modifier
-                        .padding(top = if(platform is Platform.MacOS) 48.dp else 12.dp)
+                        .padding(top = if (platform is Platform.MacOS) 48.dp else 12.dp)
                         .align(Alignment.TopStart)
                         .padding(start = 20.dp, top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
@@ -735,18 +781,53 @@ fun PlayerOverlay(
 
                                 val cache = playingInfoCache
                                 if (cache != null) {
-                                    val request = MediaPRequest(
-                                        req = "media.resetQuality",
-                                        reqId = "${System.currentTimeMillis()}",
-                                        playLink = cache.playLink,
-                                        quality = MediaPRequest.Quality(
-                                            quality.resolution,
-                                            quality.bitrate
-                                        ),
-                                        startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
-                                        clearCache = true
-                                    )
-                                    mediaPViewModel.resetQuality(request)
+                                    val currentQuality = cache.currentQuality
+                                    val originalQuality = cache.streamInfo.qualities.firstOrNull()
+                                    val videoStream = cache.currentVideoStream
+
+                                    val isTargetOriginalQuality =
+                                        currentQuality != null && originalQuality != null &&
+                                                currentResolution == originalQuality.resolution &&
+                                                currentBitrate == originalQuality.bitrate
+//                                    playerViewModel.updatePlayingInfo(cache.copy(currentQuality = quality))
+                                    val canUseDirectLink = videoStream.wrapper == "MP4" &&
+                                            videoStream.colorRangeType == "SDR"
+                                    // 如果当前非直链播放，并且视频可以被直链播放，如果切换的目标画质为原画质，则调用 media.quit
+                                    if (!cache.isUseDirectLink && isTargetOriginalQuality && canUseDirectLink) {
+                                        playerViewModel.updatePlayingInfo(
+                                            cache.copy(
+                                                currentQuality = quality,
+                                                isUseDirectLink = true,
+                                                playLink = null
+                                            )
+                                        )
+                                        mediaPViewModel.quit(
+                                            MediaPRequest(
+                                                playLink = cache.playLink ?: ""
+                                            )
+                                        )
+                                    }
+                                    // 如果当前视频可被直链播放，并且切换的目标画质非原画质，或不可被直链播放的情况下切换到原画质，则调用 media.resetQuality
+                                    if ((!isTargetOriginalQuality && canUseDirectLink) || (!canUseDirectLink && isTargetOriginalQuality)) {
+                                        playerViewModel.updatePlayingInfo(
+                                            cache.copy(
+                                                currentQuality = quality,
+                                                isUseDirectLink = false
+                                            )
+                                        )
+                                        val request = MediaPRequest(
+                                            req = "media.resetQuality",
+                                            reqId = "${System.currentTimeMillis()}",
+                                            playLink = cache.playLink ?: "",
+                                            quality = MediaPRequest.Quality(
+                                                quality.resolution,
+                                                quality.bitrate
+                                            ),
+                                            startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
+                                            clearCache = true
+                                        )
+                                        mediaPViewModel.resetQuality(request)
+                                    }
                                 }
                             },
                             isoTagData = isoTagData,
@@ -756,7 +837,7 @@ fun PlayerOverlay(
                                     val request = MediaPRequest(
                                         req = "media.resetAudio",
                                         reqId = "1234567890ABCDEF2s",
-                                        playLink = cache.playLink,
+                                        playLink = cache.playLink ?: "",
                                         quality = null,
                                         startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
                                         clearCache = true,
@@ -770,13 +851,17 @@ fun PlayerOverlay(
                             onSubtitleSelected = { subtitle ->
                                 val cache = playerViewModel.playingInfoCache.value
                                 if (cache != null) {
-                                    playerViewModel.updatePlayingInfo(cache.copy(currentSubtitleStream = subtitle))
+                                    playerViewModel.updatePlayingInfo(
+                                        cache.copy(
+                                            currentSubtitleStream = subtitle
+                                        )
+                                    )
 //                                playingInfoCache = cache.copy(currentSubtitleStream = subtitle)
                                     if (subtitle != null) {
                                         val request = MediaPRequest(
                                             req = "media.resetSubtitle",
                                             reqId = "1234567890ABCDEF",
-                                            playLink = cache.playLink,
+                                            playLink = cache.playLink ?: "",
                                             subtitleIndex = subtitle.index,
                                             startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
                                         )
@@ -785,7 +870,7 @@ fun PlayerOverlay(
                                         val request = MediaPRequest(
                                             req = "media.resetSubtitle",
                                             reqId = "1234567890ABCDEF",
-                                            playLink = cache.playLink,
+                                            playLink = cache.playLink ?: "",
                                             startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
                                         )
                                         mediaPViewModel.resetSubtitle(request)
@@ -891,6 +976,7 @@ fun PlayerOverlay(
                                 subtitleDeleteViewModel.deleteSubtitle(it.guid)
                             }
                         }
+
                         else -> {}
                     }
                     showDeleteSubtitleDialog = false
@@ -1285,13 +1371,29 @@ private suspend fun playMedia(
         var effectiveStartPosition = startPosition
 
         // 检查是否可以使用直链播放
-        val useDirectLink = videoStream.wrapper == "MP4" && videoStream.colorRangeType == "SDR"
+        val currentQuality = cache.currentQuality ?: streamInfo.qualities.firstOrNull()
+        val originalQuality = streamInfo.qualities.firstOrNull()
+        val isOriginalQuality = currentQuality != null && originalQuality != null &&
+                currentQuality.resolution == originalQuality.resolution &&
+                currentQuality.bitrate == originalQuality.bitrate
+
+        val streamMatchesSelected = videoStream.resolutionType == currentQuality?.resolution &&
+                videoStream.bps == currentQuality.bitrate
+
+        val useDirectLink = videoStream.wrapper == "MP4" &&
+                videoStream.colorRangeType == "SDR" &&
+                isOriginalQuality && streamMatchesSelected
 
         if (useDirectLink) {
-            logger.i("满足直链播放条件: wrapper=MP4, colorRangeType=SDR")
-            val (link, start) = getDirectPlayLink(playInfoResponse.mediaGuid, startPosition, mp4Parser)
+            logger.i("满足直链播放条件: wrapper=MP4, colorRangeType=SDR, isOriginalQuality=true")
+            val (link, start) = getDirectPlayLink(
+                cache.currentVideoStream.mediaGuid,
+                startPosition,
+                mp4Parser
+            )
             playLink = link
             effectiveStartPosition = start
+            playerViewModel.updatePlayingInfo(cache.copy(isUseDirectLink = true))
         } else {
             // 获取播放链接
             try {
@@ -1300,7 +1402,11 @@ private suspend fun playMedia(
             } catch (e: Exception) {
                 if (e.message?.contains("8192") ?: true) {
                     logger.i("播放接口返回8192，降级使用直链播放")
-                    val (link, start) = getDirectPlayLink(playInfoResponse.mediaGuid, startPosition, mp4Parser)
+                    val (link, start) = getDirectPlayLink(
+                        playInfoResponse.mediaGuid,
+                        startPosition,
+                        mp4Parser
+                    )
                     playLink = link
                     effectiveStartPosition = start
                 }
@@ -1320,11 +1426,11 @@ private suspend fun playMedia(
         // 启动播放器
         startPlayback(player, playLink, effectiveStartPosition, extraFiles)
         // 调用playRecord接口
-            callPlayRecord(
+        callPlayRecord(
 //            itemGuid = guid,
-                ts = if ((startPosition / 1000).toInt() == 0) 1 else (startPosition / 1000).toInt(),
-                playingInfoCache = finalCache,
-                playRecordViewModel = playRecordViewModel,
+            ts = if ((startPosition / 1000).toInt() == 0) 1 else (startPosition / 1000).toInt(),
+            playingInfoCache = finalCache,
+            playRecordViewModel = playRecordViewModel,
             onSuccess = {
                 logger.i("起播时调用playRecord成功")
             },
@@ -1483,12 +1589,18 @@ private fun handlePlayerKeyEvent(
                         val restoreVolume = if (lastVolume > 0) lastVolume else 0.05f
                         it.setVolume(restoreVolume)
                         PlayingSettingsStore.saveVolume(restoreVolume)
-                        toastManager.showToast("解除静音：${(restoreVolume * 100).toInt()}%", ToastType.Info, category = "volume")
+                        toastManager.showToast(
+                            "解除静音：${(restoreVolume * 100).toInt()}%",
+                            ToastType.Info,
+                            category = "volume"
+                        )
                     }
                 }
             }
+
             Key.DirectionLeft, Key.MediaStepBackward -> {
-                val seekPosition = (mediaPlayer.currentPositionMillis.value - 10000).coerceAtLeast(0)
+                val seekPosition =
+                    (mediaPlayer.currentPositionMillis.value - 10000).coerceAtLeast(0)
                 mediaPlayer.seekTo(seekPosition)
                 val dateTime = FnDataConvertor.formatDurationToDateTime(seekPosition)
                 toastManager.showToast("快退至：$dateTime", ToastType.Info, category = "seek")
@@ -1500,8 +1612,10 @@ private fun handlePlayerKeyEvent(
                     onError = { logger.i("Seek时调用playRecord失败：缓存为空") }
                 )
             }
-            Key.DirectionRight, Key.MediaStepForward-> {
-                val seekPosition = (mediaPlayer.currentPositionMillis.value + 10000).coerceAtMost(playerManager.playerState.duration)
+
+            Key.DirectionRight, Key.MediaStepForward -> {
+                val seekPosition =
+                    (mediaPlayer.currentPositionMillis.value + 10000).coerceAtMost(playerManager.playerState.duration)
                 mediaPlayer.seekTo(seekPosition)
                 val dateTime = FnDataConvertor.formatDurationToDateTime(seekPosition)
                 toastManager.showToast("快进至：$dateTime", ToastType.Info, category = "seek")
@@ -1513,30 +1627,43 @@ private fun handlePlayerKeyEvent(
                     onError = { logger.i("Seek时调用playRecord失败：缓存为空") }
                 )
             }
+
             Key.DirectionUp, Key.VolumeUp -> {
                 audioLevelController?.let {
                     val newVolume = (it.volume.value + 0.1f).coerceIn(0f, 1f)
                     it.setVolume(newVolume)
-                    toastManager.showToast("当前音量：${(newVolume * 100).toInt()}%", ToastType.Info, category = "volume")
+                    toastManager.showToast(
+                        "当前音量：${(newVolume * 100).toInt()}%",
+                        ToastType.Info,
+                        category = "volume"
+                    )
                     PlayingSettingsStore.saveVolume(newVolume)
                     onLastVolumeChange(0f)
                 }
             }
+
             Key.DirectionDown, Key.VolumeDown -> {
                 audioLevelController?.let {
                     val newVolume = (it.volume.value - 0.1f).coerceIn(0f, 1f)
                     it.setVolume(newVolume)
-                    toastManager.showToast("当前音量：${(newVolume * 100).toInt()}%", ToastType.Info, category = "volume")
+                    toastManager.showToast(
+                        "当前音量：${(newVolume * 100).toInt()}%",
+                        ToastType.Info,
+                        category = "volume"
+                    )
                     PlayingSettingsStore.saveVolume(newVolume)
                     onLastVolumeChange(0f)
                 }
             }
+
             Key.Spacebar, Key.MediaPlayPause -> {
                 mediaPlayer.togglePause()
             }
+
             Key.MediaStop -> {
                 mediaPlayer.pause()
             }
+
             Key.F -> {
                 if (windowState.placement == WindowPlacement.Fullscreen) {
                     windowState.placement = WindowPlacement.Floating
@@ -1544,6 +1671,7 @@ private fun handlePlayerKeyEvent(
                     windowState.placement = WindowPlacement.Fullscreen
                 }
             }
+
             else -> handled = false
         }
         return handled

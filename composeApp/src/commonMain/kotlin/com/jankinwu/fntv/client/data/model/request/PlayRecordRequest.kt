@@ -33,5 +33,5 @@ data class PlayRecordRequest(
     val duration: Int,
 
     @param:JsonProperty("play_link")
-    val playLink: String
+    val playLink: String? = null
 )

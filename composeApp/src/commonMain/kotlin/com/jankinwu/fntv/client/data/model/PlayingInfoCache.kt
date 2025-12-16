@@ -14,7 +14,7 @@ import com.jankinwu.fntv.client.data.model.response.VideoStream
  */
 data class PlayingInfoCache(
     var streamInfo: StreamResponse,
-    val playLink: String,
+    val playLink: String? = null,
     val currentFileStream: FileInfo,
     val currentVideoStream: VideoStream,
     var currentAudioStream: AudioStream? = null,
@@ -24,4 +24,5 @@ data class PlayingInfoCache(
     val currentQuality: QualityResponse? = null,
     val currentAudioStreamList: List<AudioStream>? = null,
     var currentSubtitleStreamList: List<SubtitleStream>? = null,
+    var isUseDirectLink: Boolean = false
 )

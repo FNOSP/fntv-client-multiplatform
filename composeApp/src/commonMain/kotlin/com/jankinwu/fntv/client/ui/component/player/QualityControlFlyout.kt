@@ -188,7 +188,9 @@ fun QualityControlFlyout(
                             isCustomPage = isCustomPage,
                             onSwitchPage = { isCustomPage = it },
                             onQualitySelected = {
-                                onQualitySelected(it)
+                                if (it.resolution != currentResolution || it.bitrate != currentBitrate) {
+                                    onQualitySelected(it)
+                                }
                                 isExpanded = false
                                 isCustomPage = false
                             }

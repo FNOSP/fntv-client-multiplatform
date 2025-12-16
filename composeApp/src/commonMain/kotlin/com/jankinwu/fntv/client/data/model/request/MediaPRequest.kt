@@ -6,10 +6,10 @@ import com.fasterxml.jackson.annotation.JsonProperty
 @Immutable
 data class MediaPRequest(
     @param:JsonProperty("req")
-    var req: String?,
+    var req: String? = null,
 
     @param:JsonProperty("reqid")
-    var reqId: String?,
+    var reqId: String? =  null,
 
     @param:JsonProperty("playLink")
     val playLink: String,
@@ -18,7 +18,7 @@ data class MediaPRequest(
     val quality: Quality? = null,
 
     @param:JsonProperty("startTimestamp")
-    val startTimestamp: Int?,
+    val startTimestamp: Int? = null,
 
     @param:JsonProperty("clearCache")
     val clearCache: Boolean? = null,
