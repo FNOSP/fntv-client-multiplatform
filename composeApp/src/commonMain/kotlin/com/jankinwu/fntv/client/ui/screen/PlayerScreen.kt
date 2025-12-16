@@ -431,20 +431,22 @@ fun PlayerOverlay(
         }
     }
     LaunchedEffect(quitMediaState) {
-        logger.i("Quality switch: Switching to Direct Link")
-        val cache = playingInfoCache
-        val startPos = mediaPlayer.getCurrentPositionMillis()
-        if (cache != null) {
-            mediaPViewModel.quit(MediaPRequest(playLink = cache.playLink ?: ""))
-            val (link, start) = getDirectPlayLink(
-                cache.currentVideoStream.mediaGuid,
-                startPos,
-                mp4Parser
-            )
-            val extraFiles = cache.currentSubtitleStream?.let { getMediaExtraFiles(it) }
-                ?: MediaExtraFiles()
+        if (quitMediaState is UiState.Success) {
+            logger.i("Quality switch: Switching to Direct Link")
+            val cache = playingInfoCache
+            val startPos = mediaPlayer.getCurrentPositionMillis()
+            if (cache != null) {
+                val (link, start) = getDirectPlayLink(
+                    cache.currentVideoStream.mediaGuid,
+                    startPos,
+                    mp4Parser
+                )
+                val extraFiles = cache.currentSubtitleStream?.let { getMediaExtraFiles(it) }
+                    ?: MediaExtraFiles()
 //                    mediaPlayer.stopPlayback()
-            startPlayback(mediaPlayer, link, start, extraFiles)
+                startPlayback(mediaPlayer, link, start, extraFiles)
+            }
+            mediaPViewModel.clearError()
         }
     }
 

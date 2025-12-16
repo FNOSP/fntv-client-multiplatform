@@ -93,5 +93,6 @@ class MediaPViewModel : BaseViewModel() {
     fun clearError() {
         _transcodeState.value = UiState.Initial
         _resetQualityState.value = UiState.Initial
+        _quitState.value = UiState.Initial
     }
 }

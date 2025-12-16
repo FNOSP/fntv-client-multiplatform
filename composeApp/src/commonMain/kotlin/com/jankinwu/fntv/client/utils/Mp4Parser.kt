@@ -6,6 +6,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.readBytes
 import io.ktor.http.HttpHeaders
+import kotlinx.coroutines.CancellationException
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlinx.io.readString
@@ -38,6 +39,7 @@ class Mp4Parser(private val httpClient: HttpClient) {
             logger.i { "Calculated offset for time $time: $offset" }
             return offset
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             logger.e(e) { "Failed to parse MP4" }
             return 0L
         }
