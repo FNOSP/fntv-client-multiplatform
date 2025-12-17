@@ -30,8 +30,8 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -53,6 +53,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowPlacement
@@ -71,6 +72,7 @@ import com.jankinwu.fntv.client.data.model.request.PlayPlayRequest
 import com.jankinwu.fntv.client.data.model.request.PlayRecordRequest
 import com.jankinwu.fntv.client.data.model.request.StreamRequest
 import com.jankinwu.fntv.client.data.model.response.AudioStream
+import com.jankinwu.fntv.client.data.model.response.EpisodeListResponse
 import com.jankinwu.fntv.client.data.model.response.FileInfo
 import com.jankinwu.fntv.client.data.model.response.MediaResetQualityResponse
 import com.jankinwu.fntv.client.data.model.response.PlayInfoResponse
@@ -98,7 +100,9 @@ import com.jankinwu.fntv.client.ui.component.common.dialog.AddNasSubtitleDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.CustomContentDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.SubtitleSearchDialog
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
+import com.jankinwu.fntv.client.ui.component.player.EpisodeSelectionFlyout
 import com.jankinwu.fntv.client.ui.component.player.FullScreenControl
+import com.jankinwu.fntv.client.ui.component.player.NextEpisodePreviewFlyout
 import com.jankinwu.fntv.client.ui.component.player.PlayerSettingsMenu
 import com.jankinwu.fntv.client.ui.component.player.QualityControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
@@ -118,6 +122,7 @@ import com.jankinwu.fntv.client.ui.providable.defaultVariableFamily
 import com.jankinwu.fntv.client.utils.HiddenPointerIcon
 import com.jankinwu.fntv.client.utils.Mp4Parser
 import com.jankinwu.fntv.client.utils.chooseFile
+import com.jankinwu.fntv.client.viewmodel.EpisodeListViewModel
 import com.jankinwu.fntv.client.viewmodel.MediaPViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayPlayViewModel
@@ -142,22 +147,16 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.unit.DpSize
-import com.jankinwu.fntv.client.data.model.response.EpisodeListResponse
-import com.jankinwu.fntv.client.ui.component.player.EpisodeSelectionFlyout
-import com.jankinwu.fntv.client.ui.component.player.NextEpisodePreviewFlyout
-import com.jankinwu.fntv.client.viewmodel.EpisodeListViewModel
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.openani.mediamp.MediampPlayer
 import org.openani.mediamp.PlaybackState
 import org.openani.mediamp.compose.MediampPlayerSurface
+import org.openani.mediamp.features.AspectRatioMode
 import org.openani.mediamp.features.AudioLevelController
 import org.openani.mediamp.features.PlaybackSpeed
 import org.openani.mediamp.features.VideoAspectRatio
-import org.openani.mediamp.features.AspectRatioMode
 import org.openani.mediamp.source.MediaExtraFiles
 import org.openani.mediamp.source.Subtitle
 import org.openani.mediamp.source.UriMediaData
@@ -168,6 +167,7 @@ private val logger = Logger.withTag("PlayerScreen")
 data class PlayerState(
     val isVisible: Boolean = false,
     val isUiVisible: Boolean = true,
+    val isLoading: Boolean = false,
     val itemGuid: String = "",
     val mediaTitle: String = "",
     val subhead: String = "",
@@ -188,6 +188,7 @@ class PlayerManager {
         playerState = PlayerState(
             isVisible = true,
             isUiVisible = true,
+            isLoading = false,
             itemGuid = itemGuid,
             mediaTitle = mediaTitle,
             subhead = subhead,
@@ -198,6 +199,10 @@ class PlayerManager {
 
     fun hidePlayer() {
         playerState = playerState.copy(isVisible = false)
+    }
+
+    fun setLoading(loading: Boolean) {
+        playerState = playerState.copy(isLoading = loading)
     }
 
     fun setUiVisible(visible: Boolean) {
@@ -365,21 +370,26 @@ fun PlayerOverlay(
                 }
                 
                 // 2. Play new media
-                playMedia(
-                    guid = episodeGuid,
-                    player = mediaPlayer,
-                    playInfoViewModel = playInfoViewModel,
-                    userInfoViewModel = userInfoViewModel,
-                    streamViewModel = streamViewModel,
-                    playPlayViewModel = playPlayViewModel,
-                    playRecordViewModel = playRecordViewModel,
-                    playerViewModel = playerViewModel,
-                    playerManager = playerManager,
-                    mediaGuid = null,
-                    currentAudioGuid = null,
-                    currentSubtitleGuid = null,
-                    mp4Parser = mp4Parser
-                )
+                try {
+                    playerManager.setLoading(true)
+                    playMedia(
+                        guid = episodeGuid,
+                        player = mediaPlayer,
+                        playInfoViewModel = playInfoViewModel,
+                        userInfoViewModel = userInfoViewModel,
+                        streamViewModel = streamViewModel,
+                        playPlayViewModel = playPlayViewModel,
+                        playRecordViewModel = playRecordViewModel,
+                        playerViewModel = playerViewModel,
+                        playerManager = playerManager,
+                        mediaGuid = null,
+                        currentAudioGuid = null,
+                        currentSubtitleGuid = null,
+                        mp4Parser = mp4Parser
+                    )
+                } finally {
+                    playerManager.setLoading(false)
+                }
             }
         }
     }
@@ -809,7 +819,7 @@ fun PlayerOverlay(
                 }
             }
             // 加载进度条
-            if (playState == PlaybackState.READY || playState == PlaybackState.PAUSED_BUFFERING) {
+            if (playState == PlaybackState.READY || playState == PlaybackState.PAUSED_BUFFERING || playerManager.playerState.isLoading) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize(),
@@ -1304,7 +1314,6 @@ fun rememberPlayMediaFunction(
     val playRecordViewModel: PlayRecordViewModel = koinViewModel()
     val playerViewModel: PlayerViewModel = koinViewModel()
     val mp4Parser: Mp4Parser = koinInject()
-    val scope = rememberCoroutineScope()
     val playerManager = LocalPlayerManager.current
     return remember(
         streamViewModel,
@@ -1319,22 +1328,27 @@ fun rememberPlayMediaFunction(
         mp4Parser
     ) {
         {
-            scope.launch {
-                playMedia(
-                    guid = guid,
-                    player = player,
-                    playInfoViewModel = playInfoViewModel,
-                    userInfoViewModel = userInfoViewModel,
-                    streamViewModel = streamViewModel,
-                    playPlayViewModel = playPlayViewModel,
-                    playRecordViewModel = playRecordViewModel,
-                    playerViewModel = playerViewModel,
-                    playerManager = playerManager,
-                    mediaGuid = mediaGuid,
-                    currentAudioGuid = currentAudioGuid,
-                    currentSubtitleGuid = currentSubtitleGuid,
-                    mp4Parser = mp4Parser
-                )
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                try {
+                    playerManager.setLoading(true)
+                    playMedia(
+                        guid = guid,
+                        player = player,
+                        playInfoViewModel = playInfoViewModel,
+                        userInfoViewModel = userInfoViewModel,
+                        streamViewModel = streamViewModel,
+                        playPlayViewModel = playPlayViewModel,
+                        playRecordViewModel = playRecordViewModel,
+                        playerViewModel = playerViewModel,
+                        playerManager = playerManager,
+                        mediaGuid = mediaGuid,
+                        currentAudioGuid = currentAudioGuid,
+                        currentSubtitleGuid = currentSubtitleGuid,
+                        mp4Parser = mp4Parser
+                    )
+                } finally {
+                    playerManager.setLoading(false)
+                }
             }
         }
     }
@@ -1356,15 +1370,15 @@ private suspend fun playMedia(
     mp4Parser: Mp4Parser
 ) {
     try {
-        // 获取播放信息
-        val playInfoResponse = playInfoViewModel.loadDataAndWait(guid, mediaGuid)
+        // 1. Fetch Basic Info (IO)
+        val (playInfoResponse, userInfo, streamInfo) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val p = playInfoViewModel.loadDataAndWait(guid, mediaGuid)
+            val u = getUserInfo(userInfoViewModel)
+            val s = fetchStreamInfo(p, u, streamViewModel)
+            Triple(p, u, s)
+        }
+
         val startPosition: Long = playInfoResponse.ts.toLong() * 1000
-
-        // 获取用户信息
-        val userInfo = getUserInfo(userInfoViewModel)
-
-        // 获取流信息
-        val streamInfo = fetchStreamInfo(playInfoResponse, userInfo, streamViewModel)
         val videoStream = streamInfo.videoStream
         val audioStream =
             streamInfo.audioStreams.first { audioStream -> audioStream.guid == playInfoResponse.audioGuid }
@@ -1398,15 +1412,17 @@ private suspend fun playMedia(
             createPlayRequest(videoStream, fileStream, audioGuid, subtitleGuid, forcedSdr)
 
         // 获取播放链接
-        val playLinkResult = resolvePlayLink(
-            playRequest,
-            cache,
-            streamInfo,
-            startPosition,
-            mp4Parser,
-            playPlayViewModel,
-            playInfoResponse
-        )
+        val playLinkResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            resolvePlayLink(
+                playRequest,
+                cache,
+                streamInfo,
+                startPosition,
+                mp4Parser,
+                playPlayViewModel,
+                playInfoResponse
+            )
+        }
 
         // 缓存播放信息
         val finalCache = cache.copy(
