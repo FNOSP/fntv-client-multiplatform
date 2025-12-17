@@ -458,6 +458,7 @@ fun PlayerOverlay(
                 currentBitrate = default.bitrate
             }
         }
+        logger.i("Initialize quality, Current resolution: $currentResolution, bitrate: $currentBitrate")
     }
     LaunchedEffect(quitMediaState) {
         if (quitMediaState is UiState.Success) {
@@ -1638,7 +1639,7 @@ private fun handleQualitySelection(
 ) {
     updateResolution(quality.resolution, quality.bitrate)
     PlayingSettingsStore.saveQuality(quality.resolution, quality.bitrate)
-
+//    logger.i("1 change quality to: ${quality.resolution}")
     if (playingInfoCache != null) {
         val currentQuality = playingInfoCache.currentQuality
         val originalQuality = playingInfoCache.streamInfo.qualities.firstOrNull()
@@ -1653,8 +1654,11 @@ private fun handleQualitySelection(
 
         val canUseDirectLink = videoStream.wrapper == "MP4" &&
                 videoStream.colorRangeType == "SDR"
+        logger.i("change quality to: ${quality.resolution}, useDirectLink: ${playingInfoCache.isUseDirectLink}, " +
+                "originalQuality: ${originalQuality}, canUseDirectLink: ${canUseDirectLink}, isTargetOriginalQuality: $isTargetOriginalQuality")
         // If currently not using direct link, and video can be direct linked, and target quality is original, call media.quit
         if (!playingInfoCache.isUseDirectLink && isTargetOriginalQuality && canUseDirectLink) {
+            logger.i("switch to direct link")
             playerViewModel.updatePlayingInfo(
                 playingInfoCache.copy(
                     currentQuality = quality,
@@ -1670,7 +1674,8 @@ private fun handleQualitySelection(
         }
         // If current video can be direct linked and target is not original, or cannot be direct linked and target is original, call media.resetQuality
         if (!playingInfoCache.isUseDirectLink) {
-            if ((!isTargetOriginalQuality && canUseDirectLink) || (!canUseDirectLink && isTargetOriginalQuality)) {
+            if ((!isTargetOriginalQuality && canUseDirectLink) || !canUseDirectLink) {
+                logger.i("call reset quality")
                 playerViewModel.updatePlayingInfo(
                     playingInfoCache.copy(
                         currentQuality = quality,
@@ -1698,6 +1703,7 @@ private fun handleQualitySelection(
             }
         }
         if (playingInfoCache.isUseDirectLink) {
+            logger.i("switch to HLS")
             val forcedSdr = if (videoStream.colorRangeType != "SDR") 1 else 0
             val playRequest = createPlayRequest(
                 videoStream,
@@ -1705,6 +1711,12 @@ private fun handleQualitySelection(
                 playingInfoCache.currentAudioStream?.guid ?: "",
                 playingInfoCache.currentSubtitleStream?.guid,
                 forcedSdr
+            )
+            playerViewModel.updatePlayingInfo(
+                playingInfoCache.copy(
+                    currentQuality = quality,
+                    isUseDirectLink = false
+                )
             )
             try {
                 playPlayViewModel.loadData(playRequest)
