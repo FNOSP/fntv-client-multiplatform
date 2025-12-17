@@ -203,8 +203,8 @@ jobs:
           if [[ "${{ github.ref }}" =~ [Aa]lpha ]]; then
             {
               echo "WARNING_TEXT<<EOF"
-              echo "1. 优化 MacOS 端的播放器界面布局"
-              echo "2. 其他 UI 相关优化"
+              echo "1. 修复播放器画质切换失败的问题"
+              echo "2. 其他 UI 方面优化"
               echo ""
               echo "详情请参考 git commit 日志"
               echo ""
