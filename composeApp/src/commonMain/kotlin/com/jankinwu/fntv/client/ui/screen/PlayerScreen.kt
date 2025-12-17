@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalResourceApi::class)
+@file:OptIn(ExperimentalResourceApi::class, kotlinx.coroutines.FlowPreview::class)
 
 package com.jankinwu.fntv.client.ui.screen
 
@@ -9,6 +9,7 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,10 +17,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,8 +30,8 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -50,6 +53,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowPlacement
@@ -68,9 +72,11 @@ import com.jankinwu.fntv.client.data.model.request.PlayPlayRequest
 import com.jankinwu.fntv.client.data.model.request.PlayRecordRequest
 import com.jankinwu.fntv.client.data.model.request.StreamRequest
 import com.jankinwu.fntv.client.data.model.response.AudioStream
+import com.jankinwu.fntv.client.data.model.response.EpisodeListResponse
 import com.jankinwu.fntv.client.data.model.response.FileInfo
 import com.jankinwu.fntv.client.data.model.response.MediaResetQualityResponse
 import com.jankinwu.fntv.client.data.model.response.PlayInfoResponse
+import com.jankinwu.fntv.client.data.model.response.PlayPlayResponse
 import com.jankinwu.fntv.client.data.model.response.QualityResponse
 import com.jankinwu.fntv.client.data.model.response.QueryTagResponse
 import com.jankinwu.fntv.client.data.model.response.StreamResponse
@@ -78,6 +84,7 @@ import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.data.model.response.UserInfoResponse
 import com.jankinwu.fntv.client.data.model.response.VideoStream
 import com.jankinwu.fntv.client.data.store.AccountDataCache
+import com.jankinwu.fntv.client.data.store.AppSettingsStore
 import com.jankinwu.fntv.client.data.store.PlayingSettingsStore
 import com.jankinwu.fntv.client.enums.FnTvMediaType
 import com.jankinwu.fntv.client.icons.ArrowLeft
@@ -93,12 +100,13 @@ import com.jankinwu.fntv.client.ui.component.common.dialog.AddNasSubtitleDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.CustomContentDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.SubtitleSearchDialog
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
+import com.jankinwu.fntv.client.ui.component.player.EpisodeSelectionFlyout
 import com.jankinwu.fntv.client.ui.component.player.FullScreenControl
+import com.jankinwu.fntv.client.ui.component.player.NextEpisodePreviewFlyout
 import com.jankinwu.fntv.client.ui.component.player.PlayerSettingsMenu
 import com.jankinwu.fntv.client.ui.component.player.QualityControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SubtitleControlFlyout
-import io.github.composefluent.component.NavigationDefaults
 import com.jankinwu.fntv.client.ui.component.player.VideoPlayerProgressBar
 import com.jankinwu.fntv.client.ui.component.player.VolumeControl
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
@@ -112,8 +120,9 @@ import com.jankinwu.fntv.client.ui.providable.LocalTypography
 import com.jankinwu.fntv.client.ui.providable.LocalWindowState
 import com.jankinwu.fntv.client.ui.providable.defaultVariableFamily
 import com.jankinwu.fntv.client.utils.HiddenPointerIcon
-import com.jankinwu.fntv.client.utils.chooseFile
 import com.jankinwu.fntv.client.utils.Mp4Parser
+import com.jankinwu.fntv.client.utils.chooseFile
+import com.jankinwu.fntv.client.viewmodel.EpisodeListViewModel
 import com.jankinwu.fntv.client.viewmodel.MediaPViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayPlayViewModel
@@ -131,8 +140,10 @@ import io.github.composefluent.component.ContentDialogButton
 import io.github.composefluent.component.DialogSize
 import io.github.composefluent.component.FontIconDefaults
 import io.github.composefluent.component.FontIconSize
+import io.github.composefluent.component.NavigationDefaults
 import korlibs.crypto.MD5
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -142,8 +153,10 @@ import org.koin.compose.viewmodel.koinViewModel
 import org.openani.mediamp.MediampPlayer
 import org.openani.mediamp.PlaybackState
 import org.openani.mediamp.compose.MediampPlayerSurface
+import org.openani.mediamp.features.AspectRatioMode
 import org.openani.mediamp.features.AudioLevelController
 import org.openani.mediamp.features.PlaybackSpeed
+import org.openani.mediamp.features.VideoAspectRatio
 import org.openani.mediamp.source.MediaExtraFiles
 import org.openani.mediamp.source.Subtitle
 import org.openani.mediamp.source.UriMediaData
@@ -154,6 +167,7 @@ private val logger = Logger.withTag("PlayerScreen")
 data class PlayerState(
     val isVisible: Boolean = false,
     val isUiVisible: Boolean = true,
+    val isLoading: Boolean = false,
     val itemGuid: String = "",
     val mediaTitle: String = "",
     val subhead: String = "",
@@ -169,11 +183,13 @@ class PlayerManager {
         mediaTitle: String,
         subhead: String = "",
         duration: Long = 0L,
-        isEpisode: Boolean = false
+        isEpisode: Boolean = false,
+        isLoading: Boolean = false
     ) {
         playerState = PlayerState(
             isVisible = true,
             isUiVisible = true,
+            isLoading = isLoading,
             itemGuid = itemGuid,
             mediaTitle = mediaTitle,
             subhead = subhead,
@@ -184,6 +200,10 @@ class PlayerManager {
 
     fun hidePlayer() {
         playerState = playerState.copy(isVisible = false)
+    }
+
+    fun setLoading(loading: Boolean) {
+        playerState = playerState.copy(isLoading = loading)
     }
 
     fun setUiVisible(visible: Boolean) {
@@ -255,7 +275,8 @@ fun PlayerOverlay(
     subhead: String,
     isEpisode: Boolean,
     onBack: () -> Unit,
-    mediaPlayer: MediampPlayer
+    mediaPlayer: MediampPlayer,
+    draggableArea: @Composable (content: @Composable () -> Unit) -> Unit = { it() }
 ) {
     // 控制UI可见性的状态
     var uiVisible by remember { mutableStateOf(true) }
@@ -263,6 +284,9 @@ fun PlayerOverlay(
     LaunchedEffect(uiVisible) {
         playerManager.setUiVisible(uiVisible)
     }
+    // Window Aspect Ratio State
+    var windowAspectRatio by remember { mutableStateOf(AppSettingsStore.playerWindowAspectRatio) }
+
     var isCursorVisible by remember { mutableStateOf(true) }
     var lastMouseMoveTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val interactionSource = remember { MutableInteractionSource() }
@@ -270,19 +294,126 @@ fun PlayerOverlay(
     var isSpeedControlHovered by remember { mutableStateOf(false) }
     var isVolumeControlHovered by remember { mutableStateOf(false) }
     var isQualityControlHovered by remember { mutableStateOf(false) }
+    var isEpisodeControlHovered by remember { mutableStateOf(false) }
+    var isNextEpisodeHovered by remember { mutableStateOf(false) }
     var isSettingsMenuHovered by remember { mutableStateOf(false) }
     var isSubtitleControlHovered by remember { mutableStateOf(false) }
     var lastVolume by remember { mutableFloatStateOf(0f) }
+
+
     val isPlayControlHovered =
-        isSpeedControlHovered || isVolumeControlHovered || isQualityControlHovered || isSettingsMenuHovered || isSubtitleControlHovered
+        isSpeedControlHovered || isVolumeControlHovered || isQualityControlHovered || isSettingsMenuHovered || isSubtitleControlHovered || isEpisodeControlHovered || isNextEpisodeHovered
     val currentPosition by mediaPlayer.currentPositionMillis.collectAsState()
     val frameWindowScope = LocalFrameWindowScope.current
+//    val scope = rememberCoroutineScope()
     val mediaPViewModel: MediaPViewModel = koinViewModel()
     val tagViewModel: TagViewModel = koinViewModel()
     val playerViewModel: PlayerViewModel = koinViewModel()
     val playPlayViewModel: PlayPlayViewModel = koinViewModel()
+    val episodeListViewModel: EpisodeListViewModel = koinViewModel()
+    val episodeListState by episodeListViewModel.uiState.collectAsState()
+    var episodeList by remember { mutableStateOf(emptyList<EpisodeListResponse>()) }
+    var isAutoPlay by remember { mutableStateOf(AppSettingsStore.autoPlay) }
+    val playPlayState by playPlayViewModel.uiState.collectAsState()
     val mp4Parser: Mp4Parser = koinInject()
     val playingInfoCache by playerViewModel.playingInfoCache.collectAsState()
+    val playInfoViewModel: PlayInfoViewModel = koinViewModel()
+    val userInfoViewModel: UserInfoViewModel = koinViewModel()
+    val streamViewModel: StreamViewModel = koinViewModel()
+    val playRecordViewModel: PlayRecordViewModel = koinViewModel()
+    val playState by mediaPlayer.playbackState.collectAsState()
+
+    LaunchedEffect(playingInfoCache?.itemGuid) {
+        isProgressBarHovered = false
+        isSpeedControlHovered = false
+        isVolumeControlHovered = false
+        isQualityControlHovered = false
+        isEpisodeControlHovered = false
+        isNextEpisodeHovered = false
+        isSettingsMenuHovered = false
+        isSubtitleControlHovered = false
+    }
+
+    LaunchedEffect(playingInfoCache?.parentGuid) {
+        val parentGuid = playingInfoCache?.parentGuid
+        if (isEpisode && !parentGuid.isNullOrBlank()) {
+            episodeListViewModel.loadData(parentGuid)
+        }
+    }
+
+    LaunchedEffect(episodeListState) {
+        if (episodeListState is UiState.Success) {
+            episodeList = (episodeListState as UiState.Success<List<EpisodeListResponse>>).data
+        }
+    }
+
+    val playEpisode = remember(
+        mediaPlayer,
+        playInfoViewModel,
+        userInfoViewModel,
+        streamViewModel,
+        playPlayViewModel,
+        playRecordViewModel,
+        playerViewModel,
+        playerManager,
+        mp4Parser
+    ) {
+        { episodeGuid: String ->
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                // 1. Quit current media if needed
+                if (playingInfoCache?.isUseDirectLink == false) {
+                    mediaPViewModel.quit(
+                        MediaPRequest(
+                            playLink = playingInfoCache?.playLink ?: ""
+                        ),
+                        updateState = false
+                    )
+                }
+                
+                // 2. Play new media
+                try {
+                    playerManager.setLoading(true)
+                    playMedia(
+                        guid = episodeGuid,
+                        player = mediaPlayer,
+                        playInfoViewModel = playInfoViewModel,
+                        userInfoViewModel = userInfoViewModel,
+                        streamViewModel = streamViewModel,
+                        playPlayViewModel = playPlayViewModel,
+                        playRecordViewModel = playRecordViewModel,
+                        playerViewModel = playerViewModel,
+                        playerManager = playerManager,
+                        mediaGuid = null,
+                        currentAudioGuid = null,
+                        currentSubtitleGuid = null,
+                        mp4Parser = mp4Parser
+                    )
+                } finally {
+                    playerManager.setLoading(false)
+                }
+            }
+        }
+    }
+
+    val currentEpisodeIndex = remember(episodeList, playingInfoCache) {
+        episodeList.indexOfFirst { it.guid == playingInfoCache?.itemGuid }
+    }
+    
+    val nextEpisode = remember(episodeList, currentEpisodeIndex) {
+        if (currentEpisodeIndex != -1 && currentEpisodeIndex < episodeList.size - 1) {
+            episodeList[currentEpisodeIndex + 1]
+        } else {
+            null
+        }
+    }
+
+    // Auto Play Logic
+    LaunchedEffect(playState, isAutoPlay, nextEpisode) {
+        if (isAutoPlay && playState == PlaybackState.FINISHED && nextEpisode != null) {
+             playEpisode(nextEpisode.guid)
+        }
+    }
+
     val resetQualityState by mediaPViewModel.resetQualityState.collectAsState()
     val quitMediaState by mediaPViewModel.quitState.collectAsState()
     val iso6391State by tagViewModel.iso6391State.collectAsState()
@@ -343,6 +474,11 @@ fun PlayerOverlay(
         audioLevelController?.setVolume(savedVolume)
     }
 
+    val aspectRatioFeature = remember(mediaPlayer) { mediaPlayer.features[VideoAspectRatio] }
+    LaunchedEffect(aspectRatioFeature) {
+        aspectRatioFeature?.setMode(AspectRatioMode.FIT)
+    }
+
     var showSubtitleSearchDialog by remember { mutableStateOf(false) }
     var showAddNasSubtitleDialog by remember { mutableStateOf(false) }
     var showDeleteSubtitleDialog by remember { mutableStateOf(false) }
@@ -353,8 +489,8 @@ fun PlayerOverlay(
     val subtitleUploadViewModel: SubtitleUploadViewModel = koinViewModel()
     val subtitleUploadState by subtitleUploadViewModel.uiState.collectAsState()
 
-    val streamViewModel: StreamViewModel = koinViewModel()
-    val userInfoViewModel: UserInfoViewModel = koinViewModel()
+//    val streamViewModel: StreamViewModel = koinViewModel()
+//    val userInfoViewModel: UserInfoViewModel = koinViewModel()
 
     val refreshSubtitleList =
         remember(playerViewModel, userInfoViewModel, streamViewModel, subtitleDeleteState) {
@@ -408,42 +544,29 @@ fun PlayerOverlay(
             subtitleUploadViewModel.clearError()
         }
     }
-
-    var currentResolution by remember { mutableStateOf("") }
-    var currentBitrate by remember { mutableStateOf<Int?>(null) }
-
-    // Initialize quality
-    if (currentResolution.isEmpty() && playingInfoCache?.currentQualities != null) {
-        val qualities = playingInfoCache!!.currentQualities!!
-        val saved = PlayingSettingsStore.getQuality()
-        var found = false
-        if (saved != null) {
-            val matched =
-                qualities.find { it.resolution == saved.resolution && (saved.bitrate == null || it.bitrate == saved.bitrate) }
-            if (matched != null) {
-                currentResolution = matched.resolution
-                currentBitrate = matched.bitrate
-                found = true
-            } else {
-                // Try match resolution only, pick highest bitrate
-                val matchedRes = qualities.filter { it.resolution == saved.resolution }
-                    .maxByOrNull { it.bitrate }
-                if (matchedRes != null) {
-                    currentResolution = matchedRes.resolution
-                    currentBitrate = matchedRes.bitrate
-                    found = true
-                }
-            }
-        }
-
-        if (!found) {
-            val default = qualities.firstOrNull()
-            if (default != null) {
-                currentResolution = default.resolution
-                currentBitrate = default.bitrate
+    LaunchedEffect(playPlayState) {
+        if (playPlayState is UiState.Success) {
+            (playPlayState as UiState.Success<PlayPlayResponse>).data.let { playResponse ->
+                val newPlayLink = playResponse.playLink
+                playerViewModel.updatePlayingInfo(
+                    playingInfoCache?.copy(
+                        playLink = newPlayLink,
+                        isUseDirectLink = false
+                    )
+                )
+                val extraFiles =
+                    playingInfoCache?.currentSubtitleStream?.let { getMediaExtraFiles(it) }
+                        ?: MediaExtraFiles()
+                startPlayback(
+                    mediaPlayer,
+                    newPlayLink,
+                    mediaPlayer.getCurrentPositionMillis(),
+                    extraFiles
+                )
             }
         }
     }
+
     LaunchedEffect(quitMediaState) {
         if (quitMediaState is UiState.Success) {
             logger.i("Quality switch: Switching to Direct Link")
@@ -469,43 +592,12 @@ fun PlayerOverlay(
             val response =
                 (resetQualityState as UiState.Success<*>).data as? MediaResetQualityResponse
             if (response != null && response.result == "succ") {
-                val cache = playingInfoCache
-                if (cache != null) {
-                    val startPos = mediaPlayer.getCurrentPositionMillis()
-
-                    var newPlayLink = ""
-                    val videoStream = cache.currentVideoStream
-
-                    if (!cache.isUseDirectLink) {
-                        val forcedSdr = if (videoStream.colorRangeType != "SDR") 1 else 0
-                        val playRequest = createPlayRequest(
-                            videoStream,
-                            cache.currentFileStream,
-                            cache.currentAudioStream?.guid ?: "",
-                            cache.currentSubtitleStream?.guid,
-                            forcedSdr
-                        )
-                        try {
-                            val playResponse = playPlayViewModel.loadDataAndWait(playRequest)
-                            newPlayLink = playResponse.playLink
-                            playerViewModel.updatePlayingInfo(cache.copy(playLink = newPlayLink))
-                        } catch (e: Exception) {
-                            logger.e("Failed to fetch HLS link", e)
-                        }
-                    }
-
-                    val extraFiles = cache.currentSubtitleStream?.let { getMediaExtraFiles(it) }
-                        ?: MediaExtraFiles()
-//                    mediaPlayer.stopPlayback()
-                    startPlayback(mediaPlayer, newPlayLink, startPos, extraFiles)
-                }
                 mediaPViewModel.clearError()
             }
         }
     }
 
     val totalDuration = playerManager.playerState.duration
-    val playState by mediaPlayer.playbackState.collectAsState()
     val videoProgress = if (totalDuration > 0) {
         (currentPosition.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
     } else {
@@ -513,9 +605,6 @@ fun PlayerOverlay(
     }
 
     val videoBuffered by remember { mutableFloatStateOf(0f) }
-
-    // 获取播放记录 ViewModel
-    val playRecordViewModel: PlayRecordViewModel = koinViewModel()
 
     // 上一次播放状态
     var lastPlayState by remember { mutableStateOf<PlaybackState?>(null) }
@@ -592,6 +681,80 @@ fun PlayerOverlay(
         }
     }
     val windowState = LocalWindowState.current
+
+    // region Window Resize Logic
+    var isProgrammaticResize by remember { mutableStateOf(true) }
+
+    DisposableEffect(Unit) {
+        val originalWidth = windowState.size.width
+        val originalHeight = windowState.size.height
+        val originalPlacement = windowState.placement
+
+        // Save main window size on entry
+        if (originalPlacement != WindowPlacement.Fullscreen && originalPlacement != WindowPlacement.Maximized) {
+            AppSettingsStore.windowWidth = originalWidth.value
+            AppSettingsStore.windowHeight = originalHeight.value
+        }
+
+        // Apply Player Fullscreen preference
+        if (AppSettingsStore.playerIsFullscreen) {
+            windowState.placement = WindowPlacement.Fullscreen
+        }
+
+        onDispose {
+            // Save Player Preference on exit
+            if (windowState.placement == WindowPlacement.Fullscreen) {
+                AppSettingsStore.playerIsFullscreen = true
+            } else {
+                AppSettingsStore.playerIsFullscreen = false
+                // Note: playerWindowWidth/Height are updated via LaunchedEffect below
+            }
+
+            // Restore Main Window State
+            windowState.placement = originalPlacement
+            if (originalPlacement != WindowPlacement.Fullscreen && originalPlacement != WindowPlacement.Maximized) {
+                windowState.size = DpSize(originalWidth, originalHeight)
+            }
+        }
+    }
+
+    // Dynamic Resize based on Video
+    LaunchedEffect(playingInfoCache?.currentVideoStream, windowAspectRatio) {
+        val videoStream = playingInfoCache?.currentVideoStream
+        if (videoStream != null && !AppSettingsStore.playerIsFullscreen && windowState.placement != WindowPlacement.Fullscreen) {
+            val baseWidth = AppSettingsStore.playerWindowWidth
+            val baseHeight = AppSettingsStore.playerWindowHeight
+
+            val optimalSize = calculateOptimalPlayerWindowSize(
+                videoStream,
+                baseWidth,
+                baseHeight,
+                windowAspectRatio
+            )
+            if (optimalSize != null) {
+                isProgrammaticResize = true
+                windowState.size = optimalSize
+            }
+        }
+    }
+
+    // Monitor Manual Resize
+    LaunchedEffect(windowState) {
+        snapshotFlow { windowState.size }
+            .debounce(500)
+            .collect { size ->
+                if (isProgrammaticResize) {
+                    isProgrammaticResize = false
+                } else {
+                    if (windowState.placement != WindowPlacement.Fullscreen && windowState.placement != WindowPlacement.Maximized) {
+                        AppSettingsStore.playerWindowWidth = size.width.value
+                        AppSettingsStore.playerWindowHeight = size.height.value
+                    }
+                }
+            }
+    }
+    // endregion
+
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -602,7 +765,7 @@ fun PlayerOverlay(
         LocalToastManager provides toastManager,
         LocalFileInfo provides playingInfoCache?.currentFileStream
     ) {
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .hoverable(interactionSource)
@@ -628,21 +791,10 @@ fun PlayerOverlay(
                     true
                 )
         ) {
-            if (windowState.placement != WindowPlacement.Fullscreen) {
-                // 添加标题栏占位区域，允许窗口拖动
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp) // 与标题栏高度一致
-                )
-            }
-
             // 视频层 - 从标题栏下方开始显示
             MediampPlayerSurface(
                 mediaPlayer, Modifier
-                    .fillMaxSize()
-//                    .padding(top = if (windowState.placement != WindowPlacement.Fullscreen) 48.dp else 0.dp)
-                    .padding(top = 0.dp)
+                    .size(maxWidth, maxHeight)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null,
@@ -656,8 +808,19 @@ fun PlayerOverlay(
                         uiVisible = true
                         isCursorVisible = true
                     })
+
+            if (windowState.placement != WindowPlacement.Fullscreen) {
+                // 添加标题栏占位区域，允许窗口拖动
+                draggableArea {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp) // 与标题栏高度一致
+                    )
+                }
+            }
             // 加载进度条
-            if (playState == PlaybackState.READY || playState == PlaybackState.PAUSED_BUFFERING) {
+            if (playState == PlaybackState.READY || playState == PlaybackState.PAUSED_BUFFERING || playerManager.playerState.isLoading) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize(),
@@ -675,7 +838,6 @@ fun PlayerOverlay(
                     isEpisode = isEpisode,
                     onBack = onBack,
                     mediaPlayer = mediaPlayer,
-                    playerViewModel = playerViewModel,
                     windowState = windowState,
                     platform = platform
                 )
@@ -687,11 +849,8 @@ fun PlayerOverlay(
                     videoProgress = videoProgress,
                     totalDuration = totalDuration,
                     playingInfoCache = playingInfoCache,
-                    currentResolution = currentResolution,
-                    currentBitrate = currentBitrate,
                     isoTagData = isoTagData,
                     lastVolume = lastVolume,
-                    playRecordViewModel = playRecordViewModel,
                     onProgressBarHoverChanged = { isProgressBarHovered = it },
                     onResetMouseMoveTimer = { lastMouseMoveTime = System.currentTimeMillis() },
                     onSeek = { newProgress ->
@@ -721,10 +880,7 @@ fun PlayerOverlay(
                             mediaPlayer,
                             playerViewModel,
                             mediaPViewModel,
-                            updateResolution = { res, bitrate ->
-                                currentResolution = res
-                                currentBitrate = bitrate
-                            }
+                            playPlayViewModel
                         )
                     },
                     onAudioSelected = { audio ->
@@ -798,7 +954,28 @@ fun PlayerOverlay(
                         subtitleToDelete = subtitle
                         showDeleteSubtitleDialog = true
                     },
-                    onLastVolumeChange = { lastVolume = it }
+                    onLastVolumeChange = { lastVolume = it },
+                    onWindowAspectRatioChanged = {
+                        windowAspectRatio = it
+                        AppSettingsStore.playerWindowAspectRatio = it
+                    },
+                    episodeList = episodeList,
+                    currentEpisodeGuid = playingInfoCache?.itemGuid ?: "",
+                    onEpisodeSelected = { episode -> playEpisode(episode.guid) },
+                    isAutoPlay = isAutoPlay,
+                    onAutoPlayChanged = {
+                        isAutoPlay = it
+                        AppSettingsStore.autoPlay = it
+                    },
+                    onEpisodeControlHoverChanged = { isEpisodeControlHovered = it },
+                    nextEpisode = nextEpisode,
+                    onNextEpisode = {
+                         if (nextEpisode != null) {
+                             playEpisode(nextEpisode.guid)
+                         }
+                    },
+                    isNextEpisodeHovered = isNextEpisodeHovered,
+                    onNextEpisodeHoverChanged = { isNextEpisodeHovered = it }
                 )
             }
 
@@ -910,9 +1087,6 @@ fun PlayerControlRow(
     videoProgress: Float,
     totalDuration: Long,
     playingInfoCache: PlayingInfoCache? = null,
-    qualities: List<QualityResponse>? = null,
-    currentResolution: String = "",
-    currentBitrate: Int? = null,
     onSpeedControlHoverChanged: ((Boolean) -> Unit)? = null,
     onVolumeControlHoverChanged: ((Boolean) -> Unit)? = null,
     onQualityControlHoverChanged: ((Boolean) -> Unit)? = null,
@@ -927,7 +1101,18 @@ fun PlayerControlRow(
     onSettingsMenuHoverChanged: ((Boolean) -> Unit)? = null,
     onRequestDeleteSubtitle: ((SubtitleStream) -> Unit)? = null,
     lastVolume: Float = 0f,
-    onLastVolumeChange: (Float) -> Unit = {}
+    onLastVolumeChange: (Float) -> Unit = {},
+    onWindowAspectRatioChanged: (String) -> Unit = {},
+    episodeList: List<EpisodeListResponse> = emptyList(),
+    currentEpisodeGuid: String? = null,
+    onEpisodeSelected: ((EpisodeListResponse) -> Unit)? = null,
+    isAutoPlay: Boolean = false,
+    onAutoPlayChanged: ((Boolean) -> Unit)? = null,
+    onEpisodeControlHoverChanged: ((Boolean) -> Unit)? = null,
+    nextEpisode: EpisodeListResponse? = null,
+    onPlayNextEpisode: (() -> Unit)? = null,
+    isNextEpisodeHovered: Boolean = false,
+    onNextEpisodeHoverChanged: ((Boolean) -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     Row(
@@ -962,6 +1147,7 @@ fun PlayerControlRow(
                             }
                         })
             )
+
             Icon(
                 imageVector = Back10S,
                 contentDescription = "快退10s",
@@ -988,6 +1174,14 @@ fun PlayerControlRow(
                             mediaPlayer.skip(10_000)
                         })
             )
+            // 下一集按钮
+            if (nextEpisode != null) {
+                NextEpisodePreviewFlyout(
+                    nextEpisode = nextEpisode,
+                    onClick = { onPlayNextEpisode?.invoke() },
+                    onHoverStateChanged = onNextEpisodeHoverChanged
+                )
+            }
             // 当前播放时间 / 总时间
             Text(
                 text = "${FnDataConvertor.formatDurationToDateTime((videoProgress * totalDuration).toLong())} / ${
@@ -1012,12 +1206,24 @@ fun PlayerControlRow(
                     mediaPlayer.features[PlaybackSpeed]?.set(item.value)
                 }
             )
+            if (episodeList.isNotEmpty() && currentEpisodeGuid != null && playingInfoCache?.isEpisode == true) {
+                EpisodeSelectionFlyout(
+                    episodes = episodeList,
+                    currentEpisodeGuid = currentEpisodeGuid,
+                    parentTitle = playingInfoCache.parentTitle ?: "",
+                    onEpisodeSelected = { onEpisodeSelected?.invoke(it) },
+                    isAutoPlay = isAutoPlay,
+                    onAutoPlayChanged = { onAutoPlayChanged?.invoke(it) },
+                    onHoverStateChanged = onEpisodeControlHoverChanged
+                )
+            }
+            val qualities = playingInfoCache?.currentQualities
             if (qualities != null) {
                 QualityControlFlyout(
                     modifier = Modifier,
                     qualities = qualities,
-                    currentResolution = currentResolution,
-                    currentBitrate = currentBitrate,
+                    currentResolution = playingInfoCache.currentQuality?.resolution ?: "",
+                    currentBitrate = playingInfoCache.currentQuality?.bitrate,
                     yOffset = 65,
                     onHoverStateChanged = onQualityControlHoverChanged,
                     onQualitySelected = {
@@ -1051,6 +1257,7 @@ fun PlayerControlRow(
                 onAudioSelected = { audio ->
                     onAudioSelected?.invoke(audio)
                 },
+                onWindowAspectRatioChanged = onWindowAspectRatioChanged,
                 modifier = Modifier.padding(start = 12.dp),
                 onHoverStateChanged = onSettingsMenuHoverChanged
             )
@@ -1077,8 +1284,10 @@ fun PlayerControlRow(
                 onClick = {
                     if (windowState.placement == WindowPlacement.Fullscreen) {
                         windowState.placement = WindowPlacement.Floating
+                        AppSettingsStore.playerIsFullscreen = false
                     } else {
                         windowState.placement = WindowPlacement.Fullscreen
+                        AppSettingsStore.playerIsFullscreen = true
                     }
                 }
             )
@@ -1108,7 +1317,6 @@ fun rememberPlayMediaFunction(
     val playRecordViewModel: PlayRecordViewModel = koinViewModel()
     val playerViewModel: PlayerViewModel = koinViewModel()
     val mp4Parser: Mp4Parser = koinInject()
-    val scope = rememberCoroutineScope()
     val playerManager = LocalPlayerManager.current
     return remember(
         streamViewModel,
@@ -1123,22 +1331,27 @@ fun rememberPlayMediaFunction(
         mp4Parser
     ) {
         {
-            scope.launch {
-                playMedia(
-                    guid = guid,
-                    player = player,
-                    playInfoViewModel = playInfoViewModel,
-                    userInfoViewModel = userInfoViewModel,
-                    streamViewModel = streamViewModel,
-                    playPlayViewModel = playPlayViewModel,
-                    playRecordViewModel = playRecordViewModel,
-                    playerViewModel = playerViewModel,
-                    playerManager = playerManager,
-                    mediaGuid = mediaGuid,
-                    currentAudioGuid = currentAudioGuid,
-                    currentSubtitleGuid = currentSubtitleGuid,
-                    mp4Parser = mp4Parser
-                )
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                try {
+                    playerManager.setLoading(true)
+                    playMedia(
+                        guid = guid,
+                        player = player,
+                        playInfoViewModel = playInfoViewModel,
+                        userInfoViewModel = userInfoViewModel,
+                        streamViewModel = streamViewModel,
+                        playPlayViewModel = playPlayViewModel,
+                        playRecordViewModel = playRecordViewModel,
+                        playerViewModel = playerViewModel,
+                        playerManager = playerManager,
+                        mediaGuid = mediaGuid,
+                        currentAudioGuid = currentAudioGuid,
+                        currentSubtitleGuid = currentSubtitleGuid,
+                        mp4Parser = mp4Parser
+                    )
+                } finally {
+                    playerManager.setLoading(false)
+                }
             }
         }
     }
@@ -1160,15 +1373,15 @@ private suspend fun playMedia(
     mp4Parser: Mp4Parser
 ) {
     try {
-        // 获取播放信息
-        val playInfoResponse = playInfoViewModel.loadDataAndWait(guid, mediaGuid)
+        // 1. Fetch Basic Info (IO)
+        val (playInfoResponse, userInfo, streamInfo) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val p = playInfoViewModel.loadDataAndWait(guid, mediaGuid)
+            val u = getUserInfo(userInfoViewModel)
+            val s = fetchStreamInfo(p, u, streamViewModel)
+            Triple(p, u, s)
+        }
+
         val startPosition: Long = playInfoResponse.ts.toLong() * 1000
-
-        // 获取用户信息
-        val userInfo = getUserInfo(userInfoViewModel)
-
-        // 获取流信息
-        val streamInfo = fetchStreamInfo(playInfoResponse, userInfo, streamViewModel)
         val videoStream = streamInfo.videoStream
         val audioStream =
             streamInfo.audioStreams.first { audioStream -> audioStream.guid == playInfoResponse.audioGuid }
@@ -1202,15 +1415,17 @@ private suspend fun playMedia(
             createPlayRequest(videoStream, fileStream, audioGuid, subtitleGuid, forcedSdr)
 
         // 获取播放链接
-        val playLinkResult = resolvePlayLink(
-            playRequest,
-            cache,
-            streamInfo,
-            startPosition,
-            mp4Parser,
-            playPlayViewModel,
-            playInfoResponse
-        )
+        val playLinkResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            resolvePlayLink(
+                playRequest,
+                cache,
+                streamInfo,
+                startPosition,
+                mp4Parser,
+                playPlayViewModel,
+                playInfoResponse
+            )
+        }
 
         // 缓存播放信息
         val finalCache = cache.copy(
@@ -1226,7 +1441,12 @@ private suspend fun playMedia(
             mediaExtraFiles
         } ?: MediaExtraFiles()
         // 启动播放器
-        startPlayback(player, playLinkResult.playLink, playLinkResult.effectiveStartPosition, extraFiles)
+        startPlayback(
+            player,
+            playLinkResult.playLink,
+            playLinkResult.effectiveStartPosition,
+            extraFiles
+        )
         // 调用playRecord接口
         callPlayRecord(
 //            itemGuid = guid,
@@ -1345,17 +1565,21 @@ private suspend fun startPlayback(
 //        headers["Authorization"] = AccountDataCache.authorization
         val extraFilesStr = PlayerScreen.mapper.writeValueAsString(extraFiles)
         logger.i("play param: headers: $headers, playUri: $baseUrl$playLink, extraFiles: $extraFilesStr")
-        player.playUri("$baseUrl$playLink", headers, extraFiles)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            player.playUri("$baseUrl$playLink", headers, extraFiles)
+        }
     } else {
-        player.playUri(
-            "$baseUrl$playLink",
-            extraFiles = extraFiles
-        )
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            player.playUri(
+                "$baseUrl$playLink",
+                extraFiles = extraFiles
+            )
+        }
     }
     if (!isDirectLink) {
         delay(1000) // 等待播放器初始化
     } else {
-        delay(500) // 延迟500ms，等待播放器初始化
+        delay(200)
     }
     player.features[PlaybackSpeed]?.set(1.0f)
     // 恢复音量
@@ -1385,6 +1609,35 @@ private suspend fun getUserInfo(userInfoViewModel: UserInfoViewModel): UserInfoR
     }
 }
 
+private fun initializeQuality(qualities: List<QualityResponse>?): QualityResponse? {
+    if (qualities.isNullOrEmpty()) return null
+
+    val saved = PlayingSettingsStore.getQuality()
+    var result: QualityResponse? = null
+
+    if (saved != null) {
+        val matched =
+            qualities.find { it.resolution == saved.resolution && (saved.bitrate == null || it.bitrate == saved.bitrate) }
+        if (matched != null) {
+            result = matched
+        } else {
+            // Try match resolution only, pick highest bitrate
+            val matchedRes = qualities.filter { it.resolution == saved.resolution }
+                .maxByOrNull { it.bitrate }
+            if (matchedRes != null) {
+                result = matchedRes
+            }
+        }
+    }
+
+    if (result == null) {
+        result = qualities.firstOrNull()
+    }
+
+    logger.i("Initialize quality, Current resolution: ${result?.resolution}, bitrate: ${result?.bitrate}")
+    return result
+}
+
 private fun createPlayingInfoCache(
     streamInfo: StreamResponse,
     fileStream: FileInfo,
@@ -1393,6 +1646,7 @@ private fun createPlayingInfoCache(
     subtitleStream: SubtitleStream?,
     playInfoResponse: PlayInfoResponse
 ): PlayingInfoCache {
+    val currentQuality = initializeQuality(streamInfo.qualities)
     return PlayingInfoCache(
         streamInfo,
         "",
@@ -1401,9 +1655,13 @@ private fun createPlayingInfoCache(
         audioStream,
         subtitleStream,
         playInfoResponse.item.guid,
+        playInfoResponse.item.parentGuid,
+        playInfoResponse.item.parentTitle,
         streamInfo.qualities,
+        currentQuality = currentQuality,
         currentAudioStreamList = streamInfo.audioStreams,
-        currentSubtitleStreamList = streamInfo.subtitleStreams
+        currentSubtitleStreamList = streamInfo.subtitleStreams,
+        isEpisode = playInfoResponse.type == FnTvMediaType.EPISODE.value
     )
 }
 
@@ -1425,13 +1683,15 @@ private fun showPlayerUI(
             playInfoResponse.item.tvTitle,
             subhead,
             videoDuration,
-            isEpisode = true
+            isEpisode = true,
+            isLoading = true
         )
     } else {
         playerManager.showPlayer(
             guid,
             playInfoResponse.item.title ?: "",
-            duration = videoDuration
+            duration = videoDuration,
+            isLoading = true
         )
     }
 }
@@ -1483,6 +1743,80 @@ private suspend fun resolvePlayLink(
             }
             throw e
         }
+    }
+}
+
+private fun calculateOptimalPlayerWindowSize(
+    videoStream: VideoStream,
+    baseWidth: Float,
+    baseHeight: Float,
+    aspectRatioSetting: String = "AUTO"
+): DpSize? {
+    val videoW = videoStream.width.toFloat()
+    val videoH = videoStream.height.toFloat()
+
+    if (videoW <= 0 || videoH <= 0) return null
+
+    // Determine target aspect ratio
+    val targetAspectRatio = when (aspectRatioSetting) {
+        "4:3" -> 4f / 3f
+        "16:9" -> 16f / 9f
+        "21:9" -> 21f / 9f
+        else -> parseAspectRatio(videoStream.displayAspectRatio) ?: (videoW / videoH)
+    }
+
+    var targetH = baseHeight
+    var targetW = baseWidth
+
+    val currentAspectRatio = if (baseHeight > 0) baseWidth / baseHeight else targetAspectRatio
+
+    // Compensation only applies in AUTO mode
+    val compensation =
+        if (aspectRatioSetting == "AUTO") AppSettingsStore.playerWindowWidthCompensation else 0f
+
+    // Logic to expand window rather than shrink content
+    if (targetAspectRatio > currentAspectRatio) {
+        // Wider target: Keep Height, Expand Width
+        targetH = baseHeight
+        targetW = targetH * targetAspectRatio
+        targetW += compensation
+    } else {
+        // Narrower/Taller target: Keep Width, Expand Height
+        targetW = baseWidth
+        targetH = targetW / targetAspectRatio
+        // No width compensation needed when keeping baseWidth
+    }
+
+    // Constraints: +/- 50% of Base (Applied to Result)
+    val minW = baseWidth * 0.5f
+    val maxW = baseWidth * 1.5f
+
+    // Clamp width if needed (though Expand logic usually stays reasonable unless base was very distorted)
+    if (targetW < minW) targetW = minW
+    if (targetW > maxW) targetW = maxW
+
+    if (targetW != (if (targetAspectRatio > currentAspectRatio) baseHeight * targetAspectRatio + compensation else baseWidth)) {
+
+        val effectiveW = targetW - compensation
+        targetH = effectiveW / targetAspectRatio
+    }
+
+    return DpSize(targetW.dp, targetH.dp)
+}
+
+private fun parseAspectRatio(dar: String?): Float? {
+    if (dar.isNullOrBlank()) return null
+    return try {
+        val parts = dar.split(":")
+        if (parts.size == 2) {
+            val w = parts[0].toFloat()
+            val h = parts[1].toFloat()
+            if (h > 0) w / h else null
+        } else {
+            null
+        }
+    } catch (e: Exception) {
+        null
     }
 }
 
@@ -1591,8 +1925,16 @@ private fun handlePlayerKeyEvent(
             Key.F -> {
                 if (windowState.placement == WindowPlacement.Fullscreen) {
                     windowState.placement = WindowPlacement.Floating
+                    AppSettingsStore.playerIsFullscreen = false
                 } else {
                     windowState.placement = WindowPlacement.Fullscreen
+                    AppSettingsStore.playerIsFullscreen = true
+                }
+            }
+            Key.Escape -> {
+                if (windowState.placement == WindowPlacement.Fullscreen) {
+                    windowState.placement = WindowPlacement.Floating
+                    AppSettingsStore.playerIsFullscreen = false
                 }
             }
 
@@ -1610,16 +1952,14 @@ private fun handleQualitySelection(
     mediaPlayer: MediampPlayer,
     playerViewModel: PlayerViewModel,
     mediaPViewModel: MediaPViewModel,
-    updateResolution: (String, Int?) -> Unit
+    playPlayViewModel: PlayPlayViewModel
 ) {
-    updateResolution(quality.resolution, quality.bitrate)
     PlayingSettingsStore.saveQuality(quality.resolution, quality.bitrate)
-
-    val cache = playingInfoCache
-    if (cache != null) {
-        val currentQuality = cache.currentQuality
-        val originalQuality = cache.streamInfo.qualities.firstOrNull()
-        val videoStream = cache.currentVideoStream
+//    logger.i("1 change quality to: ${quality.resolution}")
+    if (playingInfoCache != null) {
+        val currentQuality = playingInfoCache.currentQuality
+        val originalQuality = playingInfoCache.streamInfo.qualities.firstOrNull()
+        val videoStream = playingInfoCache.currentVideoStream
         val currentResolution = quality.resolution
         val currentBitrate = quality.bitrate
 
@@ -1630,10 +1970,15 @@ private fun handleQualitySelection(
 
         val canUseDirectLink = videoStream.wrapper == "MP4" &&
                 videoStream.colorRangeType == "SDR"
+        logger.i(
+            "change quality to: ${quality.resolution}, useDirectLink: ${playingInfoCache.isUseDirectLink}, " +
+                    "originalQuality: ${originalQuality}, canUseDirectLink: ${canUseDirectLink}, isTargetOriginalQuality: $isTargetOriginalQuality"
+        )
         // If currently not using direct link, and video can be direct linked, and target quality is original, call media.quit
-        if (!cache.isUseDirectLink && isTargetOriginalQuality && canUseDirectLink) {
+        if (!playingInfoCache.isUseDirectLink && isTargetOriginalQuality && canUseDirectLink) {
+            logger.i("switch to direct link")
             playerViewModel.updatePlayingInfo(
-                cache.copy(
+                playingInfoCache.copy(
                     currentQuality = quality,
                     isUseDirectLink = true,
                     playLink = null
@@ -1641,17 +1986,16 @@ private fun handleQualitySelection(
             )
             mediaPViewModel.quit(
                 MediaPRequest(
-                    playLink = cache.playLink ?: ""
+                    playLink = playingInfoCache.playLink ?: ""
                 )
             )
         }
         // If current video can be direct linked and target is not original, or cannot be direct linked and target is original, call media.resetQuality
-        // If currently using direct link and switching to other quality, no need to call media.resetQuality (handled by quit logic?) 
-        // Wait, the logic in original code was: if(!cache.isUseDirectLink) { ... }
-        if (!cache.isUseDirectLink) {
-            if ((!isTargetOriginalQuality && canUseDirectLink) || (!canUseDirectLink && isTargetOriginalQuality)) {
+        if (!playingInfoCache.isUseDirectLink) {
+            if ((!isTargetOriginalQuality && canUseDirectLink) || !canUseDirectLink) {
+                logger.i("call reset quality")
                 playerViewModel.updatePlayingInfo(
-                    cache.copy(
+                    playingInfoCache.copy(
                         currentQuality = quality,
                         isUseDirectLink = false
                     )
@@ -1659,7 +2003,7 @@ private fun handleQualitySelection(
                 val request = MediaPRequest(
                     req = "media.resetQuality",
                     reqId = "${System.currentTimeMillis()}",
-                    playLink = cache.playLink ?: "",
+                    playLink = playingInfoCache.playLink ?: "",
                     quality = MediaPRequest.Quality(
                         quality.resolution,
                         quality.bitrate
@@ -1669,16 +2013,39 @@ private fun handleQualitySelection(
                 )
                 mediaPViewModel.resetQuality(request)
                 playerViewModel.updatePlayingInfo(
-                    cache.copy(
+                    playingInfoCache.copy(
                         currentQuality = quality,
                         isUseDirectLink = false
                     )
                 )
             }
         }
+        if (playingInfoCache.isUseDirectLink) {
+            logger.i("switch to HLS")
+            val forcedSdr = if (videoStream.colorRangeType != "SDR") 1 else 0
+            val playRequest = createPlayRequest(
+                videoStream,
+                playingInfoCache.currentFileStream,
+                playingInfoCache.currentAudioStream?.guid ?: "",
+                playingInfoCache.currentSubtitleStream?.guid,
+                forcedSdr
+            )
+            playerViewModel.updatePlayingInfo(
+                playingInfoCache.copy(
+                    currentQuality = quality,
+                    isUseDirectLink = false
+                )
+            )
+            try {
+                playPlayViewModel.loadData(playRequest)
+            } catch (e: Exception) {
+                logger.e("Failed to fetch HLS link", e)
+            }
+        }
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun PlayerTopBar(
     mediaTitle: String,
@@ -1686,15 +2053,18 @@ fun PlayerTopBar(
     isEpisode: Boolean,
     onBack: () -> Unit,
     mediaPlayer: MediampPlayer,
-    playerViewModel: PlayerViewModel,
     windowState: WindowState,
     platform: Platform
 ) {
+    val mediaPViewModel: MediaPViewModel = koinViewModel()
+    val playerViewModel: PlayerViewModel = koinViewModel()
+    val playingInfoCache by playerViewModel.playingInfoCache.collectAsState()
     if (platform is Platform.MacOS) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-//                .padding(top = 10.dp)
+                .padding(top = 5.dp),
+            contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
@@ -1708,9 +2078,6 @@ fun PlayerTopBar(
                         mediaPlayer.stopPlayback()
                         playerViewModel.updatePlayingInfo(null)
                         onBack()
-                        if (windowState.placement == WindowPlacement.Fullscreen) {
-                            windowState.placement = WindowPlacement.Floating
-                        }
                     },
                     interaction = interaction,
                     icon = {
@@ -1749,22 +2116,47 @@ fun PlayerTopBar(
             horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = ArrowLeft,
-                contentDescription = "返回",
-                tint = Color.White,
+            var isHovered by remember { mutableStateOf(false) }
+            Box(
                 modifier = Modifier
-                    .size(20.dp)
-                    .clickable(onClick = {
-                        mediaPlayer.stopPlayback()
-                        // 清除缓存
-                        playerViewModel.updatePlayingInfo(null)
-                        onBack()
-                        if (windowState.placement == WindowPlacement.Fullscreen) {
-                            windowState.placement = WindowPlacement.Floating
+                    .size(30.dp)
+                    .background(
+                        color = if (isHovered) Color.White.copy(alpha = 0.1f) else Color.Transparent,
+                        shape = CircleShape
+                    )
+                    .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+                    .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {
+                            mediaPlayer.stopPlayback()
+                            playingInfoCache?.isUseDirectLink?.let {
+                                if (!it) {
+                                    mediaPViewModel.quit(
+                                        MediaPRequest(
+                                            playLink = playingInfoCache?.playLink
+                                                ?: ""
+                                        ),
+                                        updateState = false
+                                    )
+                                }
+                            }
+                            // 清除缓存
+                            playerViewModel.updatePlayingInfo(null)
+                            onBack()
                         }
-                    })
-            )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = ArrowLeft,
+                    contentDescription = "返回",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(20.dp)
+                )
+            }
             if (isEpisode) {
                 Text(
                     text = buildEpisodeTitle(mediaTitle, subhead),
@@ -1850,6 +2242,7 @@ fun PlayerDialogs(
                 ContentDialogButton.Primary -> {
                     onSubtitleDeleteConfirm()
                 }
+
                 else -> {}
             }
             onDeleteSubtitleDialogDismiss()
@@ -1874,11 +2267,8 @@ fun PlayerBottomBar(
     videoProgress: Float,
     totalDuration: Long,
     playingInfoCache: PlayingInfoCache?,
-    currentResolution: String,
-    currentBitrate: Int?,
     isoTagData: IsoTagData,
     lastVolume: Float,
-    playRecordViewModel: PlayRecordViewModel,
     onProgressBarHoverChanged: (Boolean) -> Unit,
     onResetMouseMoveTimer: () -> Unit,
     onSeek: (Float) -> Unit,
@@ -1894,7 +2284,18 @@ fun PlayerBottomBar(
     onSubtitleControlHoverChanged: (Boolean) -> Unit,
     onSettingsMenuHoverChanged: (Boolean) -> Unit,
     onRequestDeleteSubtitle: (SubtitleStream) -> Unit,
-    onLastVolumeChange: (Float) -> Unit
+    onLastVolumeChange: (Float) -> Unit,
+    onWindowAspectRatioChanged: (String) -> Unit,
+    episodeList: List<EpisodeListResponse> = emptyList(),
+    currentEpisodeGuid: String = "",
+    onEpisodeSelected: ((EpisodeListResponse) -> Unit)? = null,
+    isAutoPlay: Boolean = false,
+    onAutoPlayChanged: ((Boolean) -> Unit)? = null,
+    onEpisodeControlHoverChanged: ((Boolean) -> Unit)? = null,
+    nextEpisode: EpisodeListResponse? = null,
+    onNextEpisode: (() -> Unit)? = null,
+    isNextEpisodeHovered: Boolean = false,
+    onNextEpisodeHoverChanged: ((Boolean) -> Unit)? = null
 ) {
     Column(
         modifier = Modifier
@@ -1927,9 +2328,6 @@ fun PlayerBottomBar(
                 videoProgress,
                 totalDuration,
                 playingInfoCache = playingInfoCache,
-                qualities = playingInfoCache?.currentQualities,
-                currentResolution = currentResolution,
-                currentBitrate = currentBitrate,
                 onSpeedControlHoverChanged = onSpeedControlHoverChanged,
                 onVolumeControlHoverChanged = onVolumeControlHoverChanged,
                 onQualityControlHoverChanged = onQualityControlHoverChanged,
@@ -1944,7 +2342,18 @@ fun PlayerBottomBar(
                 onSettingsMenuHoverChanged = onSettingsMenuHoverChanged,
                 onRequestDeleteSubtitle = onRequestDeleteSubtitle,
                 lastVolume = lastVolume,
-                onLastVolumeChange = onLastVolumeChange
+                onLastVolumeChange = onLastVolumeChange,
+                onWindowAspectRatioChanged = onWindowAspectRatioChanged,
+                episodeList = episodeList,
+                currentEpisodeGuid = currentEpisodeGuid,
+                onEpisodeSelected = onEpisodeSelected,
+                isAutoPlay = isAutoPlay,
+                onAutoPlayChanged = onAutoPlayChanged,
+                onEpisodeControlHoverChanged = onEpisodeControlHoverChanged,
+                nextEpisode = nextEpisode,
+                onPlayNextEpisode = onNextEpisode,
+                isNextEpisodeHovered = isNextEpisodeHovered,
+                onNextEpisodeHoverChanged = onNextEpisodeHoverChanged
             )
         }
     }

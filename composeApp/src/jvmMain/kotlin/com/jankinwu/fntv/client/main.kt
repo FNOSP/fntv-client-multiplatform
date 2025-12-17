@@ -13,7 +13,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
@@ -94,8 +93,15 @@ fun main() = application {
             ) {
                 WindowFrame(
                     onCloseRequest = {
-                        AppSettingsStore.windowWidth = state.size.width.value
-                        AppSettingsStore.windowHeight = state.size.height.value
+                        if (playerManager.playerState.isVisible) {
+                            if (!AppSettingsStore.playerIsFullscreen) {
+                                AppSettingsStore.playerWindowWidth = state.size.width.value
+                                AppSettingsStore.playerWindowHeight = state.size.height.value
+                            }
+                        } else {
+                            AppSettingsStore.windowWidth = state.size.width.value
+                            AppSettingsStore.windowHeight = state.size.height.value
+                        }
                         player.close() // 关闭播放器
                         exitApplication() // 退出应用
                     },
@@ -132,23 +138,14 @@ fun main() = application {
                         )
                     }
                     // 显示播放器覆盖层
-                    if (playerManager.playerState.isVisible && state.placement != WindowPlacement.Fullscreen) {
-                        WindowDraggableArea {
-                            PlayerOverlay(
-                                mediaTitle = playerManager.playerState.mediaTitle,
-                                subhead = playerManager.playerState.subhead,
-                                isEpisode = playerManager.playerState.isEpisode,
-                                onBack = { playerManager.hidePlayer() },
-                                mediaPlayer = player
-                            )
-                        }
-                    } else if (playerManager.playerState.isVisible && state.placement == WindowPlacement.Fullscreen) {
+                    if (playerManager.playerState.isVisible) {
                         PlayerOverlay(
                             mediaTitle = playerManager.playerState.mediaTitle,
                             subhead = playerManager.playerState.subhead,
                             isEpisode = playerManager.playerState.isEpisode,
                             onBack = { playerManager.hidePlayer() },
-                            mediaPlayer = player
+                            mediaPlayer = player,
+                            draggableArea = { content -> WindowDraggableArea(content = content) }
                         )
                     }
                 }

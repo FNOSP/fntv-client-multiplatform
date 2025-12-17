@@ -20,9 +20,12 @@ data class PlayingInfoCache(
     var currentAudioStream: AudioStream? = null,
     var currentSubtitleStream: SubtitleStream? = null,
     val itemGuid: String,
+    val parentGuid: String? = null,
+    val parentTitle: String? = null,
     val currentQualities: List<QualityResponse>? = null,
     val currentQuality: QualityResponse? = null,
     val currentAudioStreamList: List<AudioStream>? = null,
     var currentSubtitleStreamList: List<SubtitleStream>? = null,
-    var isUseDirectLink: Boolean = false
+    var isUseDirectLink: Boolean = false,
+    var isEpisode: Boolean = false,
 )

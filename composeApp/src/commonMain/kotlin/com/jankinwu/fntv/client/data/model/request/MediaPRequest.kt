@@ -1,8 +1,10 @@
 package com.jankinwu.fntv.client.data.model.request
 
 import androidx.compose.runtime.Immutable
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 @Immutable
 data class MediaPRequest(
     @param:JsonProperty("req")

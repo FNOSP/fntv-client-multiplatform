@@ -193,6 +193,9 @@ fun QualityControlFlyout(
                                 }
                                 isExpanded = false
                                 isCustomPage = false
+                                if (!isButtonHovered) {
+                                    onHoverStateChanged?.invoke(false)
+                                }
                             }
                         )
                     }

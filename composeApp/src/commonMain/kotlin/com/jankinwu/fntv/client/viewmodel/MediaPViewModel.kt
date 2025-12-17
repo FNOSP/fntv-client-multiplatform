@@ -82,11 +82,21 @@ class MediaPViewModel : BaseViewModel() {
         }
     }
 
-    fun quit(request: MediaPRequest) {
+    fun quit(request: MediaPRequest, updateState: Boolean = true) {
         request.req = "media.quit"
         request.reqId = "1234567890ABCDEF"
-        loadData(_quitState) {
-            fnOfficialApi.mediaResetQuality(request)
+        if (updateState) {
+            loadData(_quitState) {
+                fnOfficialApi.mediaResetQuality(request)
+            }
+        } else {
+            viewModelScope.launch {
+                try {
+                    fnOfficialApi.mediaResetQuality(request)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
         }
     }
 

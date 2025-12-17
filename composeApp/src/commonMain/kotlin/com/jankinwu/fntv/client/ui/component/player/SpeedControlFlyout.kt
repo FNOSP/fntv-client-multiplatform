@@ -174,6 +174,9 @@ fun SpeedControlFlyout(
                             selectedSpeed = speed
                             isExpanded = false // 点击后立即隐藏
                             onSpeedSelected(speed)
+                            if (!isButtonHovered) {
+                                onHoverStateChanged?.invoke(false)
+                            }
                         },
                         speeds = speeds,
                         selectedSpeed = selectedSpeed,

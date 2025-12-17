@@ -134,9 +134,22 @@ jobs:
         run: |
           choco install innosetup
 
+      - name: Extract App Version
+        shell: powershell
+        run: |
+          $content = Get-Content composeApp/build.gradle.kts
+          $versionLine = $content | Select-String 'val appVersion = "(.*)"'
+          if ($versionLine) {
+            $version = $versionLine.Matches.Groups[1].Value
+            echo "APP_VERSION=$version" >> $env:GITHUB_ENV
+          } else {
+             Write-Error "Could not find appVersion in build.gradle.kts"
+             exit 1
+          }
+
       - name: Build Installer with Inno Setup
-        # 显式传入 amd64 架构参数
-        run: iscc /DMyAppArch=amd64 installer/setup.iss
+        # 显式传入 amd64 架构参数和版本号
+        run: iscc /DMyAppArch=amd64 /DMyAppVersion=${{ env.APP_VERSION }} installer/setup.iss
 
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
@@ -203,8 +216,9 @@ jobs:
           if [[ "${{ github.ref }}" =~ [Aa]lpha ]]; then
             {
               echo "WARNING_TEXT<<EOF"
-              echo "1. 优化 MacOS 端的播放器界面布局"
-              echo "2. 其他 UI 相关优化"
+              echo "1. 播放器现在支持播放剧集时切换分集"
+              echo "2. 支持播放器窗口根据视频比例自动缩放和手动设置播放器窗口比例"
+              echo "3. 其他播放器逻辑和 UI 方面的优化"
               echo ""
               echo "详情请参考 git commit 日志"
               echo ""

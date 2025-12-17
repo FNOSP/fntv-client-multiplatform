@@ -183,18 +183,30 @@ fun SubtitleControlFlyout(
                             onSubtitleSelected = {
                                 onSubtitleSelected(it)
                                 isExpanded = false
+                                if (!isButtonHovered) {
+                                    onHoverStateChanged?.invoke(false)
+                                }
                             },
                             onOpenSubtitleSearch = {
                                 onOpenSubtitleSearch()
                                 isExpanded = false
+                                if (!isButtonHovered) {
+                                    onHoverStateChanged?.invoke(false)
+                                }
                             },
                             onOpenAddNasSubtitle = {
                                 onOpenAddNasSubtitle()
                                 isExpanded = false
+                                if (!isButtonHovered) {
+                                    onHoverStateChanged?.invoke(false)
+                                }
                             },
                             onOpenAddLocalSubtitle = {
                                 onOpenAddLocalSubtitle()
                                 isExpanded = false
+                                if (!isButtonHovered) {
+                                    onHoverStateChanged?.invoke(false)
+                                }
                             },
                             onAddMenuHoverChanged = { isHovered ->
                                 isAddMenuHovered = isHovered
@@ -207,6 +219,9 @@ fun SubtitleControlFlyout(
                             onRequestDelete = { subtitle ->
                                 onRequestDelete?.invoke(subtitle)
                                 isExpanded = false
+                                if (!isButtonHovered) {
+                                    onHoverStateChanged?.invoke(false)
+                                }
                             },
                             isExpanded = isExpanded
                         )

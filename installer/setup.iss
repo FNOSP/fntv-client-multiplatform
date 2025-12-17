@@ -1,5 +1,7 @@
 #define MyAppName "飞牛影视"
-#define MyAppVersion "1.0.9"
+#ifndef MyAppVersion
+  #define MyAppVersion "1.0.10"
+#endif
 #define MyAppOS "Windows"
 #define MyAppPublisher "JankinWu"
 #define MyAppExeName "FnMedia.exe"

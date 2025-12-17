@@ -29,10 +29,10 @@ fun CastScrollRow(
     if (castScrollRowItemList.isNotEmpty()) {
         Column(
             modifier = modifier
-                .height(140.dp),
+                .height(150.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // 媒体库标题行
+            // 标题行
             Row(
                 modifier = Modifier
                     .padding(start = 32.dp, bottom = 12.dp)

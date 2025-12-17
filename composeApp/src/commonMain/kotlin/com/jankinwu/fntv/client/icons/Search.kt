@@ -13,7 +13,7 @@ val Search: ImageVector
             return _Search!!
         }
         _Search = ImageVector.Builder(
-            name = "Search",
+            name = "搜索",
             defaultWidth = 24.dp,
             defaultHeight = 24.dp,
             viewportWidth = 24f,

@@ -31,11 +31,60 @@ interface DesktopUpdateInstaller : UpdateInstaller {
     fun deleteOldUpdater()
 
     companion object {
+        private val logger = Logger.withTag("DesktopUpdateInstaller")
+
         fun currentOS(): DesktopUpdateInstaller {
             return when (currentPlatformDesktop()) {
                 is Platform.MacOS -> MacOSUpdateInstaller
                 is Platform.Windows -> WindowsUpdateInstaller
                 is Platform.Linux -> LinuxUpdateInstaller
+            }
+        }
+
+        fun getPlatformDir(): String? {
+            val osName = System.getProperty("os.name").lowercase()
+            val osArch = System.getProperty("os.arch").lowercase()
+            return when {
+                osName.contains("win") -> {
+                    when {
+                        osArch.contains("aarch64") || osArch.contains("arm64") -> "windows_aarch64"
+                        osArch.contains("amd64") -> "windows_amd64"
+                        else -> "windows_386"
+                    }
+                }
+                osName.contains("mac") -> {
+                    if (osArch.contains("aarch64") || osArch.contains("arm")) "darwin_aarch64" else "darwin_amd64"
+                }
+                osName.contains("nix") || osName.contains("nux") -> {
+                    if (osArch.contains("aarch64") || osArch.contains("arm")) "linux_aarch64" else "linux_amd64"
+                }
+                else -> null
+            }
+        }
+
+        fun deleteProxyExecutable() {
+            try {
+                val osName = System.getProperty("os.name").lowercase()
+                if (osName.contains("win")) return
+
+                val userHome = System.getProperty("user.home")
+                val appDataDir = if (osName.contains("mac")) {
+                    File(userHome, "Library/Application Support/FnMedia")
+                } else {
+                    File(userHome, ".local/share/fn-media")
+                }
+
+                val proxyDir = File(appDataDir, "proxy")
+                val platformDir = getPlatformDir() ?: return
+                val executableName = "fntv-proxy"
+
+                val targetFile = File(proxyDir, "$platformDir/$executableName")
+                if (targetFile.exists()) {
+                    logger.i { "Deleting old proxy executable: ${targetFile.absolutePath}" }
+                    targetFile.delete()
+                }
+            } catch (e: Exception) {
+                logger.w(e) { "Failed to delete old proxy executable" }
             }
         }
     }
@@ -46,6 +95,8 @@ object MacOSUpdateInstaller : DesktopUpdateInstaller {
 
     override fun install(file: SystemPath, context: ContextMP?): InstallationResult {
         logger.i { "Preparing to install update for macOS using external script." }
+
+        DesktopUpdateInstaller.deleteProxyExecutable()
 
         val contentsDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
         logger.i { "contentsDir: $contentsDir" }
@@ -283,6 +334,8 @@ object LinuxUpdateInstaller : DesktopUpdateInstaller {
     }
 
     override fun install(file: SystemPath, context: ContextMP?): InstallationResult {
+        DesktopUpdateInstaller.deleteProxyExecutable()
+
         val updateFile = file.toFile()
         if (!updateFile.exists()) {
             return failed("Update file does not exist: ${updateFile.absolutePath}")
@@ -365,7 +418,7 @@ object WindowsUpdateInstaller : DesktopUpdateInstaller {
         val appDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
         logger.i { "Current app dir: ${appDir.absolutePath}" }
 
-        val platformDir = getPlatformDir() ?: return InstallationResult.Failed(
+        val platformDir = DesktopUpdateInstaller.getPlatformDir() ?: return InstallationResult.Failed(
             InstallationFailureReason.UNSUPPORTED_FILE_STRUCTURE,
             "Unsupported platform"
         )
@@ -465,24 +518,5 @@ object WindowsUpdateInstaller : DesktopUpdateInstaller {
         }
     }
 
-    private fun getPlatformDir(): String? {
-        val osName = System.getProperty("os.name").lowercase()
-        val osArch = System.getProperty("os.arch").lowercase()
-        return when {
-            osName.contains("win") -> {
-                when {
-                    osArch.contains("aarch64") || osArch.contains("arm64") -> "windows_aarch64"
-                    osArch.contains("amd64") -> "windows_amd64"
-                    else -> "windows_386"
-                }
-            }
-            osName.contains("mac") -> {
-                if (osArch.contains("aarch64") || osArch.contains("arm")) "darwin_aarch64" else "darwin_amd64"
-            }
-            osName.contains("nix") || osName.contains("nux") -> {
-                if (osArch.contains("aarch64") || osArch.contains("arm")) "linux_aarch64" else "linux_amd64"
-            }
-            else -> null
-        }
-    }
+
 }

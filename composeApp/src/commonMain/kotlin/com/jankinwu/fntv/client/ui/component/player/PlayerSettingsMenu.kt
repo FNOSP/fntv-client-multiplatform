@@ -56,6 +56,7 @@ import co.touchlab.kermit.Logger
 import com.jankinwu.fntv.client.data.convertor.FnDataConvertor
 import com.jankinwu.fntv.client.data.model.PlayingInfoCache
 import com.jankinwu.fntv.client.data.model.response.AudioStream
+import com.jankinwu.fntv.client.data.store.AppSettingsStore
 import com.jankinwu.fntv.client.manager.PlayerResourceManager
 import com.jankinwu.fntv.client.ui.component.common.AnimatedScrollbarLazyColumn
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
@@ -83,6 +84,7 @@ fun PlayerSettingsMenu(
     playingInfoCache: PlayingInfoCache?,
     isoTagData: IsoTagData?,
     onAudioSelected: (AudioStream) -> Unit,
+    onWindowAspectRatioChanged: (String) -> Unit,
     modifier: Modifier = Modifier,
     onHoverStateChanged: ((Boolean) -> Unit)? = null
 ) {
@@ -214,6 +216,17 @@ fun PlayerSettingsMenu(
                                 onAudioSelected(it)
                                 isExpanded = false
                                 currentScreen = "Main"
+                                if (!isButtonHovered) {
+                                    onHoverStateChanged?.invoke(false)
+                                }
+                            },
+                            onWindowAspectRatioChanged = {
+                                onWindowAspectRatioChanged(it)
+                                isExpanded = false
+                                currentScreen = "Main"
+                                if (!isButtonHovered) {
+                                    onHoverStateChanged?.invoke(false)
+                                }
                             }
                         )
                     }
@@ -267,7 +280,8 @@ fun SettingsFlyoutContent(
     isoTagData: IsoTagData?,
     currentScreen: String,
     onNavigate: (String) -> Unit,
-    onAudioSelected: (AudioStream) -> Unit
+    onAudioSelected: (AudioStream) -> Unit,
+    onWindowAspectRatioChanged: (String) -> Unit
 ) {
     Surface(
         shape = FlyoutShape,
@@ -280,7 +294,8 @@ fun SettingsFlyoutContent(
                 MainSettingsScreen(
                     playingInfoCache = playingInfoCache,
                     isoTagData = isoTagData,
-                    onNavigateToAudio = { onNavigate("Audio") }
+                    onNavigateToAudio = { onNavigate("Audio") },
+                    onNavigateToWindowAspectRatio = { onNavigate("WindowAspectRatio") }
                 )
             } else if (currentScreen == "Audio") {
                 AudioSettingsScreen(
@@ -288,6 +303,11 @@ fun SettingsFlyoutContent(
                     isoTagData = isoTagData,
                     onBack = { onNavigate("Main") },
                     onAudioSelected = onAudioSelected
+                )
+            } else if (currentScreen == "WindowAspectRatio") {
+                WindowAspectRatioSettingsScreen(
+                    onBack = { onNavigate("Main") },
+                    onAspectRatioSelected = onWindowAspectRatioChanged
                 )
             }
         }
@@ -298,7 +318,8 @@ fun SettingsFlyoutContent(
 fun MainSettingsScreen(
     playingInfoCache: PlayingInfoCache?,
     isoTagData: IsoTagData?,
-    onNavigateToAudio: () -> Unit
+    onNavigateToAudio: () -> Unit,
+    onNavigateToWindowAspectRatio: () -> Unit
 ) {
     val currentAudio = playingInfoCache?.currentAudioStream
     val language = if (currentAudio != null) {
@@ -355,6 +376,36 @@ fun MainSettingsScreen(
             }
         }
 
+        val currentWindowAspectRatio = AppSettingsStore.playerWindowAspectRatio
+        val currentWindowAspectRatioText = when (currentWindowAspectRatio) {
+            "AUTO" -> "自动"
+            else -> currentWindowAspectRatio
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onNavigateToWindowAspectRatio() }
+                .padding(top = 8.dp, bottom = 8.dp, start = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("窗口比例", color = DefaultTextColor, fontSize = 14.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = currentWindowAspectRatioText,
+                    color = DefaultTextColor,
+                    fontSize = 14.sp
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = DefaultTextColor,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
         // Audio
         Row(
             modifier = Modifier
@@ -381,6 +432,103 @@ fun MainSettingsScreen(
                     modifier = Modifier.size(16.dp)
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun WindowAspectRatioSettingsScreen(
+    onBack: () -> Unit,
+    onAspectRatioSelected: (String) -> Unit
+) {
+    val currentRatio = AppSettingsStore.playerWindowAspectRatio
+    val options = listOf("AUTO", "4:3", "16:9", "21:9")
+    val optionLabels = mapOf(
+        "AUTO" to "自动",
+        "4:3" to "4:3",
+        "16:9" to "16:9",
+        "21:9" to "21:9"
+    )
+
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onBack() }
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = 180f }
+            )
+            Text(
+                text = "窗口比例",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+
+        HorizontalDivider(
+            modifier = Modifier.padding(bottom = 12.dp),
+            color = Color.White.copy(alpha = 0.1f)
+        )
+
+        Column {
+            options.forEach { option ->
+                val isSelected = option == currentRatio
+                val label = optionLabels[option] ?: option
+                
+                AspectRatioOptionItem(
+                    label = label,
+                    isSelected = isSelected,
+                    onClick = { onAspectRatioSelected(option) }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+fun AspectRatioOptionItem(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val textColor = if (isSelected) SelectedTextColor else DefaultTextColor
+    var isHovered by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isHovered) HoverBackgroundColor else Color.Transparent)
+            .clickable(onClick = onClick)
+            .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+            .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            color = textColor,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold
+        )
+        
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = SelectedTextColor,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
