@@ -76,7 +76,7 @@ fun UpdateDialog(
                                     markdownColor(text = FluentTheme.colors.text.text.primary),
                                     modifier = Modifier
                                         .wrapContentHeight()
-                                        .padding(horizontal = 8.dp)
+                                        .padding(end = 8.dp)
                                 )
                             }
                         }
@@ -114,7 +114,7 @@ fun UpdateDialog(
                                     markdownColor(text = FluentTheme.colors.text.text.primary),
                                     modifier = Modifier
                                         .wrapContentHeight()
-                                        .padding(horizontal = 8.dp)
+                                        .padding(end = 8.dp)
                                 )
                             }
                         }
