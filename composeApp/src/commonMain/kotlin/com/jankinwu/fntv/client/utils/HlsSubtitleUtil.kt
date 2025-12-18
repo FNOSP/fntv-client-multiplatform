@@ -28,7 +28,7 @@ data class SubtitleSegment(
     val endTimeSec: Double
 )
 
-class HlsSubtitleRepository(
+class HlsSubtitleUtil(
     private val client: HttpClient,
     private val playLink: String,
     private val subtitleStream: SubtitleStream

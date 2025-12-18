@@ -125,7 +125,7 @@ import com.jankinwu.fntv.client.ui.providable.LocalTypography
 import com.jankinwu.fntv.client.ui.providable.LocalWindowState
 import com.jankinwu.fntv.client.ui.providable.defaultVariableFamily
 import com.jankinwu.fntv.client.utils.HiddenPointerIcon
-import com.jankinwu.fntv.client.utils.HlsSubtitleRepository
+import com.jankinwu.fntv.client.utils.HlsSubtitleUtil
 import com.jankinwu.fntv.client.utils.Mp4Parser
 import com.jankinwu.fntv.client.utils.chooseFile
 import com.jankinwu.fntv.client.viewmodel.EpisodeListViewModel
@@ -424,29 +424,29 @@ fun PlayerOverlay(
 
 
     // HLS Subtitle Logic
-    val hlsSubtitleRepository =
+    val hlsSubtitleUtil =
         remember(playingInfoCache?.playLink, playingInfoCache?.currentSubtitleStream) {
             val link = playingInfoCache?.playLink
             val subtitle = playingInfoCache?.currentSubtitleStream
             if (!link.isNullOrBlank() && link.contains(".m3u8") && subtitle != null && subtitle.isExternal == 0) {
-                HlsSubtitleRepository(fnOfficialClient, link, subtitle)
+                HlsSubtitleUtil(fnOfficialClient, link, subtitle)
             } else {
                 null
             }
         }
 
-    LaunchedEffect(hlsSubtitleRepository) {
-        hlsSubtitleRepository?.initialize()
+    LaunchedEffect(hlsSubtitleUtil) {
+        hlsSubtitleUtil?.initialize()
     }
 
     var subtitleText by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(hlsSubtitleRepository, mediaPlayer) {
-        if (hlsSubtitleRepository != null) {
+    LaunchedEffect(hlsSubtitleUtil, mediaPlayer) {
+        if (hlsSubtitleUtil != null) {
             // Loop 1: Fetch loop (runs on IO, less frequent)
             launch(kotlinx.coroutines.Dispatchers.IO) {
                 while (isActive) {
                     val currentPos = mediaPlayer.getCurrentPositionMillis()
-                    hlsSubtitleRepository.update(currentPos)
+                    hlsSubtitleUtil.update(currentPos)
                     delay(2000) // Trigger update check every 2 seconds
                 }
             }
@@ -454,7 +454,7 @@ fun PlayerOverlay(
             launch {
                 while (isActive) {
                     val currentPos = mediaPlayer.getCurrentPositionMillis()
-                    subtitleText = hlsSubtitleRepository.getCurrentSubtitle(currentPos)
+                    subtitleText = hlsSubtitleUtil.getCurrentSubtitle(currentPos)
                     delay(200)
                 }
             }
@@ -494,7 +494,7 @@ fun PlayerOverlay(
                         // Check if it's an internal subtitle
                         if (subtitleStream != null && subtitleStream.isExternal == 0) {
                             // Reload HLS subtitle repository to fetch new segments
-                            hlsSubtitleRepository?.reload()
+                            hlsSubtitleUtil?.reload()
                             // Don't restart playback for internal subtitles
                             shouldStartPlayback = false
                         }
@@ -1605,9 +1605,9 @@ private suspend fun playMedia(
                 // If it's HLS, check if it contains subtitles
                 // If so, we need to extract the video stream URL to pass to VLC
                 // to avoid VLC parsing subtitles itself
-                val m3u8Content = HlsSubtitleRepository.fetchContent(fnOfficialClient, playLinkResult.playLink)
+                val m3u8Content = HlsSubtitleUtil.fetchContent(fnOfficialClient, playLinkResult.playLink)
                 if (m3u8Content.contains("#EXT-X-MEDIA:TYPE=SUBTITLES")) {
-                    val videoStreamUrl = HlsSubtitleRepository.extractVideoStreamUrl(m3u8Content, playLinkResult.playLink)
+                    val videoStreamUrl = HlsSubtitleUtil.extractVideoStreamUrl(m3u8Content, playLinkResult.playLink)
                     if (videoStreamUrl != null) {
                         actualPlayLink = videoStreamUrl
                         logger.i("Extracted video stream URL for VLC: $actualPlayLink")
