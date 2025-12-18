@@ -404,7 +404,7 @@ fun SubtitleFlyoutContent(
                     )
                     val title =
                         if (subtitle.isExternal == 1) "$languageTitle - 外挂" else languageTitle
-                    val details = "SUP  ${subtitle.title}"
+                    val details = "${subtitle.format.uppercase()}  ${subtitle.title}"
 
                     SubtitleOptionItem(
                         language = title,
