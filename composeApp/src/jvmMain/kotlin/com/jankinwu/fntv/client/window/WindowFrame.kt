@@ -2,6 +2,7 @@ package com.jankinwu.fntv.client.window
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +35,12 @@ fun FrameWindowScope.WindowFrame(
     val supportBackdrop = hostOs.isWindows && isWindows11OrLater()
     val refreshManager = remember { RefreshManager() }
     var isRefreshing by remember { mutableStateOf(false) }
+    var isAlwaysOnTop by remember { mutableStateOf(false) }
+
+     LaunchedEffect(isAlwaysOnTop) {
+        window.isAlwaysOnTop = isAlwaysOnTop
+    }
+
     AppTheme(
         !supportBackdrop,
         state,
@@ -52,6 +59,8 @@ fun FrameWindowScope.WindowFrame(
                     backButtonVisible = backButtonVisible && !isCollapsed,
                     backButtonEnabled = backButtonEnabled,
                     backButtonClick = backButtonClick,
+                    isAlwaysOnTop = isAlwaysOnTop,
+                    onToggleAlwaysOnTop = { isAlwaysOnTop = !isAlwaysOnTop },
                     onRefreshClick = {
                         // 执行刷新操作
                         refreshManager.requestRefresh {
@@ -79,6 +88,8 @@ fun FrameWindowScope.WindowFrame(
                     icon = if (isCollapsed) null else icon,
                     title = if (isCollapsed) "" else title,
                     state = state,
+                    isAlwaysOnTop = isAlwaysOnTop,
+                    onToggleAlwaysOnTop = { isAlwaysOnTop = !isAlwaysOnTop },
                     onRefreshClick = {
                         // 执行刷新操作
                         refreshManager.requestRefresh {
