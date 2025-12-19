@@ -55,6 +55,8 @@ import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.zIndex
+import com.jankinwu.fntv.client.icons.Pin as PinIcon
+import com.jankinwu.fntv.client.icons.PinFill as PinFillIcon
 import com.jankinwu.fntv.client.icons.RefreshCircle
 import com.jankinwu.fntv.client.jna.windows.ComposeWindowProcedure
 import com.jankinwu.fntv.client.ui.component.common.HasNewVersionTag
@@ -103,6 +105,8 @@ fun FrameWindowScope.WindowsWindowFrame(
     backButtonVisible: Boolean = true,
     backButtonEnabled: Boolean = false,
     backButtonClick: () -> Unit = {},
+    isAlwaysOnTop: Boolean = false,
+    onToggleAlwaysOnTop: () -> Unit = {},
     onRefreshClick: (() -> Unit)? = null,
     onRefreshAnimationStart: (() -> Unit)? = null,
     onRefreshAnimationEnd: (() -> Unit)? = null,
@@ -231,6 +235,8 @@ fun FrameWindowScope.WindowsWindowFrame(
                         windowHandle = procedure.windowHandle,
                         isMaximize = state.placement == WindowPlacement.Maximized,
                         onCloseRequest = onCloseRequest,
+                        isAlwaysOnTop = isAlwaysOnTop,
+                        onToggleAlwaysOnTop = onToggleAlwaysOnTop,
                         onRefreshClick = onRefreshClick,
                         onRefreshAnimationStart = onRefreshAnimationStart,
                         onRefreshAnimationEnd = onRefreshAnimationEnd,
@@ -265,6 +271,8 @@ fun Window.CaptionButtonRow(
     frameColorEnabled: Boolean,
     onCloseRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    isAlwaysOnTop: Boolean = false,
+    onToggleAlwaysOnTop: () -> Unit = {},
     onRefreshClick: (() -> Unit)? = null,
     onRefreshAnimationStart: (() -> Unit)? = null,
     onRefreshAnimationEnd: (() -> Unit)? = null,
@@ -313,6 +321,13 @@ fun Window.CaptionButtonRow(
                 )
             }
         }
+        CaptionButton(
+            onClick = onToggleAlwaysOnTop,
+            icon = if (isAlwaysOnTop) CaptionButtonIcon.Unpin else CaptionButtonIcon.Pin,
+            isActive = isActive,
+            colors = colors,
+            iconSize = 15.dp
+        )
         CaptionButton(
             onClick = {
                 User32.INSTANCE.ShowWindow(windowHandle, WinUser.SW_MINIMIZE)
@@ -370,7 +385,8 @@ fun CaptionButton(
     modifier: Modifier = Modifier,
     colors: VisualStateScheme<CaptionButtonColor> = CaptionButtonDefaults.defaultColors(),
     interaction: MutableInteractionSource = remember { MutableInteractionSource() },
-    rotation: Float = 0f
+    rotation: Float = 0f,
+    iconSize: Dp = 13.dp
 ) {
     val color = colors.schemeFor(interaction.collectVisualState(false))
     TooltipBox(
@@ -397,7 +413,7 @@ fun CaptionButton(
             shape = RectangleShape
         ) {
             val fontFamily by rememberFontIconFamily()
-            if (fontFamily != null) {
+            if (fontFamily != null && !icon.useImageVector) {
                 Text(
                     text = icon.glyph.toString(),
                     fontFamily = fontFamily,
@@ -412,7 +428,7 @@ fun CaptionButton(
                 Icon(
                     imageVector = icon.imageVector,
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize().wrapContentSize(Alignment.Center).size(13.dp)
+                    modifier = Modifier.fillMaxSize().wrapContentSize(Alignment.Center).size(iconSize)
                         .graphicsLayer { // 应用旋转
                             rotationZ = rotation
                         }
@@ -525,7 +541,8 @@ data class CaptionButtonColor(
 
 enum class CaptionButtonIcon(
     val glyph: Char,
-    val imageVector: ImageVector
+    val imageVector: ImageVector,
+    val useImageVector: Boolean = false
 ) {
     Minimize(
         glyph = '\uE921',
@@ -546,6 +563,16 @@ enum class CaptionButtonIcon(
     Refresh(
         glyph = '\uE72C',
         imageVector = RefreshCircle
+    ),
+    Pin(
+        glyph = '\uE718',
+        imageVector = PinIcon,
+        useImageVector = true
+    ),
+    Unpin(
+        glyph = '\uE840',
+        imageVector = PinFillIcon,
+        useImageVector = true
     ),
 }
 

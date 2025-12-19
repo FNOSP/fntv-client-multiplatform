@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
+import com.jankinwu.fntv.client.icons.Pin
+import com.jankinwu.fntv.client.icons.PinFill
 import com.jankinwu.fntv.client.icons.RefreshCircle
 import com.jankinwu.fntv.client.ui.component.common.HasNewVersionTag
 import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
@@ -54,6 +56,8 @@ fun FrameWindowScope.MacOSWindowFrame(
     icon: Painter?,
     captionBarHeight: Dp,
     onBackButtonClick: () -> Unit,
+    isAlwaysOnTop: Boolean = false,
+    onToggleAlwaysOnTop: () -> Unit = {},
     onRefreshClick: (() -> Unit)? = null,
     content: @Composable (windowInset: WindowInsets, captionBarInset: WindowInsets) -> Unit
 ) {
@@ -126,6 +130,15 @@ fun FrameWindowScope.MacOSWindowFrame(
                             modifier = Modifier.padding(start = 16.dp)
                         )
                     }
+
+                    Icon(
+                        imageVector = if (isAlwaysOnTop) PinFill else Pin,
+                        contentDescription = "Always On Top",
+                        modifier = Modifier
+                            .padding(start = 6.dp)
+                            .size(16.dp)
+                            .clickable { onToggleAlwaysOnTop() }
+                    )
 
                     // 添加刷新按钮
                     if (onRefreshClick != null) {

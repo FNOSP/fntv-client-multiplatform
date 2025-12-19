@@ -1,24 +1,19 @@
 package com.jankinwu.fntv.client.utils
 
+import androidx.compose.ui.text.AnnotatedString
 import co.touchlab.kermit.Logger
 import com.jankinwu.fntv.client.data.model.response.SubtitleStream
 import com.jankinwu.fntv.client.data.store.AccountDataCache
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
-data class SubtitleCue(
-    val startTime: Long, // milliseconds
-    val endTime: Long,   // milliseconds
-    val text: String
-)
 
 data class SubtitleSegment(
     val index: Int,
@@ -33,7 +28,7 @@ class HlsSubtitleUtil(
     private val playLink: String,
     private val subtitleStream: SubtitleStream
 ) {
-    private val logger = Logger.withTag("HlsSubtitleRepository")
+    private val logger = Logger.withTag("HlsSubtitleUtil")
     
     private val segments = mutableListOf<SubtitleSegment>()
     private val cues = mutableListOf<SubtitleCue>()
@@ -101,9 +96,11 @@ class HlsSubtitleUtil(
         }
     }
 
-    suspend fun initialize() {
+    suspend fun initialize(startPositionMs: Long) {
+        mutex.withLock {
+            if (isInitialized) return
+        }
         withContext(Dispatchers.IO) {
-            if (isInitialized) return@withContext
             try {
                 baseUrl = playLink.substringBeforeLast("/")
                 val fullPlayLink = constructFullUrl(playLink)
@@ -125,17 +122,21 @@ class HlsSubtitleUtil(
                 val playlistContent = fetchWithAuth(subtitlePlaylistUrl)
                 
                 // 4. Parse segments with duration
-                parseSegments(playlistContent)
+                mutex.withLock {
+                    parseSegments(playlistContent)
+                    isInitialized = true
+                }
+                logger.i { "Initialized HLS subtitle util with ${segments.size} segments" }
                 
-                isInitialized = true
-                logger.i { "Initialized HLS subtitle repository with ${segments.size} segments" }
+                // 5. Immediately update for the current position
+                update(startPositionMs)
             } catch (e: Exception) {
-                logger.e(e) { "Failed to initialize HlsSubtitleRepository" }
+                logger.e(e) { "Failed to initialize HlsSubtitleUtil" }
             }
         }
     }
 
-    suspend fun reload() {
+    suspend fun reload(startPositionMs: Long = 0L) {
         mutex.withLock {
             segments.clear()
             cues.clear()
@@ -144,7 +145,7 @@ class HlsSubtitleUtil(
             lastUpdateCheckTime = 0L
             lastProcessedPositionSec = -1.0
         }
-        initialize()
+        initialize(startPositionMs)
     }
 
     suspend fun update(currentPositionMs: Long) = withContext(Dispatchers.IO) {
@@ -177,13 +178,12 @@ class HlsSubtitleUtil(
         }
     }
     
-    suspend fun getCurrentSubtitle(currentPositionMs: Long): String? {
+    suspend fun getCurrentSubtitle(currentPositionMs: Long): List<SubtitleCue> {
         mutex.withLock {
             val activeCues = cues.filter { cue ->
                 currentPositionMs >= cue.startTime && currentPositionMs < cue.endTime
             }
-            if (activeCues.isEmpty()) return null
-            return activeCues.joinToString("\n") { it.text }
+            return activeCues
         }
     }
     
@@ -272,7 +272,14 @@ class HlsSubtitleUtil(
                     val text = textBuilder.toString().trim()
                     
                     if (text.isNotEmpty()) {
-                        cues.add(SubtitleCue(startMs, endMs, text))
+                        cues.add(
+                            SubtitleCue(
+                                startTime = startMs,
+                                endTime = endMs,
+                                text = AnnotatedString(text),
+                                assProps = null
+                            )
+                        )
                     }
                 } catch (e: Exception) {
                     // Ignore malformed
@@ -328,10 +335,10 @@ class HlsSubtitleUtil(
 
     private suspend fun fetchWithAuth(url: String): String {
         return client.get(url) {
-            if (AccountDataCache.cookieState.isNotBlank()) {
-                 header("cookie", AccountDataCache.cookieState)
-                 header("Authorization", AccountDataCache.authorization)
-            }
+//            if (AccountDataCache.cookieState.isNotBlank()) {
+//                 header("cookie", AccountDataCache.cookieState)
+//                 header("Authorization", AccountDataCache.authorization)
+//            }
         }.bodyAsText()
     }
 

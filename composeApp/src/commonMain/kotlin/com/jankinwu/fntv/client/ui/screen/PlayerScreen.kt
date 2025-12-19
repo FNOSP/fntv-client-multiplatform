@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -32,14 +33,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -52,15 +52,14 @@ import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 import co.touchlab.kermit.Logger
 import com.fasterxml.jackson.databind.DeserializationFeature
@@ -112,6 +111,8 @@ import com.jankinwu.fntv.client.ui.component.player.PlayerSettingsMenu
 import com.jankinwu.fntv.client.ui.component.player.QualityControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SubtitleControlFlyout
+import com.jankinwu.fntv.client.ui.component.player.SubtitleOverlay
+import com.jankinwu.fntv.client.data.model.SubtitleSettings
 import com.jankinwu.fntv.client.ui.component.player.VideoPlayerProgressBar
 import com.jankinwu.fntv.client.ui.component.player.VolumeControl
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
@@ -127,6 +128,7 @@ import com.jankinwu.fntv.client.ui.providable.defaultVariableFamily
 import com.jankinwu.fntv.client.utils.HiddenPointerIcon
 import com.jankinwu.fntv.client.utils.HlsSubtitleUtil
 import com.jankinwu.fntv.client.utils.Mp4Parser
+import com.jankinwu.fntv.client.utils.SubtitleCue
 import com.jankinwu.fntv.client.utils.chooseFile
 import com.jankinwu.fntv.client.viewmodel.EpisodeListViewModel
 import com.jankinwu.fntv.client.viewmodel.MediaPViewModel
@@ -165,9 +167,10 @@ import org.openani.mediamp.features.AudioLevelController
 import org.openani.mediamp.features.PlaybackSpeed
 import org.openani.mediamp.features.VideoAspectRatio
 import org.openani.mediamp.source.MediaExtraFiles
-import org.openani.mediamp.source.Subtitle
 import org.openani.mediamp.source.UriMediaData
 import org.openani.mediamp.togglePause
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private val logger = Logger.withTag("PlayerScreen")
 
@@ -275,6 +278,37 @@ private fun callPlayRecord(
     }
 }
 
+@Composable
+fun rememberSmoothVideoTime(mediaPlayer: MediampPlayer): State<Long> {
+    val targetTime by mediaPlayer.currentPositionMillis.collectAsState()
+    val isPlaying by mediaPlayer.playbackState.collectAsState()
+    val smoothTime = remember { mutableLongStateOf(targetTime) }
+
+    // Sync when paused or seeking (large diff)
+    LaunchedEffect(targetTime, isPlaying) {
+        if (isPlaying != PlaybackState.PLAYING || abs(smoothTime.longValue - targetTime) > 1000) {
+            smoothTime.longValue = targetTime
+        }
+    }
+
+    // Smooth update loop
+    LaunchedEffect(isPlaying) {
+        if (isPlaying == PlaybackState.PLAYING) {
+            var lastFrameTime = withFrameNanos { it }
+            while (isActive) {
+                withFrameNanos { frameTime ->
+                    val delta = (frameTime - lastFrameTime) / 1_000_000 // ns to ms
+                    if (delta > 0) {
+                        smoothTime.longValue += delta
+                    }
+                    lastFrameTime = frameTime
+                }
+            }
+        }
+    }
+    return smoothTime
+}
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun PlayerOverlay(
@@ -293,6 +327,8 @@ fun PlayerOverlay(
     }
     // Window Aspect Ratio State
     var windowAspectRatio by remember { mutableStateOf(AppSettingsStore.playerWindowAspectRatio) }
+
+    var subtitleSettings by remember { mutableStateOf(SubtitleSettings()) }
 
     var isCursorVisible by remember { mutableStateOf(true) }
     var lastMouseMoveTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -422,7 +458,6 @@ fun PlayerOverlay(
     }
 
 
-
     // HLS Subtitle Logic
     val hlsSubtitleUtil =
         remember(playingInfoCache?.playLink, playingInfoCache?.currentSubtitleStream) {
@@ -435,12 +470,31 @@ fun PlayerOverlay(
             }
         }
 
-    LaunchedEffect(hlsSubtitleUtil) {
-        hlsSubtitleUtil?.initialize()
+    // External Subtitle Logic
+    val externalSubtitleUtil =
+        remember(playingInfoCache?.currentSubtitleStream) {
+            val subtitle = playingInfoCache?.currentSubtitleStream
+            if (subtitle != null && subtitle.isExternal == 1 && subtitle.format in listOf(
+                    "srt",
+                    "ass",
+                    "vtt"
+                )
+            ) {
+                com.jankinwu.fntv.client.utils.ExternalSubtitleUtil(fnOfficialClient, subtitle)
+            } else {
+                null
+            }
+        }
+
+    LaunchedEffect(hlsSubtitleUtil, externalSubtitleUtil) {
+        hlsSubtitleUtil?.initialize(mediaPlayer.getCurrentPositionMillis())
+        externalSubtitleUtil?.initialize()
     }
 
-    var subtitleText by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(hlsSubtitleUtil, mediaPlayer) {
+    var subtitleCues by remember { mutableStateOf<List<SubtitleCue>>(emptyList()) }
+    val currentRenderTime by rememberSmoothVideoTime(mediaPlayer)
+
+    LaunchedEffect(hlsSubtitleUtil, externalSubtitleUtil, mediaPlayer, subtitleSettings) {
         if (hlsSubtitleUtil != null) {
             // Loop 1: Fetch loop (runs on IO, less frequent)
             launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -450,16 +504,26 @@ fun PlayerOverlay(
                     delay(2000) // Trigger update check every 2 seconds
                 }
             }
-            // Loop 2: Display loop (runs on Main, frequent for sync)
+            // Loop 2: List update loop (runs on Main, less frequent than render)
             launch {
                 while (isActive) {
                     val currentPos = mediaPlayer.getCurrentPositionMillis()
-                    subtitleText = hlsSubtitleUtil.getCurrentSubtitle(currentPos)
-                    delay(200)
+                    val adjustedPos = currentPos - (subtitleSettings.offsetSeconds * 1000).toLong()
+                    subtitleCues = hlsSubtitleUtil.getCurrentSubtitle(adjustedPos)
+                    delay(50)
+                }
+            }
+        } else if (externalSubtitleUtil != null) {
+            launch {
+                while (isActive) {
+                    val currentPos = mediaPlayer.getCurrentPositionMillis()
+                    val adjustedPos = currentPos - (subtitleSettings.offsetSeconds * 1000).toLong()
+                    subtitleCues = externalSubtitleUtil.getCurrentSubtitle(adjustedPos)
+                    delay(50)
                 }
             }
         } else {
-            subtitleText = null
+            subtitleCues = emptyList()
         }
     }
 
@@ -473,11 +537,11 @@ fun PlayerOverlay(
                 // Re-fetch play link or use existing one? 
                 // Usually resetSubtitle just changes state on server, we might need to re-request play link or just reuse.
                 // Assuming we can reuse existing playLink logic but re-evaluate subtitles.
-                
+
                 // We need to re-evaluate how to play based on new subtitle selection
                 val subtitleStream = cache.currentSubtitleStream
                 val playLink = cache.playLink ?: ""
-                
+
                 var extraFiles = MediaExtraFiles()
                 var actualPlayLink = playLink
                 var isM3u8 = false
@@ -494,7 +558,7 @@ fun PlayerOverlay(
                         // Check if it's an internal subtitle
                         if (subtitleStream != null && subtitleStream.isExternal == 0) {
                             // Reload HLS subtitle repository to fetch new segments
-                            hlsSubtitleUtil?.reload()
+                            // hlsSubtitleUtil?.reload() // Removed reload() to avoid re-initialization conflict
                             // Don't restart playback for internal subtitles
                             if (cache.previousSubtitle?.isExternal == 0) {
                                 shouldStartPlayback = false
@@ -504,8 +568,8 @@ fun PlayerOverlay(
                         logger.w("ResetSubtitle: Failed to parse m3u8: ${e.message}")
                     }
                 } else if (cache.isUseDirectLink) {
-                     // Direct link logic (usually for external subtitles or non-HLS)
-                     val (link, start) = getDirectPlayLink(
+                    // Direct link logic (usually for external subtitles or non-HLS)
+                    val (link, start) = getDirectPlayLink(
                         cache.currentVideoStream.mediaGuid,
                         startPos,
                         mp4Parser
@@ -513,15 +577,15 @@ fun PlayerOverlay(
                     actualPlayLink = link
                 }
 
-                if (shouldStartPlayback) {
-                    startPlayback(
-                        mediaPlayer,
-                        actualPlayLink,
-                        startPos,
-                        extraFiles,
-                        isM3u8
-                    )
-                }
+//                if (shouldStartPlayback) {
+//                    startPlayback(
+//                        mediaPlayer,
+//                        actualPlayLink,
+//                        startPos,
+//                        extraFiles,
+//                        isM3u8
+//                    )
+//                }
             }
             mediaPViewModel.clearError()
         }
@@ -700,7 +764,13 @@ fun PlayerOverlay(
                     cache.currentSubtitleStream?.let { getMediaExtraFiles(it, link) }
                         ?: MediaExtraFiles()
 //                    mediaPlayer.stopPlayback()
-                startPlayback(mediaPlayer, link, start, extraFiles, false) // isM3u8 = false for direct link (usually)
+                startPlayback(
+                    mediaPlayer,
+                    link,
+                    start,
+                    extraFiles,
+                    false
+                ) // isM3u8 = false for direct link (usually)
             }
             mediaPViewModel.clearError()
         }
@@ -808,6 +878,7 @@ fun PlayerOverlay(
         val originalWidth = windowState.size.width
         val originalHeight = windowState.size.height
         val originalPlacement = windowState.placement
+        val originalPosition = windowState.position
 
         // Save main window size on entry
         if (originalPlacement != WindowPlacement.Fullscreen && originalPlacement != WindowPlacement.Maximized) {
@@ -818,6 +889,13 @@ fun PlayerOverlay(
         // Apply Player Fullscreen preference
         if (AppSettingsStore.playerIsFullscreen) {
             windowState.placement = WindowPlacement.Fullscreen
+        } else {
+            // Restore Player Window Position
+            val savedX = AppSettingsStore.playerWindowX
+            val savedY = AppSettingsStore.playerWindowY
+            if (!savedX.isNaN() && !savedY.isNaN()) {
+                windowState.position = WindowPosition(savedX.dp, savedY.dp)
+            }
         }
 
         onDispose {
@@ -827,12 +905,22 @@ fun PlayerOverlay(
             } else {
                 AppSettingsStore.playerIsFullscreen = false
                 // Note: playerWindowWidth/Height are updated via LaunchedEffect below
+
+                // Save position on exit
+                if (windowState.placement != WindowPlacement.Maximized) {
+                    val position = windowState.position
+                    if (position is WindowPosition.Absolute) {
+                        AppSettingsStore.playerWindowX = position.x.value
+                        AppSettingsStore.playerWindowY = position.y.value
+                    }
+                }
             }
 
             // Restore Main Window State
             windowState.placement = originalPlacement
             if (originalPlacement != WindowPlacement.Fullscreen && originalPlacement != WindowPlacement.Maximized) {
                 windowState.size = DpSize(originalWidth, originalHeight)
+                windowState.position = originalPosition
             }
         }
     }
@@ -857,17 +945,22 @@ fun PlayerOverlay(
         }
     }
 
-    // Monitor Manual Resize
+    // Monitor Manual Resize and Move
     LaunchedEffect(windowState) {
-        snapshotFlow { windowState.size }
+        snapshotFlow { windowState.size to windowState.position }
             .debounce(500)
-            .collect { size ->
+            .collect { (size, position) ->
                 if (isProgrammaticResize) {
                     isProgrammaticResize = false
                 } else {
                     if (windowState.placement != WindowPlacement.Fullscreen && windowState.placement != WindowPlacement.Maximized) {
                         AppSettingsStore.playerWindowWidth = size.width.value
                         AppSettingsStore.playerWindowHeight = size.height.value
+
+                        if (position is WindowPosition.Absolute) {
+                            AppSettingsStore.playerWindowX = position.x.value
+                            AppSettingsStore.playerWindowY = position.y.value
+                        }
                     }
                 }
             }
@@ -928,29 +1021,17 @@ fun PlayerOverlay(
                         isCursorVisible = true
                     })
 
-            if (!subtitleText.isNullOrBlank()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = 64.dp), // Adjust based on control bar height
-                    contentAlignment = Alignment.BottomCenter
+            if (subtitleCues.isNotEmpty()) {
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    Text(
-                        text = subtitleText!!,
-                        style = TextStyle(
-                            color = Color.White,
-                            fontSize = 40.sp,
-                            fontWeight = FontWeight.Bold,
-                            shadow = Shadow(
-                                color = Color.Black,
-                                offset = Offset(2f, 2f),
-                                blurRadius = 4f
-                            )
-                        ),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-//                            .background(Color.Black.copy(alpha = 0.3f), shape = RoundedCornerShape(4.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    SubtitleOverlay(
+                        subtitleCues = subtitleCues,
+                        currentRenderTime = currentRenderTime - (subtitleSettings.offsetSeconds * 1000).toLong(),
+                        maxWidth = maxWidth,
+                        maxHeight = maxHeight,
+                        currentPosition = currentPosition - (subtitleSettings.offsetSeconds * 1000).toLong(),
+                        settings = subtitleSettings
                     )
                 }
             }
@@ -1004,6 +1085,14 @@ fun PlayerOverlay(
                         mediaPlayer.seekTo(seekPosition)
                         logger.i("Seek to: ${newProgress * 100}%")
 
+                        // Force update subtitle on seek
+                        if (hlsSubtitleUtil != null) {
+                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                                .launch {
+                                    hlsSubtitleUtil.update(seekPosition)
+                                }
+                        }
+
                         callPlayRecord(
                             ts = (seekPosition / 1000).toInt(),
                             playingInfoCache = playingInfoCache,
@@ -1047,6 +1136,8 @@ fun PlayerOverlay(
                             mediaPViewModel.resetAudio(request)
                         }
                     },
+                    subtitleSettings = subtitleSettings,
+                    onSubtitleSettingsChanged = { subtitleSettings = it },
                     onSubtitleSelected = { subtitle ->
                         val cache = playerViewModel.playingInfoCache.value
                         if (cache != null) {
@@ -1252,6 +1343,8 @@ fun PlayerControlRow(
     onQualitySelected: ((QualityResponse) -> Unit)? = null,
     isoTagData: IsoTagData? = null,
     onAudioSelected: ((AudioStream) -> Unit)? = null,
+    subtitleSettings: SubtitleSettings = SubtitleSettings(),
+    onSubtitleSettingsChanged: (SubtitleSettings) -> Unit = {},
     onSubtitleSelected: ((SubtitleStream?) -> Unit)? = null,
     onOpenSubtitleSearch: (() -> Unit)? = null,
     onOpenAddNasSubtitle: (() -> Unit)? = null,
@@ -1402,6 +1495,8 @@ fun PlayerControlRow(
             SubtitleControlFlyout(
                 playingInfoCache = playingInfoCache,
                 isoTagData = isoTagData,
+                subtitleSettings = subtitleSettings,
+                onSubtitleSettingsChanged = onSubtitleSettingsChanged,
                 onSubtitleSelected = { onSubtitleSelected?.invoke(it) },
                 onOpenSubtitleSearch = { onOpenSubtitleSearch?.invoke() },
                 onOpenAddNasSubtitle = { onOpenAddNasSubtitle?.invoke() },
@@ -1608,9 +1703,11 @@ private suspend fun playMedia(
                 // If it's HLS, check if it contains subtitles
                 // If so, we need to extract the video stream URL to pass to VLC
                 // to avoid VLC parsing subtitles itself
-                val m3u8Content = HlsSubtitleUtil.fetchContent(fnOfficialClient, playLinkResult.playLink)
+                val m3u8Content =
+                    HlsSubtitleUtil.fetchContent(fnOfficialClient, playLinkResult.playLink)
                 if (m3u8Content.contains("#EXT-X-MEDIA:TYPE=SUBTITLES")) {
-                    val videoStreamUrl = HlsSubtitleUtil.extractVideoStreamUrl(m3u8Content, playLinkResult.playLink)
+                    val videoStreamUrl =
+                        HlsSubtitleUtil.extractVideoStreamUrl(m3u8Content, playLinkResult.playLink)
                     if (videoStreamUrl != null) {
                         actualPlayLink = videoStreamUrl
                         logger.i("Extracted video stream URL for VLC: $actualPlayLink")
@@ -1657,10 +1754,12 @@ private fun getMediaExtraFiles(
 
     if (subtitleStream.isExternal == 1) {
         if (subtitleStream.format in listOf("srt", "ass", "vtt")) {
-            val subtitleLink =
-                "${AccountDataCache.getProxyBaseUrl()}/v/api/v1/subtitle/dl/${subtitleStream.guid}"
-            val subtitle = Subtitle(subtitleLink)
-            return MediaExtraFiles(listOf(subtitle))
+//            val subtitleLink =
+//                "${AccountDataCache.getProxyBaseUrl()}/v/api/v1/subtitle/dl/${subtitleStream.guid}"
+//            val subtitle = Subtitle(subtitleLink)
+//            return MediaExtraFiles(listOf(subtitle))
+            // Handled manually by ExternalSubtitleUtil
+            return MediaExtraFiles()
         }
     }
     return MediaExtraFiles()
@@ -1746,7 +1845,7 @@ private suspend fun startPlayback(
     } else {
         AccountDataCache.getFnOfficialBaseUrl()
     }
-    
+
     // If it's a full URL (e.g. extracted m3u8 video stream), don't prepend base URL
     if (playLink.startsWith("http")) {
         baseUrl = ""
@@ -2083,7 +2182,8 @@ private fun handlePlayerKeyEvent(
 
             Key.DirectionUp, Key.VolumeUp -> {
                 audioLevelController?.let {
-                    val newVolume = (it.volume.value + 0.1f).coerceIn(0f, 1f)
+                    val newVolume =
+                        (((it.volume.value + 0.1f) * 10).roundToInt() / 10f).coerceIn(0f, 1f)
                     it.setVolume(newVolume)
                     toastManager.showToast(
                         "当前音量：${(newVolume * 100).toInt()}%",
@@ -2097,7 +2197,8 @@ private fun handlePlayerKeyEvent(
 
             Key.DirectionDown, Key.VolumeDown -> {
                 audioLevelController?.let {
-                    val newVolume = (it.volume.value - 0.1f).coerceIn(0f, 1f)
+                    val newVolume =
+                        (((it.volume.value - 0.1f) * 10).roundToInt() / 10f).coerceIn(0f, 1f)
                     it.setVolume(newVolume)
                     toastManager.showToast(
                         "当前音量：${(newVolume * 100).toInt()}%",
@@ -2270,7 +2371,7 @@ fun PlayerTopBar(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 5.dp),
+                .padding(top = 4.dp),
             contentAlignment = Alignment.Center
         ) {
             Box(
@@ -2484,6 +2585,8 @@ fun PlayerBottomBar(
     onQualityControlHoverChanged: (Boolean) -> Unit,
     onQualitySelected: (QualityResponse) -> Unit,
     onAudioSelected: (AudioStream) -> Unit,
+    subtitleSettings: SubtitleSettings = SubtitleSettings(),
+    onSubtitleSettingsChanged: (SubtitleSettings) -> Unit = {},
     onSubtitleSelected: (SubtitleStream?) -> Unit,
     onOpenSubtitleSearch: () -> Unit,
     onOpenAddNasSubtitle: () -> Unit,
@@ -2541,6 +2644,8 @@ fun PlayerBottomBar(
                 onQualitySelected = onQualitySelected,
                 isoTagData = isoTagData,
                 onAudioSelected = onAudioSelected,
+                subtitleSettings = subtitleSettings,
+                onSubtitleSettingsChanged = onSubtitleSettingsChanged,
                 onSubtitleSelected = onSubtitleSelected,
                 onOpenSubtitleSearch = onOpenSubtitleSearch,
                 onOpenAddNasSubtitle = onOpenAddNasSubtitle,
