@@ -112,7 +112,23 @@ fun TvSeasonDetailScreen(
 
     val episodeListViewModel: EpisodeListViewModel = koinViewModel()
     val episodeListState by episodeListViewModel.uiState.collectAsState()
-    var episodeList: List<EpisodeListResponse> by remember { mutableStateOf(emptyList()) }
+    val episodeList = remember(episodeListState) {
+        when (episodeListState) {
+            is UiState.Success -> {
+                (episodeListState as UiState.Success).data
+            }
+
+            is UiState.Error -> {
+                val message = (episodeListState as UiState.Error).message
+                logger.e("episodeList request error: $message")
+                emptyList()
+            }
+
+            else -> {
+                emptyList()
+            }
+        }
+    }
     val personListViewModel: PersonListViewModel = koinViewModel()
     val personListState by personListViewModel.uiState.collectAsState()
     var personList: List<PersonList> by remember { mutableStateOf(emptyList()) }
@@ -180,18 +196,10 @@ fun TvSeasonDetailScreen(
         }
     }
     LaunchedEffect(itemUiState) {
-        if (itemUiState is UiState.Success) {
-            itemData = (itemUiState as UiState.Success<ItemResponse>).data
+        itemData = if (itemUiState is UiState.Success) {
+            (itemUiState as UiState.Success<ItemResponse>).data
         } else {
-            itemData = null
-        }
-    }
-
-    LaunchedEffect(episodeListState) {
-        if (episodeListState is UiState.Success) {
-            episodeList = (episodeListState as UiState.Success<List<EpisodeListResponse>>).data
-        } else {
-            episodeList = emptyList()
+            null
         }
     }
 
@@ -222,12 +230,10 @@ fun TvSeasonDetailScreen(
 
             is UiState.Error -> {
                 logger.e("message: ${(personListState as UiState.Error).message}")
-                personList = emptyList()
                 castScrollRowItemList = emptyList()
             }
 
             else -> {
-                personList = emptyList()
                 castScrollRowItemList = emptyList()
             }
         }
@@ -488,6 +494,7 @@ fun TvEpisodeBody(
                 }
 
                 item {
+                    logger.i("episodeList: $episodeList")
                     EpisodesScrollRow(
                         episodes = episodeList,
                         navigator,

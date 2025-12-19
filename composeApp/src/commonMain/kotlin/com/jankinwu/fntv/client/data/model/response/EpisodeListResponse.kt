@@ -84,7 +84,7 @@ data class EpisodeListResponse(
     val status: String,
 
     @param:JsonProperty("overview")
-    val overview: String,
+    val overview: String?,
 
     @param:JsonProperty("ancestor_guid")
     val ancestorGuid: String,
