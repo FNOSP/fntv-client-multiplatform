@@ -112,6 +112,7 @@ import com.jankinwu.fntv.client.ui.component.player.QualityControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SubtitleControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SubtitleOverlay
+import com.jankinwu.fntv.client.data.model.SubtitleSettings
 import com.jankinwu.fntv.client.ui.component.player.VideoPlayerProgressBar
 import com.jankinwu.fntv.client.ui.component.player.VolumeControl
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
@@ -282,7 +283,7 @@ fun rememberSmoothVideoTime(mediaPlayer: MediampPlayer): State<Long> {
     val targetTime by mediaPlayer.currentPositionMillis.collectAsState()
     val isPlaying by mediaPlayer.playbackState.collectAsState()
     val smoothTime = remember { mutableLongStateOf(targetTime) }
-    
+
     // Sync when paused or seeking (large diff)
     LaunchedEffect(targetTime, isPlaying) {
         if (isPlaying != PlaybackState.PLAYING || abs(smoothTime.longValue - targetTime) > 1000) {
@@ -326,6 +327,8 @@ fun PlayerOverlay(
     }
     // Window Aspect Ratio State
     var windowAspectRatio by remember { mutableStateOf(AppSettingsStore.playerWindowAspectRatio) }
+
+    var subtitleSettings by remember { mutableStateOf(SubtitleSettings()) }
 
     var isCursorVisible by remember { mutableStateOf(true) }
     var lastMouseMoveTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -455,7 +458,6 @@ fun PlayerOverlay(
     }
 
 
-
     // HLS Subtitle Logic
     val hlsSubtitleUtil =
         remember(playingInfoCache?.playLink, playingInfoCache?.currentSubtitleStream) {
@@ -472,7 +474,12 @@ fun PlayerOverlay(
     val externalSubtitleUtil =
         remember(playingInfoCache?.currentSubtitleStream) {
             val subtitle = playingInfoCache?.currentSubtitleStream
-            if (subtitle != null && subtitle.isExternal == 1 && subtitle.format in listOf("srt", "ass", "vtt")) {
+            if (subtitle != null && subtitle.isExternal == 1 && subtitle.format in listOf(
+                    "srt",
+                    "ass",
+                    "vtt"
+                )
+            ) {
                 com.jankinwu.fntv.client.utils.ExternalSubtitleUtil(fnOfficialClient, subtitle)
             } else {
                 null
@@ -487,7 +494,7 @@ fun PlayerOverlay(
     var subtitleCues by remember { mutableStateOf<List<SubtitleCue>>(emptyList()) }
     val currentRenderTime by rememberSmoothVideoTime(mediaPlayer)
 
-    LaunchedEffect(hlsSubtitleUtil, externalSubtitleUtil, mediaPlayer) {
+    LaunchedEffect(hlsSubtitleUtil, externalSubtitleUtil, mediaPlayer, subtitleSettings) {
         if (hlsSubtitleUtil != null) {
             // Loop 1: Fetch loop (runs on IO, less frequent)
             launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -501,16 +508,17 @@ fun PlayerOverlay(
             launch {
                 while (isActive) {
                     val currentPos = mediaPlayer.getCurrentPositionMillis()
-
-                    subtitleCues = hlsSubtitleUtil.getCurrentSubtitle(currentPos)
+                    val adjustedPos = currentPos - (subtitleSettings.offsetSeconds * 1000).toLong()
+                    subtitleCues = hlsSubtitleUtil.getCurrentSubtitle(adjustedPos)
                     delay(50)
                 }
             }
         } else if (externalSubtitleUtil != null) {
-             launch {
+            launch {
                 while (isActive) {
                     val currentPos = mediaPlayer.getCurrentPositionMillis()
-                    subtitleCues = externalSubtitleUtil.getCurrentSubtitle(currentPos)
+                    val adjustedPos = currentPos - (subtitleSettings.offsetSeconds * 1000).toLong()
+                    subtitleCues = externalSubtitleUtil.getCurrentSubtitle(adjustedPos)
                     delay(50)
                 }
             }
@@ -529,11 +537,11 @@ fun PlayerOverlay(
                 // Re-fetch play link or use existing one? 
                 // Usually resetSubtitle just changes state on server, we might need to re-request play link or just reuse.
                 // Assuming we can reuse existing playLink logic but re-evaluate subtitles.
-                
+
                 // We need to re-evaluate how to play based on new subtitle selection
                 val subtitleStream = cache.currentSubtitleStream
                 val playLink = cache.playLink ?: ""
-                
+
                 var extraFiles = MediaExtraFiles()
                 var actualPlayLink = playLink
                 var isM3u8 = false
@@ -560,8 +568,8 @@ fun PlayerOverlay(
                         logger.w("ResetSubtitle: Failed to parse m3u8: ${e.message}")
                     }
                 } else if (cache.isUseDirectLink) {
-                     // Direct link logic (usually for external subtitles or non-HLS)
-                     val (link, start) = getDirectPlayLink(
+                    // Direct link logic (usually for external subtitles or non-HLS)
+                    val (link, start) = getDirectPlayLink(
                         cache.currentVideoStream.mediaGuid,
                         startPos,
                         mp4Parser
@@ -756,7 +764,13 @@ fun PlayerOverlay(
                     cache.currentSubtitleStream?.let { getMediaExtraFiles(it, link) }
                         ?: MediaExtraFiles()
 //                    mediaPlayer.stopPlayback()
-                startPlayback(mediaPlayer, link, start, extraFiles, false) // isM3u8 = false for direct link (usually)
+                startPlayback(
+                    mediaPlayer,
+                    link,
+                    start,
+                    extraFiles,
+                    false
+                ) // isM3u8 = false for direct link (usually)
             }
             mediaPViewModel.clearError()
         }
@@ -1013,10 +1027,11 @@ fun PlayerOverlay(
                 ) {
                     SubtitleOverlay(
                         subtitleCues = subtitleCues,
-                        currentRenderTime = currentRenderTime,
+                        currentRenderTime = currentRenderTime - (subtitleSettings.offsetSeconds * 1000).toLong(),
                         maxWidth = maxWidth,
                         maxHeight = maxHeight,
-                        currentPosition = currentPosition
+                        currentPosition = currentPosition - (subtitleSettings.offsetSeconds * 1000).toLong(),
+                        settings = subtitleSettings
                     )
                 }
             }
@@ -1069,12 +1084,13 @@ fun PlayerOverlay(
                         val seekPosition = (newProgress * totalDuration).toLong()
                         mediaPlayer.seekTo(seekPosition)
                         logger.i("Seek to: ${newProgress * 100}%")
-                        
+
                         // Force update subtitle on seek
                         if (hlsSubtitleUtil != null) {
-                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                                hlsSubtitleUtil.update(seekPosition)
-                            }
+                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                                .launch {
+                                    hlsSubtitleUtil.update(seekPosition)
+                                }
                         }
 
                         callPlayRecord(
@@ -1120,6 +1136,8 @@ fun PlayerOverlay(
                             mediaPViewModel.resetAudio(request)
                         }
                     },
+                    subtitleSettings = subtitleSettings,
+                    onSubtitleSettingsChanged = { subtitleSettings = it },
                     onSubtitleSelected = { subtitle ->
                         val cache = playerViewModel.playingInfoCache.value
                         if (cache != null) {
@@ -1325,6 +1343,8 @@ fun PlayerControlRow(
     onQualitySelected: ((QualityResponse) -> Unit)? = null,
     isoTagData: IsoTagData? = null,
     onAudioSelected: ((AudioStream) -> Unit)? = null,
+    subtitleSettings: SubtitleSettings = SubtitleSettings(),
+    onSubtitleSettingsChanged: (SubtitleSettings) -> Unit = {},
     onSubtitleSelected: ((SubtitleStream?) -> Unit)? = null,
     onOpenSubtitleSearch: (() -> Unit)? = null,
     onOpenAddNasSubtitle: (() -> Unit)? = null,
@@ -1475,6 +1495,8 @@ fun PlayerControlRow(
             SubtitleControlFlyout(
                 playingInfoCache = playingInfoCache,
                 isoTagData = isoTagData,
+                subtitleSettings = subtitleSettings,
+                onSubtitleSettingsChanged = onSubtitleSettingsChanged,
                 onSubtitleSelected = { onSubtitleSelected?.invoke(it) },
                 onOpenSubtitleSearch = { onOpenSubtitleSearch?.invoke() },
                 onOpenAddNasSubtitle = { onOpenAddNasSubtitle?.invoke() },
@@ -1681,9 +1703,11 @@ private suspend fun playMedia(
                 // If it's HLS, check if it contains subtitles
                 // If so, we need to extract the video stream URL to pass to VLC
                 // to avoid VLC parsing subtitles itself
-                val m3u8Content = HlsSubtitleUtil.fetchContent(fnOfficialClient, playLinkResult.playLink)
+                val m3u8Content =
+                    HlsSubtitleUtil.fetchContent(fnOfficialClient, playLinkResult.playLink)
                 if (m3u8Content.contains("#EXT-X-MEDIA:TYPE=SUBTITLES")) {
-                    val videoStreamUrl = HlsSubtitleUtil.extractVideoStreamUrl(m3u8Content, playLinkResult.playLink)
+                    val videoStreamUrl =
+                        HlsSubtitleUtil.extractVideoStreamUrl(m3u8Content, playLinkResult.playLink)
                     if (videoStreamUrl != null) {
                         actualPlayLink = videoStreamUrl
                         logger.i("Extracted video stream URL for VLC: $actualPlayLink")
@@ -1821,7 +1845,7 @@ private suspend fun startPlayback(
     } else {
         AccountDataCache.getFnOfficialBaseUrl()
     }
-    
+
     // If it's a full URL (e.g. extracted m3u8 video stream), don't prepend base URL
     if (playLink.startsWith("http")) {
         baseUrl = ""
@@ -2158,7 +2182,8 @@ private fun handlePlayerKeyEvent(
 
             Key.DirectionUp, Key.VolumeUp -> {
                 audioLevelController?.let {
-                    val newVolume = (((it.volume.value + 0.1f) * 10).roundToInt() / 10f).coerceIn(0f, 1f)
+                    val newVolume =
+                        (((it.volume.value + 0.1f) * 10).roundToInt() / 10f).coerceIn(0f, 1f)
                     it.setVolume(newVolume)
                     toastManager.showToast(
                         "当前音量：${(newVolume * 100).toInt()}%",
@@ -2172,7 +2197,8 @@ private fun handlePlayerKeyEvent(
 
             Key.DirectionDown, Key.VolumeDown -> {
                 audioLevelController?.let {
-                    val newVolume = (((it.volume.value - 0.1f) * 10).roundToInt() / 10f).coerceIn(0f, 1f)
+                    val newVolume =
+                        (((it.volume.value - 0.1f) * 10).roundToInt() / 10f).coerceIn(0f, 1f)
                     it.setVolume(newVolume)
                     toastManager.showToast(
                         "当前音量：${(newVolume * 100).toInt()}%",
@@ -2559,6 +2585,8 @@ fun PlayerBottomBar(
     onQualityControlHoverChanged: (Boolean) -> Unit,
     onQualitySelected: (QualityResponse) -> Unit,
     onAudioSelected: (AudioStream) -> Unit,
+    subtitleSettings: SubtitleSettings = SubtitleSettings(),
+    onSubtitleSettingsChanged: (SubtitleSettings) -> Unit = {},
     onSubtitleSelected: (SubtitleStream?) -> Unit,
     onOpenSubtitleSearch: () -> Unit,
     onOpenAddNasSubtitle: () -> Unit,
@@ -2616,6 +2644,8 @@ fun PlayerBottomBar(
                 onQualitySelected = onQualitySelected,
                 isoTagData = isoTagData,
                 onAudioSelected = onAudioSelected,
+                subtitleSettings = subtitleSettings,
+                onSubtitleSettingsChanged = onSubtitleSettingsChanged,
                 onSubtitleSelected = onSubtitleSelected,
                 onOpenSubtitleSearch = onOpenSubtitleSearch,
                 onOpenAddNasSubtitle = onOpenAddNasSubtitle,

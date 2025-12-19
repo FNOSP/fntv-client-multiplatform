@@ -27,17 +27,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jankinwu.fntv.client.utils.SubtitleCue
 
+import androidx.compose.ui.unit.times
+import com.jankinwu.fntv.client.data.model.SubtitleSettings
+
 @Composable
 fun SubtitleOverlay(
     subtitleCues: List<SubtitleCue>,
     currentRenderTime: Long,
     maxWidth: Dp,
     maxHeight: Dp,
-    currentPosition: Long
+    currentPosition: Long,
+    settings: SubtitleSettings = SubtitleSettings()
 ) {
     val screenWidth = maxWidth.value
     val screenHeight = maxHeight.value
     val currentPos = currentPosition
+
+    // Calculate vertical shift for ASS (assuming 0.1 is default/baseline)
+    // VerticalPosition 0..1. 0.1 is default.
+    // If pos = 0 (Bottom), shift = (0 - 0.1) * H = -0.1H. But Y is down.
+    // We want to move DOWN if pos < 0.1. So translationY should be POSITIVE.
+    // translationY += (0.1 - pos) * H?
+    // Let's stick to: We want visual position to correspond to slider.
+    // If slider goes UP (value increases), Text goes UP (Y decreases).
+    // deltaY = (OldPos - NewPos) * H.
+    // deltaY = (0.1 - settings.verticalPosition) * screenHeight.
+    val verticalShift = (0.1f - settings.verticalPosition) * screenHeight
 
     subtitleCues.forEach { cue ->
         val props = cue.assProps
@@ -50,7 +65,7 @@ fun SubtitleOverlay(
             val scaleY = screenHeight / playResY
 
             // Font Size
-            val fontSizeDp = props.fontSize * scaleY
+            val fontSizeDp = props.fontSize * scaleY * settings.fontScale
             val fontSizeSp = with(LocalDensity.current) { fontSizeDp.dp.toSp() }
 
             // Position
@@ -132,7 +147,7 @@ fun SubtitleOverlay(
                             }
 
                             translationX = screenX.dp.toPx() + offsetX
-                            translationY = screenY.dp.toPx() + offsetY
+                            translationY = screenY.dp.toPx() + offsetY + verticalShift.dp.toPx()
 
                             // Apply Rotation
                             if (props.rotationZ != null) {
@@ -201,7 +216,7 @@ fun SubtitleOverlay(
                                         }
 
                                         val transX = with(density) { screenX.dp.toPx() } + offsetX
-                                        val transY = with(density) { screenY.dp.toPx() } + offsetY
+                                        val transY = with(density) { screenY.dp.toPx() } + offsetY + with(density) { verticalShift.dp.toPx() }
 
                                         val localCx1 = with(density) { cx1.dp.toPx() } - transX
                                         val localCy1 = with(density) { cy1.dp.toPx() } - transY
@@ -219,7 +234,7 @@ fun SubtitleOverlay(
             } else {
                 // Default positioning (Bottom Center)
                 Box(
-                    modifier = Modifier.fillMaxSize().padding(bottom = 64.dp),
+                    modifier = Modifier.fillMaxSize().padding(bottom = (maxHeight * settings.verticalPosition)),
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     Text(
@@ -236,14 +251,14 @@ fun SubtitleOverlay(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = 64.dp),
+                    .padding(bottom = (maxHeight * settings.verticalPosition)),
                 contentAlignment = Alignment.BottomCenter
             ) {
                 Text(
                     text = cue.text,
                     style = TextStyle(
                         color = Color.White,
-                        fontSize = 40.sp,
+                        fontSize = 40.sp * settings.fontScale,
                         fontWeight = FontWeight.Bold,
                         shadow = Shadow(
                             color = Color.Black,

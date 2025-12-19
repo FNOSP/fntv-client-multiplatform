@@ -3,6 +3,14 @@ package com.jankinwu.fntv.client.ui.component.player
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlin.math.roundToInt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +18,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -19,12 +29,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,17 +66,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import com.jankinwu.fntv.client.data.model.SubtitleSettings
 import com.jankinwu.fntv.client.data.convertor.FnDataConvertor
 import com.jankinwu.fntv.client.data.model.PlayingInfoCache
 import com.jankinwu.fntv.client.data.model.response.SubtitleStream
+import com.jankinwu.fntv.client.icons.Delete
 import com.jankinwu.fntv.client.icons.Subtitle
 import com.jankinwu.fntv.client.ui.component.common.AnimatedScrollbarLazyColumn
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
-import com.jankinwu.fntv.client.icons.Delete
 
 private val FlyoutBackgroundColor = Color.Black.copy(alpha = 0.9f)
 private val FlyoutBorderColor = Color.Gray.copy(alpha = 0.5f)
@@ -81,6 +93,8 @@ private const val ANIMATION_DURATION_MS = 200
 fun SubtitleControlFlyout(
     playingInfoCache: PlayingInfoCache?,
     isoTagData: IsoTagData?,
+    subtitleSettings: SubtitleSettings,
+    onSubtitleSettingsChanged: (SubtitleSettings) -> Unit,
     onSubtitleSelected: (SubtitleStream?) -> Unit,
     onOpenSubtitleSearch: () -> Unit,
     onOpenAddNasSubtitle: () -> Unit,
@@ -97,6 +111,7 @@ fun SubtitleControlFlyout(
     var isAddMenuHovered by remember { mutableStateOf(false) }
     var showPopup by remember { mutableStateOf(false) }
     var isAddMenuExpanded by remember { mutableStateOf(false) }
+    var isAdjustmentMode by remember { mutableStateOf(false) }
 
     fun showFlyout() {
         hideJob?.cancel()
@@ -116,6 +131,7 @@ fun SubtitleControlFlyout(
                 onHoverStateChanged?.invoke(false)
                 delay(ANIMATION_DURATION_MS.toLong())
                 showPopup = false
+                isAdjustmentMode = false // Reset mode on close
             }
         }
     }
@@ -175,62 +191,286 @@ fun SubtitleControlFlyout(
                             }
                         }
                     ) {
-                        SubtitleFlyoutContent(
-                            playingInfoCache = playingInfoCache,
-                            isoTagData = isoTagData,
-                            isAddMenuExpanded = isAddMenuExpanded,
-                            onAddMenuExpandedChanged = { isAddMenuExpanded = it },
-                            onSubtitleSelected = {
-                                onSubtitleSelected(it)
-                                isExpanded = false
-                                if (!isButtonHovered) {
-                                    onHoverStateChanged?.invoke(false)
-                                }
-                            },
-                            onOpenSubtitleSearch = {
-                                onOpenSubtitleSearch()
-                                isExpanded = false
-                                if (!isButtonHovered) {
-                                    onHoverStateChanged?.invoke(false)
-                                }
-                            },
-                            onOpenAddNasSubtitle = {
-                                onOpenAddNasSubtitle()
-                                isExpanded = false
-                                if (!isButtonHovered) {
-                                    onHoverStateChanged?.invoke(false)
-                                }
-                            },
-                            onOpenAddLocalSubtitle = {
-                                onOpenAddLocalSubtitle()
-                                isExpanded = false
-                                if (!isButtonHovered) {
-                                    onHoverStateChanged?.invoke(false)
-                                }
-                            },
-                            onAddMenuHoverChanged = { isHovered ->
-                                isAddMenuHovered = isHovered
-                                if (isHovered) {
-                                    hideJob?.cancel()
-                                } else {
-                                    hideFlyoutWithDelay()
-                                }
-                            },
-                            onRequestDelete = { subtitle ->
-                                onRequestDelete?.invoke(subtitle)
-                                isExpanded = false
-                                if (!isButtonHovered) {
-                                    onHoverStateChanged?.invoke(false)
-                                }
-                            },
-                            isExpanded = isExpanded
-                        )
+                        if (isAdjustmentMode) {
+                            SubtitleAdjustmentContent(
+                                settings = subtitleSettings,
+                                onSettingsChanged = onSubtitleSettingsChanged,
+                                onBack = { isAdjustmentMode = false }
+                            )
+                        } else {
+                            SubtitleFlyoutContent(
+                                playingInfoCache = playingInfoCache,
+                                isoTagData = isoTagData,
+                                isAddMenuExpanded = isAddMenuExpanded,
+                                onAddMenuExpandedChanged = { isAddMenuExpanded = it },
+                                onSubtitleSelected = {
+                                    onSubtitleSelected(it)
+                                    isExpanded = false
+                                    if (!isButtonHovered) {
+                                        onHoverStateChanged?.invoke(false)
+                                    }
+                                },
+                                onOpenSubtitleSearch = {
+                                    onOpenSubtitleSearch()
+                                    isExpanded = false
+                                    if (!isButtonHovered) {
+                                        onHoverStateChanged?.invoke(false)
+                                    }
+                                },
+                                onOpenAddNasSubtitle = {
+                                    onOpenAddNasSubtitle()
+                                    isExpanded = false
+                                    if (!isButtonHovered) {
+                                        onHoverStateChanged?.invoke(false)
+                                    }
+                                },
+                                onOpenAddLocalSubtitle = {
+                                    onOpenAddLocalSubtitle()
+                                    isExpanded = false
+                                    if (!isButtonHovered) {
+                                        onHoverStateChanged?.invoke(false)
+                                    }
+                                },
+                                onAddMenuHoverChanged = { isHovered ->
+                                    isAddMenuHovered = isHovered
+                                    if (isHovered) {
+                                        hideJob?.cancel()
+                                    } else {
+                                        hideFlyoutWithDelay()
+                                    }
+                                },
+                                onRequestDelete = { subtitle ->
+                                    onRequestDelete?.invoke(subtitle)
+                                    isExpanded = false
+                                    if (!isButtonHovered) {
+                                        onHoverStateChanged?.invoke(false)
+                                    }
+                                },
+                                onAdjustmentClicked = { isAdjustmentMode = true },
+                                isExpanded = isExpanded
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+
+@Composable
+fun SubtitleAdjustmentSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
+    showCenterMark: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val barHeight = 4.dp
+    val thumbRadius = 6.dp
+    val centerMarkRadius = 2.dp
+
+    Box(
+        modifier = modifier
+            .height(20.dp) // Ensure enough touch area height
+            .pointerInput(valueRange) {
+                detectTapGestures { offset ->
+                    val progress = (offset.x / size.width).coerceIn(0f, 1f)
+                    val newValue = valueRange.start + progress * (valueRange.endInclusive - valueRange.start)
+                    onValueChange(newValue)
+                }
+            }
+            .pointerInput(valueRange) {
+                detectDragGestures { change, _ ->
+                    val progress = (change.position.x / size.width).coerceIn(0f, 1f)
+                    val newValue = valueRange.start + progress * (valueRange.endInclusive - valueRange.start)
+                    onValueChange(newValue)
+                    change.consume()
+                }
+            }
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val trackYCenter = size.height / 2
+            val trackHeightPx = barHeight.toPx()
+
+            // 1. Gray background track
+            drawLine(
+                color = Color.White.copy(alpha = 0.3f),
+                start = Offset(0f, trackYCenter),
+                end = Offset(size.width, trackYCenter),
+                strokeWidth = trackHeightPx,
+                cap = StrokeCap.Round
+            )
+
+            // 2. Center mark (if enabled)
+            if (showCenterMark) {
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.5f),
+                    radius = centerMarkRadius.toPx(),
+                    center = Offset(size.width / 2, trackYCenter)
+                )
+            }
+
+            // 3. Blue active progress
+            val currentProgress = ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
+            val activeWidth = currentProgress * size.width
+
+            if (activeWidth > 0) {
+                drawLine(
+                    color = SelectedTextColor,
+                    start = Offset(0f, trackYCenter),
+                    end = Offset(activeWidth, trackYCenter),
+                    strokeWidth = trackHeightPx,
+                    cap = StrokeCap.Round
+                )
+            }
+
+            // 4. White circle thumb
+            drawCircle(
+                color = Color.White,
+                radius = thumbRadius.toPx(),
+                center = Offset(activeWidth, trackYCenter)
+            )
+        }
+    }
+}
+
+@Composable
+fun SubtitleAdjustmentContent(
+    settings: SubtitleSettings,
+    onSettingsChanged: (SubtitleSettings) -> Unit,
+    onBack: () -> Unit
+) {
+    Surface(
+        shape = FlyoutShape,
+        color = FlyoutBackgroundColor,
+        border = BorderStroke(1.dp, FlyoutBorderColor),
+        modifier = Modifier.width(MenuWidth)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "调整字幕",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                // Reset Button
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Transparent)
+                        .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                        .clickable { onSettingsChanged(SubtitleSettings()) }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text("重置", color = DefaultTextColor, fontSize = 12.sp)
+                }
+            }
+
+            // Offset
+            Text("偏移", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SubtitleAdjustmentSlider(
+                    value = settings.offsetSeconds,
+                    onValueChange = { 
+                        // Round to 1 decimal place
+                        val rounded = (it * 10).roundToInt() / 10f
+                        onSettingsChanged(settings.copy(offsetSeconds = rounded)) 
+                    },
+                    valueRange = -5f..5f,
+                    showCenterMark = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .width(40.dp), // Fixed width for stability
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "${((settings.offsetSeconds * 10).roundToInt() / 10.0)}",
+                        color = Color.White,
+                        fontSize = 12.sp
+                    )
+                }
+                Text(
+                    " 秒",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(end = 60.dp), // Align with slider
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("-5秒", color = DefaultTextColor, fontSize = 10.sp)
+                Text("+5秒", color = DefaultTextColor, fontSize = 10.sp)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Position
+            Text("位置", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "底部",
+                    color = DefaultTextColor,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                SubtitleAdjustmentSlider(
+                    value = settings.verticalPosition,
+                    onValueChange = { onSettingsChanged(settings.copy(verticalPosition = it)) },
+                    valueRange = 0f..1f,
+                    showCenterMark = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "顶部",
+                    color = DefaultTextColor,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Font Size
+            Text("字号", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "最小",
+                    color = DefaultTextColor,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                SubtitleAdjustmentSlider(
+                    value = settings.fontScale,
+                    onValueChange = { onSettingsChanged(settings.copy(fontScale = it)) },
+                    valueRange = 0.5f..2.0f,
+                    showCenterMark = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "最大",
+                    color = DefaultTextColor,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun FlyoutWithAnimation(
@@ -283,6 +523,7 @@ fun SubtitleFlyoutContent(
     onOpenAddLocalSubtitle: () -> Unit,
     onAddMenuHoverChanged: (Boolean) -> Unit,
     onRequestDelete: (SubtitleStream) -> Unit,
+    onAdjustmentClicked: () -> Unit,
     isExpanded: Boolean = false
 ) {
     val currentSubtitle = playingInfoCache?.currentSubtitleStream
@@ -310,13 +551,13 @@ fun SubtitleFlyoutContent(
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Adjustment Button (Placeholder)
+                    // Adjustment Button
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
                             .background(Color.Transparent)
                             .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                            .clickable { /* TODO */ }
+                            .clickable { onAdjustmentClicked() }
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text("调整", color = DefaultTextColor, fontSize = 12.sp)
@@ -328,7 +569,11 @@ fun SubtitleFlyoutContent(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(if (addSubtitleButtonHovered) HoverBackgroundColor else Color.Transparent)
-                                .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                                .border(
+                                    1.dp,
+                                    Color.White.copy(alpha = 0.5f),
+                                    RoundedCornerShape(16.dp)
+                                )
                                 .clickable { onAddMenuExpandedChanged(true) }
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                                 .onPointerEvent(PointerEventType.Enter) {
