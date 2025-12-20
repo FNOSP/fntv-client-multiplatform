@@ -968,7 +968,7 @@ fun PlayerOverlay(
     // endregion
 
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(Unit, windowState.placement) {
         focusRequester.requestFocus()
     }
 
