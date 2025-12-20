@@ -137,6 +137,10 @@ public class CustomVlcMediampPlayer(
         }
     }
 
+    override fun toString(): String {
+        return "CustomVlcMediampPlayer(mode=$mode)"
+    }
+
     @InternalMediampApi
     public val surface: CustomSkiaBitmapVideoSurface = CustomSkiaBitmapVideoSurface().apply {
         if (mode == VlcRenderMode.CALLBACK) {

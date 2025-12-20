@@ -3,6 +3,7 @@
 package com.jankinwu.fntv.client.ui.screen
 
 import androidx.compose.foundation.background
+import com.jankinwu.fntv.client.ui.component.player.EmbeddedPlayerSurface
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
@@ -58,6 +59,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
@@ -70,6 +73,7 @@ import com.jankinwu.fntv.client.currentPlatform
 import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.convertor.FnDataConvertor
 import com.jankinwu.fntv.client.data.model.PlayingInfoCache
+import com.jankinwu.fntv.client.data.model.SubtitleSettings
 import com.jankinwu.fntv.client.data.model.request.MediaPRequest
 import com.jankinwu.fntv.client.data.model.request.PlayPlayRequest
 import com.jankinwu.fntv.client.data.model.request.PlayRecordRequest
@@ -112,7 +116,6 @@ import com.jankinwu.fntv.client.ui.component.player.QualityControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SubtitleControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SubtitleOverlay
-import com.jankinwu.fntv.client.data.model.SubtitleSettings
 import com.jankinwu.fntv.client.ui.component.player.VideoPlayerProgressBar
 import com.jankinwu.fntv.client.ui.component.player.VolumeControl
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
@@ -309,6 +312,35 @@ fun rememberSmoothVideoTime(mediaPlayer: MediampPlayer): State<Long> {
     return smoothTime
 }
 
+@Composable
+fun OverlayContainer(
+    modifier: Modifier = Modifier,
+    isEmbedded: Boolean,
+    content: @Composable () -> Unit
+) {
+    if (isEmbedded) {
+        // On Desktop, use Popup to float over heavyweight component
+        Popup(
+            alignment = Alignment.TopStart,
+            properties = PopupProperties(
+                focusable = true,
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+                clippingEnabled = false
+            )
+        ) {
+            // Popup content needs explicit size, otherwise it might shrink
+            Box(modifier = modifier) {
+                content()
+            }
+        }
+    } else {
+        Box(modifier = modifier) {
+            content()
+        }
+    }
+}
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun PlayerOverlay(
@@ -319,6 +351,11 @@ fun PlayerOverlay(
     mediaPlayer: MediampPlayer,
     draggableArea: @Composable (content: @Composable () -> Unit) -> Unit = { it() }
 ) {
+    // Detect Embedded mode using toString() hack since we can't access JVM class directly in commonMain
+    val isEmbedded = remember(mediaPlayer) {
+        mediaPlayer.toString().contains("mode=EMBEDDED")
+    }
+
     // 控制UI可见性的状态
     var uiVisible by remember { mutableStateOf(true) }
     val playerManager = LocalPlayerManager.current
@@ -390,7 +427,7 @@ fun PlayerOverlay(
         }
     }
 
-    val playEpisode = remember(
+    val playEpisode: (String) -> Unit = remember(
         mediaPlayer,
         playInfoViewModel,
         userInfoViewModel,
@@ -1014,252 +1051,178 @@ fun PlayerOverlay(
                     true
                 )
         ) {
+            val constraintsMaxWidth = maxWidth
+            val constraintsMaxHeight = maxHeight
             // 视频层 - 从标题栏下方开始显示
-            MediampPlayerSurface(
-                mediaPlayer, Modifier
-                    .size(maxWidth, maxHeight)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = {
-                            mediaPlayer.togglePause()
-                        }
-                    )
-                    .onPointerEvent(PointerEventType.Move) {
-                        // 鼠标移动时更新时间并显示UI
-                        lastMouseMoveTime = System.currentTimeMillis()
-                        uiVisible = true
-                        isCursorVisible = true
-                    })
-
-            if (subtitleCues.isNotEmpty()) {
-                BoxWithConstraints(
-                    modifier = Modifier.fillMaxSize()
+            if (isEmbedded) {
+                // Use the custom JLayeredPane based surface for Embedded mode to handle UI overlay
+                EmbeddedPlayerSurface(
+                    mediampPlayer = mediaPlayer,
+                    modifier = Modifier.size(constraintsMaxWidth, constraintsMaxHeight)
                 ) {
-                    SubtitleOverlay(
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .onPointerEvent(PointerEventType.Move) {
+                                // 鼠标移动时更新时间并显示UI
+                                lastMouseMoveTime = System.currentTimeMillis()
+                                uiVisible = true
+                                isCursorVisible = true
+                            }
+                    ) {
+                        PlayerUIOverlay(
+                            mediaPlayer = mediaPlayer,
+                            uiVisible = uiVisible,
+                            isEmbedded = isEmbedded,
+                            mediaTitle = mediaTitle,
+                            subhead = subhead,
+                            isEpisode = isEpisode,
+                            onBack = onBack,
+                            windowState = windowState,
+                            playState = playState,
+                            videoProgress = videoProgress,
+                            totalDuration = totalDuration,
+                            playingInfoCache = playingInfoCache,
+                            isoTagData = isoTagData,
+                            lastVolume = lastVolume,
+                            isProgressBarHovered = isProgressBarHovered,
+                            onProgressBarHoverChanged = { isProgressBarHovered = it },
+                            onResetMouseMoveTimer = { lastMouseMoveTime = System.currentTimeMillis() },
+                            subtitleSettings = subtitleSettings,
+                            onSubtitleSettingsChanged = { subtitleSettings = it },
+                            hlsSubtitleUtil = hlsSubtitleUtil,
+                            playRecordViewModel = playRecordViewModel,
+                            playerViewModel = playerViewModel,
+                            mediaPViewModel = mediaPViewModel,
+                            playPlayViewModel = playPlayViewModel,
+                            subtitleUploadViewModel = subtitleUploadViewModel,
+                            subtitleDeleteViewModel = subtitleDeleteViewModel,
+                            episodeList = episodeList,
+                            isAutoPlay = isAutoPlay,
+                            onAutoPlayChanged = {
+                                isAutoPlay = it
+                                AppSettingsStore.autoPlay = it
+                            },
+                            nextEpisode = nextEpisode,
+                            playEpisode = playEpisode,
+                            onPlayNextEpisode = {
+                                if (nextEpisode != null) {
+                                    playEpisode(nextEpisode.guid)
+                                }
+                            },
+                            refreshSubtitleList = refreshSubtitleList,
+                            toastManager = toastManager,
+                            onLastVolumeChange = { lastVolume = it },
+                            onSpeedControlHoverChanged = { isSpeedControlHovered = it },
+                            onVolumeControlHoverChanged = { isVolumeControlHovered = it },
+                            onQualityControlHoverChanged = { isQualityControlHovered = it },
+                            onSubtitleControlHoverChanged = { isSubtitleControlHovered = it },
+                            onSettingsMenuHoverChanged = { isSettingsMenuHovered = it },
+                            onEpisodeControlHoverChanged = { isEpisodeControlHovered = it },
+                            onNextEpisodeHoverChanged = { isNextEpisodeHovered = it },
+                            isNextEpisodeHovered = isNextEpisodeHovered,
+                            isSpeedControlHovered = isSpeedControlHovered,
+                            isVolumeControlHovered = isVolumeControlHovered,
+                            isQualityControlHovered = isQualityControlHovered,
+                            isEpisodeControlHovered = isEpisodeControlHovered,
+                            isSettingsMenuHovered = isSettingsMenuHovered,
+                            subtitleCues = subtitleCues,
+                            currentRenderTime = currentRenderTime - (subtitleSettings.offsetSeconds * 1000).toLong(),
+                            maxWidth = constraintsMaxWidth,
+                            maxHeight = constraintsMaxHeight,
+                            currentPosition = currentPosition - (subtitleSettings.offsetSeconds * 1000).toLong(),
+                            draggableArea = draggableArea
+                        )
+                    }
+                }
+            } else {
+                MediampPlayerSurface(
+                    mediaPlayer, Modifier
+                        .size(maxWidth, maxHeight)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = {
+                                mediaPlayer.togglePause()
+                            }
+                        )
+                        .onPointerEvent(PointerEventType.Move) {
+                            // 鼠标移动时更新时间并显示UI
+                            lastMouseMoveTime = System.currentTimeMillis()
+                            uiVisible = true
+                            isCursorVisible = true
+                        })
+
+                // Overlay Container Logic for non-embedded (standard) mode
+                OverlayContainer(
+                    modifier = Modifier.size(maxWidth, maxHeight),
+                    isEmbedded = false
+                ) {
+                    PlayerUIOverlay(
+                        mediaPlayer = mediaPlayer,
+                        uiVisible = uiVisible,
+                        isEmbedded = false,
+                        mediaTitle = mediaTitle,
+                        subhead = subhead,
+                        isEpisode = isEpisode,
+                        onBack = onBack,
+                        windowState = windowState,
+                        playState = playState,
+                        videoProgress = videoProgress,
+                        totalDuration = totalDuration,
+                        playingInfoCache = playingInfoCache,
+                        isoTagData = isoTagData,
+                        lastVolume = lastVolume,
+                        isProgressBarHovered = isProgressBarHovered,
+                        onProgressBarHoverChanged = { isProgressBarHovered = it },
+                        onResetMouseMoveTimer = { lastMouseMoveTime = System.currentTimeMillis() },
+                        subtitleSettings = subtitleSettings,
+                        onSubtitleSettingsChanged = { subtitleSettings = it },
+                        hlsSubtitleUtil = hlsSubtitleUtil,
+                        playRecordViewModel = playRecordViewModel,
+                        playerViewModel = playerViewModel,
+                        mediaPViewModel = mediaPViewModel,
+                        playPlayViewModel = playPlayViewModel,
+                        subtitleUploadViewModel = subtitleUploadViewModel,
+                        subtitleDeleteViewModel = subtitleDeleteViewModel,
+                        episodeList = episodeList,
+                        isAutoPlay = isAutoPlay,
+                        onAutoPlayChanged = {
+                            isAutoPlay = it
+                            AppSettingsStore.autoPlay = it
+                        },
+                        nextEpisode = nextEpisode,
+                        playEpisode = playEpisode,
+                        onPlayNextEpisode = {
+                            if (nextEpisode != null) {
+                                playEpisode(nextEpisode.guid)
+                            }
+                        },
+                        refreshSubtitleList = refreshSubtitleList,
+                        toastManager = toastManager,
+                        onLastVolumeChange = { lastVolume = it },
+                        onSpeedControlHoverChanged = { isSpeedControlHovered = it },
+                        onVolumeControlHoverChanged = { isVolumeControlHovered = it },
+                        onQualityControlHoverChanged = { isQualityControlHovered = it },
+                        onSubtitleControlHoverChanged = { isSubtitleControlHovered = it },
+                        onSettingsMenuHoverChanged = { isSettingsMenuHovered = it },
+                        onEpisodeControlHoverChanged = { isEpisodeControlHovered = it },
+                        onNextEpisodeHoverChanged = { isNextEpisodeHovered = it },
+                        isNextEpisodeHovered = isNextEpisodeHovered,
+                        isSpeedControlHovered = isSpeedControlHovered,
+                        isVolumeControlHovered = isVolumeControlHovered,
+                        isQualityControlHovered = isQualityControlHovered,
+                        isEpisodeControlHovered = isEpisodeControlHovered,
+                        isSettingsMenuHovered = isSettingsMenuHovered,
                         subtitleCues = subtitleCues,
                         currentRenderTime = currentRenderTime - (subtitleSettings.offsetSeconds * 1000).toLong(),
                         maxWidth = maxWidth,
                         maxHeight = maxHeight,
                         currentPosition = currentPosition - (subtitleSettings.offsetSeconds * 1000).toLong(),
-                        settings = subtitleSettings
+                        draggableArea = draggableArea
                     )
                 }
             }
-
-            if (windowState.placement != WindowPlacement.Fullscreen) {
-                // 添加标题栏占位区域，允许窗口拖动
-                draggableArea {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp) // 与标题栏高度一致
-                    )
-                }
-            }
-            // 加载进度条
-            if (playState == PlaybackState.READY || playState == PlaybackState.PAUSED_BUFFERING || playerManager.playerState.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    ImgLoadingProgressRing(modifier = Modifier.size(32.dp))
-                }
-            }
-            val platform = currentPlatform()
-            // 播放器 UI
-            if (uiVisible) {
-                PlayerTopBar(
-                    mediaTitle = mediaTitle,
-                    subhead = subhead,
-                    isEpisode = isEpisode,
-                    onBack = onBack,
-                    mediaPlayer = mediaPlayer,
-                    windowState = windowState,
-                    platform = platform
-                )
-
-                PlayerBottomBar(
-                    mediaPlayer = mediaPlayer,
-                    playerManager = playerManager,
-                    playState = playState,
-                    videoProgress = videoProgress,
-                    totalDuration = totalDuration,
-                    playingInfoCache = playingInfoCache,
-                    isoTagData = isoTagData,
-                    lastVolume = lastVolume,
-                    onProgressBarHoverChanged = { isProgressBarHovered = it },
-                    onResetMouseMoveTimer = { lastMouseMoveTime = System.currentTimeMillis() },
-                    onSeek = { newProgress ->
-                        val seekPosition = (newProgress * totalDuration).toLong()
-                        mediaPlayer.seekTo(seekPosition)
-                        logger.i("Seek to: ${newProgress * 100}%")
-
-                        // Force update subtitle on seek
-                        if (hlsSubtitleUtil != null) {
-                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                                .launch {
-                                    hlsSubtitleUtil.update(seekPosition)
-                                }
-                        }
-
-                        callPlayRecord(
-                            ts = (seekPosition / 1000).toInt(),
-                            playingInfoCache = playingInfoCache,
-                            playRecordViewModel = playRecordViewModel,
-                            onSuccess = {
-                                logger.i("Seek时调用playRecord成功")
-                            },
-                            onError = {
-                                logger.i("Seek时调用playRecord失败：缓存为空")
-                            },
-                        )
-                    },
-                    onSpeedControlHoverChanged = { isSpeedControlHovered = it },
-                    onVolumeControlHoverChanged = { isVolumeControlHovered = it },
-                    onQualityControlHoverChanged = { isQualityControlHovered = it },
-                    onQualitySelected = { quality ->
-                        handleQualitySelection(
-                            quality,
-                            playingInfoCache,
-                            mediaPlayer,
-                            playerViewModel,
-                            mediaPViewModel,
-                            playPlayViewModel,
-                            playRecordViewModel
-                        )
-                    },
-                    onAudioSelected = { audio ->
-                        val cache = playingInfoCache
-                        if (cache != null) {
-                            val request = MediaPRequest(
-                                req = "media.resetAudio",
-                                reqId = "1234567890ABCDEF2s",
-                                playLink = cache.playLink ?: "",
-                                quality = null,
-                                startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
-                                clearCache = true,
-                                audioEncoder = "aac",
-                                channels = 2,
-                                audioIndex = audio.index
-                            )
-                            mediaPViewModel.resetAudio(request)
-                        }
-                    },
-                    subtitleSettings = subtitleSettings,
-                    onSubtitleSettingsChanged = { subtitleSettings = it },
-                    onSubtitleSelected = { subtitle ->
-                        val cache = playerViewModel.playingInfoCache.value
-                        if (cache != null) {
-                            playerViewModel.updatePlayingInfo(
-                                cache.copy(
-                                    previousSubtitle = cache.currentSubtitleStream,
-                                    currentSubtitleStream = subtitle
-                                )
-                            )
-                            callPlayRecord(
-                                ts = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
-                                playingInfoCache = playingInfoCache,
-                                playRecordViewModel = playRecordViewModel,
-                                onSuccess = {
-                                    logger.i("切换字幕时调用playRecord成功")
-                                },
-                                onError = {
-                                    logger.i("切换字幕时调用playRecord失败：缓存为空")
-                                },
-                            )
-                            val subtitleIndex = if (subtitle != null) {
-                                if (subtitle.isExternal == 1) -1 else subtitle.index
-                            } else {
-                                null
-                            }
-
-                            val request = MediaPRequest(
-                                req = "media.resetSubtitle",
-                                reqId = "1234567890ABCDEF",
-                                playLink = cache.playLink ?: "",
-                                subtitleIndex = subtitleIndex,
-                                startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
-                            )
-                            mediaPViewModel.resetSubtitle(request)
-                        }
-                    },
-                    onOpenSubtitleSearch = { showSubtitleSearchDialog = true },
-                    onOpenAddNasSubtitle = { showAddNasSubtitleDialog = true },
-                    onOpenAddLocalSubtitle = {
-                        val mediaGuid = playingInfoCache?.currentFileStream?.guid
-                        if (mediaGuid != null) {
-                            val file = chooseFile(
-                                frameWindowScope,
-                                arrayOf("ass", "srt", "vtt", "sub", "ssa"),
-                                "选择字幕文件"
-                            )
-                            file?.let { selectedFile ->
-                                val byteArray = selectedFile.readBytes()
-                                subtitleUploadViewModel.uploadSubtitle(
-                                    mediaGuid,
-                                    byteArray,
-                                    selectedFile.name
-                                )
-                            }
-                        }
-                    },
-                    onSubtitleControlHoverChanged = { isSubtitleControlHovered = it },
-                    onSettingsMenuHoverChanged = { isSettingsMenuHovered = it },
-                    onRequestDeleteSubtitle = { subtitle ->
-                        subtitleToDelete = subtitle
-                        showDeleteSubtitleDialog = true
-                    },
-                    onLastVolumeChange = { lastVolume = it },
-                    onWindowAspectRatioChanged = {
-                        windowAspectRatio = it
-                        AppSettingsStore.playerWindowAspectRatio = it
-                    },
-                    episodeList = episodeList,
-                    currentEpisodeGuid = playingInfoCache?.itemGuid ?: "",
-                    onEpisodeSelected = { episode -> playEpisode(episode.guid) },
-                    isAutoPlay = isAutoPlay,
-                    onAutoPlayChanged = {
-                        isAutoPlay = it
-                        AppSettingsStore.autoPlay = it
-                    },
-                    onEpisodeControlHoverChanged = { isEpisodeControlHovered = it },
-                    nextEpisode = nextEpisode,
-                    onNextEpisode = {
-                        if (nextEpisode != null) {
-                            playEpisode(nextEpisode.guid)
-                        }
-                    },
-                    isNextEpisodeHovered = isNextEpisodeHovered,
-                    onNextEpisodeHoverChanged = { isNextEpisodeHovered = it }
-                )
-            }
-
-            PlayerDialogs(
-                showSubtitleSearchDialog = showSubtitleSearchDialog,
-                onSubtitleSearchDialogDismiss = { showSubtitleSearchDialog = false },
-                showAddNasSubtitleDialog = showAddNasSubtitleDialog,
-                onAddNasSubtitleDialogDismiss = { showAddNasSubtitleDialog = false },
-                showDeleteSubtitleDialog = showDeleteSubtitleDialog,
-                onDeleteSubtitleDialogDismiss = {
-                    showDeleteSubtitleDialog = false
-                    subtitleToDelete = null
-                },
-                playingInfoCache = playingInfoCache,
-                subtitleToDelete = subtitleToDelete,
-                onSubtitleDeleteConfirm = {
-                    subtitleToDelete?.let {
-                        subtitleDeleteViewModel.deleteSubtitle(it.guid)
-                    }
-                },
-                refreshSubtitleList = refreshSubtitleList
-            )
-
-            ToastHost(
-                toastManager = toastManager,
-                modifier = Modifier.fillMaxSize()
-            )
         }
     }
 }
@@ -1336,213 +1299,1220 @@ fun buildMacOsEpisodeTitle(mediaTitle: String, subhead: String): AnnotatedString
     return annotatedString
 }
 
+@Composable
+fun PlayerUIOverlay(
+    mediaPlayer: MediampPlayer,
+    uiVisible: Boolean,
+    isEmbedded: Boolean,
+    mediaTitle: String,
+    subhead: String,
+    isEpisode: Boolean,
+    onBack: () -> Unit,
+    windowState: WindowState,
+    playState: PlaybackState,
+    videoProgress: Float,
+    totalDuration: Long,
+    playingInfoCache: PlayingInfoCache?,
+    isoTagData: IsoTagData,
+    lastVolume: Float,
+    isProgressBarHovered: Boolean,
+    onProgressBarHoverChanged: (Boolean) -> Unit,
+    onResetMouseMoveTimer: () -> Unit,
+    subtitleSettings: SubtitleSettings,
+    onSubtitleSettingsChanged: (SubtitleSettings) -> Unit,
+    hlsSubtitleUtil: HlsSubtitleUtil?,
+    playRecordViewModel: PlayRecordViewModel,
+    playerViewModel: PlayerViewModel,
+    mediaPViewModel: MediaPViewModel,
+    playPlayViewModel: PlayPlayViewModel,
+    subtitleUploadViewModel: SubtitleUploadViewModel,
+    subtitleDeleteViewModel: SubtitleDeleteViewModel,
+    episodeList: List<EpisodeListResponse>,
+    isAutoPlay: Boolean,
+    onAutoPlayChanged: (Boolean) -> Unit,
+    nextEpisode: EpisodeListResponse?,
+    playEpisode: (String) -> Unit,
+    refreshSubtitleList: (String?) -> Unit,
+    toastManager: ToastManager,
+    onLastVolumeChange: (Float) -> Unit,
+    onSpeedControlHoverChanged: (Boolean) -> Unit,
+    onVolumeControlHoverChanged: (Boolean) -> Unit,
+    onQualityControlHoverChanged: (Boolean) -> Unit,
+    onSubtitleControlHoverChanged: (Boolean) -> Unit,
+    onSettingsMenuHoverChanged: (Boolean) -> Unit,
+    onEpisodeControlHoverChanged: (Boolean) -> Unit,
+    onNextEpisodeHoverChanged: (Boolean) -> Unit,
+    onPlayNextEpisode: () -> Unit,
+    isNextEpisodeHovered: Boolean,
+    isSpeedControlHovered: Boolean,
+    isVolumeControlHovered: Boolean,
+    isQualityControlHovered: Boolean,
+    isEpisodeControlHovered: Boolean,
+    isSettingsMenuHovered: Boolean,
+    subtitleCues: List<SubtitleCue>,
+    currentRenderTime: Long,
+    maxWidth: androidx.compose.ui.unit.Dp,
+    maxHeight: androidx.compose.ui.unit.Dp,
+    currentPosition: Long,
+    draggableArea: @Composable (content: @Composable () -> Unit) -> Unit
+) {
+    val playerManager = LocalPlayerManager.current
+    val frameWindowScope = LocalFrameWindowScope.current
+    var showSubtitleSearchDialog by remember { mutableStateOf(false) }
+    var showAddNasSubtitleDialog by remember { mutableStateOf(false) }
+    var showDeleteSubtitleDialog by remember { mutableStateOf(false) }
+    var subtitleToDelete by remember { mutableStateOf<SubtitleStream?>(null) }
+    var windowAspectRatio by remember { mutableStateOf(AppSettingsStore.playerWindowAspectRatio) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (subtitleCues.isNotEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                SubtitleOverlay(
+                    subtitleCues = subtitleCues,
+                    currentRenderTime = currentRenderTime,
+                    maxWidth = maxWidth,
+                    maxHeight = maxHeight,
+                    currentPosition = currentPosition,
+                    settings = subtitleSettings
+                )
+            }
+        }
+
+        if (windowState.placement != WindowPlacement.Fullscreen) {
+            // 添加标题栏占位区域，允许窗口拖动
+            draggableArea {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp) // 与标题栏高度一致
+                )
+            }
+        }
+        // 加载进度条
+        if (playState == PlaybackState.READY || playState == PlaybackState.PAUSED_BUFFERING || playerManager.playerState.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                ImgLoadingProgressRing(modifier = Modifier.size(32.dp))
+            }
+        }
+        val platform = currentPlatform()
+        // 播放器 UI
+        if (uiVisible) {
+            PlayerTopBar(
+                mediaTitle = mediaTitle,
+                subhead = subhead,
+                isEpisode = isEpisode,
+                onBack = onBack,
+                mediaPlayer = mediaPlayer,
+                windowState = windowState,
+                platform = platform
+            )
+
+            PlayerBottomBar(
+                mediaPlayer = mediaPlayer,
+                playerManager = playerManager,
+                playState = playState,
+                videoProgress = videoProgress,
+                totalDuration = totalDuration,
+                playingInfoCache = playingInfoCache,
+                isoTagData = isoTagData,
+                lastVolume = lastVolume,
+                onProgressBarHoverChanged = onProgressBarHoverChanged,
+                onResetMouseMoveTimer = onResetMouseMoveTimer,
+                onSeek = { newProgress ->
+                    val seekPosition = (newProgress * totalDuration).toLong()
+                    mediaPlayer.seekTo(seekPosition)
+                    logger.i("Seek to: ${newProgress * 100}%")
+
+                    // Force update subtitle on seek
+                    if (hlsSubtitleUtil != null) {
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                            .launch {
+                                hlsSubtitleUtil.update(seekPosition)
+                            }
+                    }
+
+                    callPlayRecord(
+                        ts = (seekPosition / 1000).toInt(),
+                        playingInfoCache = playingInfoCache,
+                        playRecordViewModel = playRecordViewModel,
+                        onSuccess = {
+                            logger.i("Seek时调用playRecord成功")
+                        },
+                        onError = {
+                            logger.i("Seek时调用playRecord失败：缓存为空")
+                        },
+                    )
+                },
+                onSpeedControlHoverChanged = onSpeedControlHoverChanged,
+                onVolumeControlHoverChanged = onVolumeControlHoverChanged,
+                onQualityControlHoverChanged = onQualityControlHoverChanged,
+                onQualitySelected = { quality ->
+                    handleQualitySelection(
+                        quality,
+                        playingInfoCache,
+                        mediaPlayer,
+                        playerViewModel,
+                        mediaPViewModel,
+                        playPlayViewModel,
+                        playRecordViewModel
+                    )
+                },
+                onAudioSelected = { audio ->
+                    val cache = playingInfoCache
+                    if (cache != null) {
+                        val request = MediaPRequest(
+                            req = "media.resetAudio",
+                            reqId = "1234567890ABCDEF2s",
+                            playLink = cache.playLink ?: "",
+                            quality = null,
+                            startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
+                            clearCache = true,
+                            audioEncoder = "aac",
+                            channels = 2,
+                            audioIndex = audio.index
+                        )
+                        mediaPViewModel.resetAudio(request)
+                    }
+                },
+                subtitleSettings = subtitleSettings,
+                onSubtitleSettingsChanged = onSubtitleSettingsChanged,
+                onSubtitleSelected = { subtitle ->
+                    val cache = playerViewModel.playingInfoCache.value
+                    if (cache != null) {
+                        playerViewModel.updatePlayingInfo(
+                            cache.copy(
+                                previousSubtitle = cache.currentSubtitleStream,
+                                currentSubtitleStream = subtitle
+                            )
+                        )
+                        callPlayRecord(
+                            ts = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
+                            playingInfoCache = playingInfoCache,
+                            playRecordViewModel = playRecordViewModel,
+                            onSuccess = {
+                                logger.i("切换字幕时调用playRecord成功")
+                            },
+                            onError = {
+                                logger.i("切换字幕时调用playRecord失败：缓存为空")
+                            },
+                        )
+                        val subtitleIndex = if (subtitle != null) {
+                            if (subtitle.isExternal == 1) -1 else subtitle.index
+                        } else {
+                            null
+                        }
+
+                        val request = MediaPRequest(
+                            req = "media.resetSubtitle",
+                            reqId = "1234567890ABCDEF",
+                            playLink = cache.playLink ?: "",
+                            subtitleIndex = subtitleIndex,
+                            startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
+                        )
+                        mediaPViewModel.resetSubtitle(request)
+                    }
+                },
+                onOpenSubtitleSearch = { showSubtitleSearchDialog = true },
+                onOpenAddNasSubtitle = { showAddNasSubtitleDialog = true },
+                onOpenAddLocalSubtitle = {
+                    val mediaGuid = playingInfoCache?.currentFileStream?.guid
+                    if (mediaGuid != null) {
+                        val file = chooseFile(
+                            frameWindowScope,
+                            arrayOf("ass", "srt", "vtt", "sub", "ssa"),
+                            "选择字幕文件"
+                        )
+                        file?.let { selectedFile ->
+                            val byteArray = selectedFile.readBytes()
+                            subtitleUploadViewModel.uploadSubtitle(
+                                mediaGuid,
+                                byteArray,
+                                selectedFile.name
+                            )
+                        }
+                    }
+                },
+                onSubtitleControlHoverChanged = onSubtitleControlHoverChanged,
+                onSettingsMenuHoverChanged = onSettingsMenuHoverChanged,
+                onRequestDeleteSubtitle = { subtitle ->
+                    subtitleToDelete = subtitle
+                    showDeleteSubtitleDialog = true
+                },
+                onLastVolumeChange = onLastVolumeChange,
+                onWindowAspectRatioChanged = {
+                    windowAspectRatio = it
+                    AppSettingsStore.playerWindowAspectRatio = it
+                },
+                episodeList = episodeList,
+                currentEpisodeGuid = playingInfoCache?.itemGuid ?: "",
+                onEpisodeSelected = { episode -> playEpisode(episode.guid) },
+                isAutoPlay = isAutoPlay,
+                onAutoPlayChanged = onAutoPlayChanged,
+                onEpisodeControlHoverChanged = onEpisodeControlHoverChanged,
+                nextEpisode = nextEpisode,
+                onNextEpisode = {
+                    if (nextEpisode != null) {
+                        playEpisode(nextEpisode.guid)
+                    }
+                },
+                isNextEpisodeHovered = isNextEpisodeHovered,
+                onNextEpisodeHoverChanged = onNextEpisodeHoverChanged
+            )
+        }
+
+        // 居中播放/暂停按钮 (仅在鼠标移动时显示)
+        if (uiVisible && !isProgressBarHovered && !isSpeedControlHovered && !isVolumeControlHovered && !isQualityControlHovered && !isEpisodeControlHovered && !isNextEpisodeHovered && !isSettingsMenuHovered) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        .clickable {
+                            mediaPlayer.togglePause()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (playState == PlaybackState.PLAYING) Pause else Play,
+                        contentDescription = if (playState == PlaybackState.PLAYING) "暂停" else "播放",
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+        }
+
+        PlayerDialogs(
+            showSubtitleSearchDialog = showSubtitleSearchDialog,
+            onSubtitleSearchDialogDismiss = { showSubtitleSearchDialog = false },
+            showAddNasSubtitleDialog = showAddNasSubtitleDialog,
+            onAddNasSubtitleDialogDismiss = { showAddNasSubtitleDialog = false },
+            showDeleteSubtitleDialog = showDeleteSubtitleDialog,
+            onDeleteSubtitleDialogDismiss = {
+                showDeleteSubtitleDialog = false
+                subtitleToDelete = null
+            },
+            playingInfoCache = playingInfoCache,
+            subtitleToDelete = subtitleToDelete,
+            onSubtitleDeleteConfirm = {
+                subtitleToDelete?.let {
+                    subtitleDeleteViewModel.deleteSubtitle(it.guid)
+                }
+            },
+            refreshSubtitleList = refreshSubtitleList
+        )
+
+        ToastHost(
+            toastManager = toastManager,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun PlayerControlRow(
-    playState: PlaybackState,
-    mediaPlayer: MediampPlayer,
-    videoProgress: Float,
-    totalDuration: Long,
-    playingInfoCache: PlayingInfoCache? = null,
-    onSpeedControlHoverChanged: ((Boolean) -> Unit)? = null,
-    onVolumeControlHoverChanged: ((Boolean) -> Unit)? = null,
-    onQualityControlHoverChanged: ((Boolean) -> Unit)? = null,
-    onQualitySelected: ((QualityResponse) -> Unit)? = null,
-    isoTagData: IsoTagData? = null,
-    onAudioSelected: ((AudioStream) -> Unit)? = null,
-    subtitleSettings: SubtitleSettings = SubtitleSettings(),
-    onSubtitleSettingsChanged: (SubtitleSettings) -> Unit = {},
-    onSubtitleSelected: ((SubtitleStream?) -> Unit)? = null,
-    onOpenSubtitleSearch: (() -> Unit)? = null,
-    onOpenAddNasSubtitle: (() -> Unit)? = null,
-    onOpenAddLocalSubtitle: (() -> Unit)? = null,
-    onSubtitleControlHoverChanged: ((Boolean) -> Unit)? = null,
-    onSettingsMenuHoverChanged: ((Boolean) -> Unit)? = null,
-    onRequestDeleteSubtitle: ((SubtitleStream) -> Unit)? = null,
-    lastVolume: Float = 0f,
-    onLastVolumeChange: (Float) -> Unit = {},
-    onWindowAspectRatioChanged: (String) -> Unit = {},
-    episodeList: List<EpisodeListResponse> = emptyList(),
-    currentEpisodeGuid: String? = null,
-    onEpisodeSelected: ((EpisodeListResponse) -> Unit)? = null,
-    isAutoPlay: Boolean = false,
-    onAutoPlayChanged: ((Boolean) -> Unit)? = null,
-    onEpisodeControlHoverChanged: ((Boolean) -> Unit)? = null,
-    nextEpisode: EpisodeListResponse? = null,
-    onPlayNextEpisode: (() -> Unit)? = null,
-    isNextEpisodeHovered: Boolean = false,
-    onNextEpisodeHoverChanged: ((Boolean) -> Unit)? = null
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        playState: PlaybackState,
+        mediaPlayer: MediampPlayer,
+        videoProgress: Float,
+        totalDuration: Long,
+        playingInfoCache: PlayingInfoCache? = null,
+        onSpeedControlHoverChanged: ((Boolean) -> Unit)? = null,
+        onVolumeControlHoverChanged: ((Boolean) -> Unit)? = null,
+        onQualityControlHoverChanged: ((Boolean) -> Unit)? = null,
+        onQualitySelected: ((QualityResponse) -> Unit)? = null,
+        isoTagData: IsoTagData? = null,
+        onAudioSelected: ((AudioStream) -> Unit)? = null,
+        subtitleSettings: SubtitleSettings = SubtitleSettings(),
+        onSubtitleSettingsChanged: (SubtitleSettings) -> Unit = {},
+        onSubtitleSelected: ((SubtitleStream?) -> Unit)? = null,
+        onOpenSubtitleSearch: (() -> Unit)? = null,
+        onOpenAddNasSubtitle: (() -> Unit)? = null,
+        onOpenAddLocalSubtitle: (() -> Unit)? = null,
+        onSubtitleControlHoverChanged: ((Boolean) -> Unit)? = null,
+        onSettingsMenuHoverChanged: ((Boolean) -> Unit)? = null,
+        onRequestDeleteSubtitle: ((SubtitleStream) -> Unit)? = null,
+        lastVolume: Float = 0f,
+        onLastVolumeChange: (Float) -> Unit = {},
+        onWindowAspectRatioChanged: (String) -> Unit = {},
+        episodeList: List<EpisodeListResponse> = emptyList(),
+        currentEpisodeGuid: String? = null,
+        onEpisodeSelected: ((EpisodeListResponse) -> Unit)? = null,
+        isAutoPlay: Boolean = false,
+        onAutoPlayChanged: ((Boolean) -> Unit)? = null,
+        onEpisodeControlHoverChanged: ((Boolean) -> Unit)? = null,
+        nextEpisode: EpisodeListResponse? = null,
+        onPlayNextEpisode: (() -> Unit)? = null,
+        isNextEpisodeHovered: Boolean = false,
+        onNextEpisodeHoverChanged: ((Boolean) -> Unit)? = null
     ) {
+        val interactionSource = remember { MutableInteractionSource() }
         Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(
-                16.dp,
-                Alignment.Start
-            ),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 播放/暂停按钮
-            Icon(
-                imageVector = if (playState == PlaybackState.PLAYING) Pause else Play,
-                contentDescription = "播放/暂停",
-                tint = Color.White,
+            Row(
                 modifier = Modifier
-                    .size(24.dp)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = {
-                            if (mediaPlayer.getCurrentPlaybackState() == PlaybackState.PLAYING) {
-                                mediaPlayer.pause()
-                            } else if (mediaPlayer.getCurrentPlaybackState() == PlaybackState.PAUSED) {
-                                mediaPlayer.resume()
-                            }
-                        })
-            )
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(
+                    16.dp,
+                    Alignment.Start
+                ),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 播放/暂停按钮
+                Icon(
+                    imageVector = if (playState == PlaybackState.PLAYING) Pause else Play,
+                    contentDescription = "播放/暂停",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = {
+                                if (mediaPlayer.getCurrentPlaybackState() == PlaybackState.PLAYING) {
+                                    mediaPlayer.pause()
+                                } else if (mediaPlayer.getCurrentPlaybackState() == PlaybackState.PAUSED) {
+                                    mediaPlayer.resume()
+                                }
+                            })
+                )
 
-            Icon(
-                imageVector = Back10S,
-                contentDescription = "快退10s",
-                tint = Color.White,
-                modifier = Modifier
-                    .size(20.dp)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = {
-                            mediaPlayer.skip(-10_000)
-                        })
-            )
-            Icon(
-                imageVector = Forward10S,
-                contentDescription = "快进10s",
-                tint = Color.White,
-                modifier = Modifier
-                    .size(20.dp)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = {
-                            mediaPlayer.skip(10_000)
-                        })
-            )
-            // 下一集按钮
-            if (nextEpisode != null) {
-                NextEpisodePreviewFlyout(
-                    nextEpisode = nextEpisode,
-                    onClick = { onPlayNextEpisode?.invoke() },
-                    onHoverStateChanged = onNextEpisodeHoverChanged
+                Icon(
+                    imageVector = Back10S,
+                    contentDescription = "快退10s",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = {
+                                mediaPlayer.skip(-10_000)
+                            })
                 )
-            }
-            // 当前播放时间 / 总时间
-            Text(
-                text = "${FnDataConvertor.formatDurationToDateTime((videoProgress * totalDuration).toLong())} / ${
-                    FnDataConvertor.formatDurationToDateTime(totalDuration)
-                }",
-                color = Color.White,
-                fontSize = 14.sp,
-                modifier = Modifier
-            )
-        }
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 倍速
-            SpeedControlFlyout(
-                yOffset = 70,
-                onHoverStateChanged = onSpeedControlHoverChanged,
-                onSpeedSelected = { item ->
-                    mediaPlayer.features[PlaybackSpeed]?.set(item.value)
+                Icon(
+                    imageVector = Forward10S,
+                    contentDescription = "快进10s",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = {
+                                mediaPlayer.skip(10_000)
+                            })
+                )
+                // 下一集按钮
+                if (nextEpisode != null) {
+                    NextEpisodePreviewFlyout(
+                        nextEpisode = nextEpisode,
+                        onClick = { onPlayNextEpisode?.invoke() },
+                        onHoverStateChanged = onNextEpisodeHoverChanged
+                    )
                 }
-            )
-            if (episodeList.isNotEmpty() && currentEpisodeGuid != null && playingInfoCache?.isEpisode == true) {
-                EpisodeSelectionFlyout(
-                    episodes = episodeList,
-                    currentEpisodeGuid = currentEpisodeGuid,
-                    parentTitle = playingInfoCache.parentTitle ?: "",
-                    onEpisodeSelected = { onEpisodeSelected?.invoke(it) },
-                    isAutoPlay = isAutoPlay,
-                    onAutoPlayChanged = { onAutoPlayChanged?.invoke(it) },
-                    onHoverStateChanged = onEpisodeControlHoverChanged
-                )
-            }
-            val qualities = playingInfoCache?.currentQualities
-            if (qualities != null) {
-                QualityControlFlyout(
-                    modifier = Modifier,
-                    qualities = qualities,
-                    currentResolution = playingInfoCache.currentQuality?.resolution ?: "",
-                    currentBitrate = playingInfoCache.currentQuality?.bitrate,
-                    yOffset = 70,
-                    onHoverStateChanged = onQualityControlHoverChanged,
-                    onQualitySelected = {
-                        onQualitySelected?.invoke(it)
-                    }
-                )
-            } else {
+                // 当前播放时间 / 总时间
                 Text(
-                    text = "原画质",
-                    style = LocalTypography.current.title,
-                    color = Color.White.copy(alpha = 0.7843f),
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Normal,
+                    text = "${FnDataConvertor.formatDurationToDateTime((videoProgress * totalDuration).toLong())} / ${
+                        FnDataConvertor.formatDurationToDateTime(totalDuration)
+                    }",
+                    color = Color.White,
+                    fontSize = 14.sp,
                     modifier = Modifier
                 )
             }
-            SubtitleControlFlyout(
-                playingInfoCache = playingInfoCache,
-                isoTagData = isoTagData,
-                subtitleSettings = subtitleSettings,
-                onSubtitleSettingsChanged = onSubtitleSettingsChanged,
-                onSubtitleSelected = { onSubtitleSelected?.invoke(it) },
-                onOpenSubtitleSearch = { onOpenSubtitleSearch?.invoke() },
-                onOpenAddNasSubtitle = { onOpenAddNasSubtitle?.invoke() },
-                onOpenAddLocalSubtitle = { onOpenAddLocalSubtitle?.invoke() },
-                modifier = Modifier.padding(start = 12.dp),
-                onHoverStateChanged = onSubtitleControlHoverChanged,
-                onRequestDelete = onRequestDeleteSubtitle
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 倍速
+                SpeedControlFlyout(
+                    yOffset = 70,
+                    onHoverStateChanged = onSpeedControlHoverChanged,
+                    onSpeedSelected = { item ->
+                        mediaPlayer.features[PlaybackSpeed]?.set(item.value)
+                    }
+                )
+                if (episodeList.isNotEmpty() && currentEpisodeGuid != null && playingInfoCache?.isEpisode == true) {
+                    EpisodeSelectionFlyout(
+                        episodes = episodeList,
+                        currentEpisodeGuid = currentEpisodeGuid,
+                        parentTitle = playingInfoCache.parentTitle ?: "",
+                        onEpisodeSelected = { onEpisodeSelected?.invoke(it) },
+                        isAutoPlay = isAutoPlay,
+                        onAutoPlayChanged = { onAutoPlayChanged?.invoke(it) },
+                        onHoverStateChanged = onEpisodeControlHoverChanged
+                    )
+                }
+                val qualities = playingInfoCache?.currentQualities
+                if (qualities != null) {
+                    QualityControlFlyout(
+                        modifier = Modifier,
+                        qualities = qualities,
+                        currentResolution = playingInfoCache.currentQuality?.resolution ?: "",
+                        currentBitrate = playingInfoCache.currentQuality?.bitrate,
+                        yOffset = 70,
+                        onHoverStateChanged = onQualityControlHoverChanged,
+                        onQualitySelected = {
+                            onQualitySelected?.invoke(it)
+                        }
+                    )
+                } else {
+                    Text(
+                        text = "原画质",
+                        style = LocalTypography.current.title,
+                        color = Color.White.copy(alpha = 0.7843f),
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Normal,
+                        modifier = Modifier
+                    )
+                }
+                SubtitleControlFlyout(
+                    playingInfoCache = playingInfoCache,
+                    isoTagData = isoTagData,
+                    subtitleSettings = subtitleSettings,
+                    onSubtitleSettingsChanged = onSubtitleSettingsChanged,
+                    onSubtitleSelected = { onSubtitleSelected?.invoke(it) },
+                    onOpenSubtitleSearch = { onOpenSubtitleSearch?.invoke() },
+                    onOpenAddNasSubtitle = { onOpenAddNasSubtitle?.invoke() },
+                    onOpenAddLocalSubtitle = { onOpenAddLocalSubtitle?.invoke() },
+                    modifier = Modifier.padding(start = 12.dp),
+                    onHoverStateChanged = onSubtitleControlHoverChanged,
+                    onRequestDelete = onRequestDeleteSubtitle
+                )
+                PlayerSettingsMenu(
+                    playingInfoCache = playingInfoCache,
+                    isoTagData = isoTagData,
+                    onAudioSelected = { audio ->
+                        onAudioSelected?.invoke(audio)
+                    },
+                    onWindowAspectRatioChanged = onWindowAspectRatioChanged,
+                    modifier = Modifier.padding(start = 12.dp),
+                    onHoverStateChanged = onSettingsMenuHoverChanged
+                )
+                val audioLevelController =
+                    remember(mediaPlayer) { mediaPlayer.features[AudioLevelController] }
+                val volume by audioLevelController?.volume?.collectAsState()
+                    ?: remember { mutableFloatStateOf(1f) }
+                // 音量控制
+                VolumeControl(
+                    volume = volume,
+                    onVolumeChange = {
+                        audioLevelController?.setVolume(it)
+                        PlayingSettingsStore.saveVolume(it)
+                        onLastVolumeChange(0f)
+                    },
+                    onHoverStateChanged = onVolumeControlHoverChanged,
+                    modifier = Modifier.size(50.dp)
+                )
+                // 全屏
+                val windowState = LocalWindowState.current
+                val store = LocalStore.current
+                FullScreenControl(
+                    isFullScreen = windowState.placement == WindowPlacement.Fullscreen,
+                    onClick = {
+                        if (windowState.placement == WindowPlacement.Fullscreen) {
+                            windowState.placement = WindowPlacement.Floating
+                            AppSettingsStore.playerIsFullscreen = false
+                        } else {
+                            windowState.placement = WindowPlacement.Fullscreen
+                            AppSettingsStore.playerIsFullscreen = true
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    suspend fun MediampPlayer.playUri(
+        uri: String,
+        headers: Map<String, String> = emptyMap(),
+        extraFiles: MediaExtraFiles
+    ): Unit =
+        setMediaData(UriMediaData(uri, headers, extraFiles))
+
+    @Composable
+    fun rememberPlayMediaFunction(
+        guid: String,
+        player: MediampPlayer,
+        mediaGuid: String? = null,
+        currentAudioGuid: String? = null,
+        currentSubtitleGuid: String? = null
+    ): () -> Unit {
+        val streamViewModel: StreamViewModel = koinViewModel()
+        val playPlayViewModel: PlayPlayViewModel = koinViewModel()
+        val playInfoViewModel: PlayInfoViewModel = koinViewModel()
+        val userInfoViewModel: UserInfoViewModel = koinViewModel()
+        val playRecordViewModel: PlayRecordViewModel = koinViewModel()
+        val playerViewModel: PlayerViewModel = koinViewModel()
+        val mp4Parser: Mp4Parser = koinInject()
+        val playerManager = LocalPlayerManager.current
+        return remember(
+            streamViewModel,
+            playPlayViewModel,
+            playerViewModel,
+            guid,
+            player,
+            playerManager,
+            mediaGuid,
+            currentAudioGuid,
+            currentSubtitleGuid,
+            mp4Parser
+        ) {
+            {
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    try {
+                        playerManager.setLoading(true)
+                        playMedia(
+                            guid = guid,
+                            player = player,
+                            playInfoViewModel = playInfoViewModel,
+                            userInfoViewModel = userInfoViewModel,
+                            streamViewModel = streamViewModel,
+                            playPlayViewModel = playPlayViewModel,
+                            playRecordViewModel = playRecordViewModel,
+                            playerViewModel = playerViewModel,
+                            playerManager = playerManager,
+                            mediaGuid = mediaGuid,
+                            currentAudioGuid = currentAudioGuid,
+                            currentSubtitleGuid = currentSubtitleGuid,
+                            mp4Parser = mp4Parser
+                        )
+                    } finally {
+                        playerManager.setLoading(false)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun playMedia(
+        guid: String,
+        player: MediampPlayer,
+        playInfoViewModel: PlayInfoViewModel,
+        userInfoViewModel: UserInfoViewModel,
+        streamViewModel: StreamViewModel,
+        playPlayViewModel: PlayPlayViewModel,
+        playRecordViewModel: PlayRecordViewModel,
+        playerViewModel: PlayerViewModel,
+        playerManager: PlayerManager,
+        mediaGuid: String?,
+        currentAudioGuid: String?,
+        currentSubtitleGuid: String?,
+        mp4Parser: Mp4Parser
+    ) {
+        try {
+            // 1. Fetch Basic Info (IO)
+            val (playInfoResponse, userInfo, streamInfo) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val p = playInfoViewModel.loadDataAndWait(guid, mediaGuid)
+                val u = getUserInfo(userInfoViewModel)
+                val s = fetchStreamInfo(p, u, streamViewModel)
+                Triple(p, u, s)
+            }
+
+            val startPosition: Long = playInfoResponse.ts.toLong() * 1000
+            val videoStream = streamInfo.videoStream
+            val audioStream =
+                streamInfo.audioStreams.first { audioStream -> audioStream.guid == playInfoResponse.audioGuid }
+            val audioGuid = currentAudioGuid ?: audioStream.guid
+//        val subtitleStream = streamInfo.subtitleStreams?.first{ it.guid == playInfoResponse.subtitleGuid}
+            val subtitleStream = streamInfo.subtitleStreams?.find {
+                it.guid == playInfoResponse.subtitleGuid
+            }
+            val subtitleGuid = currentSubtitleGuid ?: subtitleStream?.guid
+            val fileStream = streamInfo.fileStream
+
+            // 缓存播放信息 (提前初始化，确保LocalFileInfo可用)
+            val cache = createPlayingInfoCache(
+                streamInfo,
+                fileStream,
+                videoStream,
+                audioStream,
+                subtitleStream,
+                playInfoResponse
             )
-            PlayerSettingsMenu(
-                playingInfoCache = playingInfoCache,
-                isoTagData = isoTagData,
-                onAudioSelected = { audio ->
-                    onAudioSelected?.invoke(audio)
+            playerViewModel.updatePlayingInfo(cache)
+
+            // 显示播放器
+            showPlayerUI(playInfoResponse, videoStream, playerManager, guid)
+
+            // VLC 播放器对 HDR 颜色空间有兼容问题，强制使用 SDR
+//        val forcedSdr = if (videoStream.colorRangeType != "SDR") 1 else 0
+            val forcedSdr = 0
+
+            // 构造播放请求
+            val playRequest =
+                createPlayRequest(videoStream, fileStream, audioGuid, subtitleGuid, forcedSdr)
+
+            // 获取播放链接
+            val playLinkResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                resolvePlayLink(
+                    playRequest,
+                    cache,
+                    streamInfo,
+                    startPosition,
+                    mp4Parser,
+                    playPlayViewModel,
+                    playInfoResponse
+                )
+            }
+
+            // 缓存播放信息
+            val finalCache = cache.copy(
+                playLink = playLinkResult.playLink,
+                isUseDirectLink = playLinkResult.isDirectLink
+            )
+            playerViewModel.updatePlayingInfo(finalCache)
+
+            logger.i("startPosition: $startPosition, effectiveStartPosition: ${playLinkResult.effectiveStartPosition}")
+            // 设置字幕
+            val extraFiles = subtitleStream?.let {
+                val mediaExtraFiles = getMediaExtraFiles(it, playLinkResult.playLink)
+                mediaExtraFiles
+            } ?: MediaExtraFiles()
+            // 启动播放器
+            var actualPlayLink = playLinkResult.playLink
+            var isM3u8 = false
+            if (playLinkResult.playLink.contains(".m3u8")) {
+                isM3u8 = true
+                try {
+                    // If it's HLS, check if it contains subtitles
+                    // If so, we need to extract the video stream URL to pass to VLC
+                    // to avoid VLC parsing subtitles itself
+                    val m3u8Content =
+                        HlsSubtitleUtil.fetchContent(fnOfficialClient, playLinkResult.playLink)
+                    if (m3u8Content.contains("#EXT-X-MEDIA:TYPE=SUBTITLES")) {
+                        val videoStreamUrl =
+                            HlsSubtitleUtil.extractVideoStreamUrl(
+                                m3u8Content,
+                                playLinkResult.playLink
+                            )
+                        if (videoStreamUrl != null) {
+                            actualPlayLink = videoStreamUrl
+                            logger.i("Extracted video stream URL for VLC: $actualPlayLink")
+                        }
+                    }
+                } catch (e: Exception) {
+                    logger.w("Failed to parse m3u8 for video stream extraction: ${e.message}")
+                }
+            }
+
+            startPlayback(
+                player,
+                actualPlayLink,
+                playLinkResult.effectiveStartPosition,
+                extraFiles,
+                isM3u8
+            )
+            // 调用playRecord接口
+            callPlayRecord(
+//            itemGuid = guid,
+                ts = if ((startPosition / 1000).toInt() == 0) 1 else (startPosition / 1000).toInt(),
+                playingInfoCache = finalCache,
+                playRecordViewModel = playRecordViewModel,
+                onSuccess = {
+                    logger.i("起播时调用playRecord成功")
                 },
-                onWindowAspectRatioChanged = onWindowAspectRatioChanged,
-                modifier = Modifier.padding(start = 12.dp),
-                onHoverStateChanged = onSettingsMenuHoverChanged
-            )
-            val audioLevelController =
-                remember(mediaPlayer) { mediaPlayer.features[AudioLevelController] }
-            val volume by audioLevelController?.volume?.collectAsState()
-                ?: remember { mutableFloatStateOf(1f) }
-            // 音量控制
-            VolumeControl(
-                volume = volume,
-                onVolumeChange = {
-                    audioLevelController?.setVolume(it)
-                    PlayingSettingsStore.saveVolume(it)
-                    onLastVolumeChange(0f)
+                onError = {
+                    logger.e("起播时调用playRecord失败：缓存为空")
                 },
-                onHoverStateChanged = onVolumeControlHoverChanged,
-                modifier = Modifier.size(50.dp)
             )
-            // 全屏
-            val windowState = LocalWindowState.current
-            val store = LocalStore.current
-            FullScreenControl(
-                isFullScreen = windowState.placement == WindowPlacement.Fullscreen,
-                onClick = {
+        } catch (e: Exception) {
+            logger.e("播放失败: ${e.message}", e)
+        }
+    }
+
+    private fun getMediaExtraFiles(
+        subtitleStream: SubtitleStream,
+        playLink: String? = null
+    ): MediaExtraFiles {
+        // HLS subtitles are handled manually by HlsSubtitleRepository and overlay
+        if (!playLink.isNullOrBlank() && playLink.contains(".m3u8") && subtitleStream.isExternal == 0) {
+            return MediaExtraFiles()
+        }
+
+        if (subtitleStream.isExternal == 1) {
+            if (subtitleStream.format in listOf("srt", "ass", "vtt")) {
+//            val subtitleLink =
+//                "${AccountDataCache.getProxyBaseUrl()}/v/api/v1/subtitle/dl/${subtitleStream.guid}"
+//            val subtitle = Subtitle(subtitleLink)
+//            return MediaExtraFiles(listOf(subtitle))
+                // Handled manually by ExternalSubtitleUtil
+                return MediaExtraFiles()
+            }
+        }
+        return MediaExtraFiles()
+    }
+
+    suspend fun fetchStreamInfo(
+        playInfoResponse: PlayInfoResponse,
+        userInfo: UserInfoResponse,
+        streamViewModel: StreamViewModel
+    ): StreamResponse {
+        // 获取用户信息以获取source_name
+        val sourceName = userInfo.userSources.firstOrNull()?.sourceName ?: ""
+        val ip = MD5.digest(sourceName.toByteArray()).hex
+
+        // 调用 getStreamList 接口
+        return streamViewModel.loadDataAndWait(
+            StreamRequest(
+                playInfoResponse.mediaGuid,
+                ip = ip,
+                level = 1,
+                header = StreamRequest.Header(
+                    listOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
+                )
+            )
+        )
+    }
+
+    suspend fun getDirectPlayLink(
+        mediaGuid: String,
+        startPosition: Long,
+        mp4Parser: Mp4Parser
+    ): Pair<String, Long> {
+        val directLinkBase = "/v/api/v1/media/range/${mediaGuid}"
+        val fullUrl = "${AccountDataCache.getProxyBaseUrl()}$directLinkBase"
+        val ts = startPosition / 1000.0
+
+        return try {
+            val offset = mp4Parser.getOffset(fullUrl, ts)
+            if (offset > 0) {
+                val link = "$directLinkBase?range=bytes=$offset-"
+                link to 0L
+            } else {
+                directLinkBase to startPosition
+            }
+        } catch (ex: Exception) {
+            logger.e(ex) { "Failed to calculate offset" }
+            directLinkBase to startPosition
+        }
+    }
+
+    fun createPlayRequest(
+        videoStream: VideoStream,
+        fileStream: FileInfo,
+        audioGuid: String,
+        subtitleGuid: String?,
+        forcedSdr: Int
+    ): PlayPlayRequest {
+        return PlayPlayRequest(
+            videoGuid = videoStream.guid,
+            mediaGuid = fileStream.guid,
+            audioEncoder = "aac",
+            audioGuid = audioGuid,
+            bitrate = videoStream.bps,
+            channels = 2,
+            forcedSdr = forcedSdr,
+            resolution = videoStream.resolutionType,
+            startTimestamp = 0,
+            subtitleGuid = subtitleGuid ?: "",
+            videoEncoder = videoStream.codecName,
+        )
+    }
+
+    private suspend fun startPlayback(
+        player: MediampPlayer,
+        playLink: String,
+        startPosition: Long,
+        extraFiles: MediaExtraFiles,
+        isM3u8: Boolean = false
+    ) {
+        val isDirectLink = playLink.contains("/v/api/v1/media/range/")
+        var baseUrl = if (AccountDataCache.cookieState.isNotBlank() && isDirectLink) {
+            AccountDataCache.getProxyBaseUrl()
+        } else {
+            AccountDataCache.getFnOfficialBaseUrl()
+        }
+
+        // If it's a full URL (e.g. extracted m3u8 video stream), don't prepend base URL
+        if (playLink.startsWith("http")) {
+            baseUrl = ""
+        }
+
+        if (AccountDataCache.cookieState.isNotBlank()) {
+            val headers = mapOf(
+                "cookie" to AccountDataCache.cookieState,
+                "Authorization" to AccountDataCache.authorization
+            )
+//        headers["Authorization"] = AccountDataCache.authorization
+            val extraFilesStr = PlayerScreen.mapper.writeValueAsString(extraFiles)
+            logger.i("play param: headers: $headers, playUri: $baseUrl$playLink, extraFiles: $extraFilesStr")
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                player.playUri("$baseUrl$playLink", headers, extraFiles)
+            }
+        } else {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                player.playUri(
+                    "$baseUrl$playLink",
+                    extraFiles = extraFiles
+                )
+            }
+        }
+        if (!isDirectLink) {
+            delay(1000) // 等待播放器初始化
+        } else {
+            delay(200)
+        }
+        player.features[PlaybackSpeed]?.set(1.0f)
+        // 恢复音量
+        val savedVolume = PlayingSettingsStore.getVolume()
+        player.features[AudioLevelController]?.setVolume(savedVolume)
+
+        logger.i("startPlayback startPosition: $startPosition")
+        player.seekTo(startPosition)
+    }
+
+    private data class PlayLinkResult(
+        val playLink: String,
+        val effectiveStartPosition: Long,
+        val isDirectLink: Boolean
+    )
+
+    private suspend fun getUserInfo(userInfoViewModel: UserInfoViewModel): UserInfoResponse {
+        userInfoViewModel.loadUserInfo()
+        val userInfoState = userInfoViewModel.uiState
+            .filter { it is UiState.Success || it is UiState.Error }
+            .first()
+
+        return when (userInfoState) {
+            is UiState.Success -> userInfoState.data
+            is UiState.Error -> throw Exception(userInfoState.message)
+            else -> throw Exception("Unknown Error")
+        }
+    }
+
+    private fun initializeQuality(qualities: List<QualityResponse>?): QualityResponse? {
+        if (qualities.isNullOrEmpty()) return null
+
+        val saved = PlayingSettingsStore.getQuality()
+        var result: QualityResponse? = null
+
+        if (saved != null) {
+            val matched =
+                qualities.find { it.resolution == saved.resolution && (saved.bitrate == null || it.bitrate == saved.bitrate) }
+            if (matched != null) {
+                result = matched
+            } else {
+                // Try match resolution only, pick highest bitrate
+                val matchedRes = qualities.filter { it.resolution == saved.resolution }
+                    .maxByOrNull { it.bitrate }
+                if (matchedRes != null) {
+                    result = matchedRes
+                }
+            }
+        }
+
+        if (result == null) {
+            result = qualities.firstOrNull()
+        }
+
+        logger.i("Initialize quality, Current resolution: ${result?.resolution}, bitrate: ${result?.bitrate}")
+        return result
+    }
+
+    private fun createPlayingInfoCache(
+        streamInfo: StreamResponse,
+        fileStream: FileInfo,
+        videoStream: VideoStream,
+        audioStream: AudioStream,
+        subtitleStream: SubtitleStream?,
+        playInfoResponse: PlayInfoResponse
+    ): PlayingInfoCache {
+        val currentQuality = initializeQuality(streamInfo.qualities)
+        return PlayingInfoCache(
+            streamInfo,
+            "",
+            fileStream,
+            videoStream,
+            audioStream,
+            subtitleStream,
+            playInfoResponse.item.guid,
+            playInfoResponse.item.parentGuid,
+            playInfoResponse.item.parentTitle,
+            streamInfo.qualities,
+            currentQuality = currentQuality,
+            currentAudioStreamList = streamInfo.audioStreams,
+            currentSubtitleStreamList = streamInfo.subtitleStreams,
+            isEpisode = playInfoResponse.type == FnTvMediaType.EPISODE.value
+        )
+    }
+
+    private fun showPlayerUI(
+        playInfoResponse: PlayInfoResponse,
+        videoStream: VideoStream,
+        playerManager: PlayerManager,
+        guid: String
+    ) {
+        val videoDuration = videoStream.duration * 1000L
+        if (playInfoResponse.type == FnTvMediaType.EPISODE.value) {
+            val season = playInfoResponse.item.parentTitle
+            val episode = "第${playInfoResponse.item.episodeNumber}集"
+            val episodeTitle = playInfoResponse.item.title
+            val subhead =
+                if (episodeTitle.isNullOrEmpty()) "$season · $episode" else "$season · $episode $episodeTitle"
+            playerManager.showPlayer(
+                guid,
+                playInfoResponse.item.tvTitle,
+                subhead,
+                videoDuration,
+                isEpisode = true,
+                isLoading = true
+            )
+        } else {
+            playerManager.showPlayer(
+                guid,
+                playInfoResponse.item.title ?: "",
+                duration = videoDuration,
+                isLoading = true
+            )
+        }
+    }
+
+    private suspend fun resolvePlayLink(
+        playRequest: PlayPlayRequest,
+        cache: PlayingInfoCache,
+        streamInfo: StreamResponse,
+        startPosition: Long,
+        mp4Parser: Mp4Parser,
+        playPlayViewModel: PlayPlayViewModel,
+        playInfoResponse: PlayInfoResponse
+    ): PlayLinkResult {
+        val currentQuality = cache.currentQuality ?: streamInfo.qualities.firstOrNull()
+        val originalQuality = streamInfo.qualities.firstOrNull()
+        val isOriginalQuality = currentQuality != null && originalQuality != null &&
+                currentQuality.resolution == originalQuality.resolution &&
+                currentQuality.bitrate == originalQuality.bitrate
+
+        val videoStream = cache.currentVideoStream
+        val streamMatchesSelected = videoStream.resolutionType == currentQuality?.resolution &&
+                videoStream.bps == currentQuality.bitrate
+
+        val useDirectLink = videoStream.wrapper == "MP4" &&
+                videoStream.colorRangeType == "SDR" &&
+                isOriginalQuality && streamMatchesSelected
+
+        if (useDirectLink) {
+            logger.i("满足直链播放条件: wrapper=MP4, colorRangeType=SDR, isOriginalQuality=true")
+            val (link, start) = getDirectPlayLink(
+                videoStream.mediaGuid,
+                startPosition,
+                mp4Parser
+            )
+            return PlayLinkResult(link, start, isDirectLink = true)
+        } else {
+            try {
+                val playResponse = playPlayViewModel.loadDataAndWait(playRequest)
+                return PlayLinkResult(playResponse.playLink, startPosition, isDirectLink = false)
+            } catch (e: Exception) {
+                if (e.message?.contains("8192") == true) {
+                    logger.i("播放接口返回8192，降级使用直链播放")
+                    val (link, start) = getDirectPlayLink(
+                        playInfoResponse.mediaGuid,
+                        startPosition,
+                        mp4Parser
+                    )
+                    return PlayLinkResult(link, start, isDirectLink = false)
+                }
+                throw e
+            }
+        }
+    }
+
+private fun calculateOptimalPlayerWindowSize(
+        videoStream: VideoStream,
+        baseWidth: Float,
+        baseHeight: Float,
+        aspectRatioSetting: String = "AUTO"
+    ): DpSize? {
+        val videoW = videoStream.width.toFloat()
+        val videoH = videoStream.height.toFloat()
+
+        if (videoW <= 0 || videoH <= 0) return null
+
+        // Determine target aspect ratio
+        val targetAspectRatio = when (aspectRatioSetting) {
+            "4:3" -> 4f / 3f
+            "16:9" -> 16f / 9f
+            "21:9" -> 21f / 9f
+            else -> parseAspectRatio(videoStream.displayAspectRatio) ?: (videoW / videoH)
+        }
+
+        var targetH = baseHeight
+        var targetW = baseWidth
+
+        val currentAspectRatio = if (baseHeight > 0) baseWidth / baseHeight else targetAspectRatio
+
+        // Compensation only applies in AUTO mode
+        val compensation =
+            if (aspectRatioSetting == "AUTO") AppSettingsStore.playerWindowWidthCompensation else 0f
+
+        // Logic to expand window rather than shrink content
+        if (targetAspectRatio > currentAspectRatio) {
+            // Wider target: Keep Height, Expand Width
+            targetH = baseHeight
+            targetW = targetH * targetAspectRatio
+            targetW += compensation
+        } else {
+            // Narrower/Taller target: Keep Width, Expand Height
+            targetW = baseWidth
+            targetH = targetW / targetAspectRatio
+            // No width compensation needed when keeping baseWidth
+        }
+
+        // Constraints: +/- 50% of Base (Applied to Result)
+        val minW = baseWidth * 0.5f
+        val maxW = baseWidth * 1.5f
+
+        // Clamp width if needed (though Expand logic usually stays reasonable unless base was very distorted)
+        if (targetW < minW) targetW = minW
+        if (targetW > maxW) targetW = maxW
+
+        if (targetW != (if (targetAspectRatio > currentAspectRatio) baseHeight * targetAspectRatio + compensation else baseWidth)) {
+
+            val effectiveW = targetW - compensation
+            targetH = effectiveW / targetAspectRatio
+        }
+
+        return DpSize(targetW.dp, targetH.dp)
+    }
+
+    private fun parseAspectRatio(dar: String?): Float? {
+        if (dar.isNullOrBlank()) return null
+        return try {
+            val parts = dar.split(":")
+            if (parts.size == 2) {
+                val w = parts[0].toFloat()
+                val h = parts[1].toFloat()
+                if (h > 0) w / h else null
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+private fun handlePlayerKeyEvent(
+        event: KeyEvent,
+        mediaPlayer: MediampPlayer,
+        playingInfoCache: PlayingInfoCache?,
+        playRecordViewModel: PlayRecordViewModel,
+        playerManager: PlayerManager,
+        audioLevelController: AudioLevelController?,
+        windowState: WindowState,
+        toastManager: ToastManager,
+        lastVolume: Float,
+        onLastVolumeChange: (Float) -> Unit
+    ): Boolean {
+        if (event.type == KeyEventType.KeyDown) {
+            var handled = true
+            when (event.key) {
+                Key.M, Key.VolumeMute -> {
+                    audioLevelController?.let {
+                        val currentVolume = it.volume.value
+                        if (currentVolume > 0) {
+                            onLastVolumeChange(currentVolume)
+                            it.setVolume(0f)
+                            PlayingSettingsStore.saveVolume(0f)
+                            toastManager.showToast("静音", ToastType.Info, category = "volume")
+                        } else {
+                            val restoreVolume = if (lastVolume > 0) lastVolume else 0.05f
+                            it.setVolume(restoreVolume)
+                            PlayingSettingsStore.saveVolume(restoreVolume)
+                            toastManager.showToast(
+                                "解除静音：${(restoreVolume * 100).toInt()}%",
+                                ToastType.Info,
+                                category = "volume"
+                            )
+                        }
+                    }
+                }
+
+                Key.DirectionLeft, Key.MediaStepBackward -> {
+                    val seekPosition =
+                        (mediaPlayer.currentPositionMillis.value - 10000).coerceAtLeast(0)
+                    mediaPlayer.seekTo(seekPosition)
+                    val dateTime = FnDataConvertor.formatDurationToDateTime(seekPosition)
+                    toastManager.showToast("快退至：$dateTime", ToastType.Info, category = "seek")
+                    callPlayRecord(
+                        ts = (seekPosition / 1000).toInt(),
+                        playingInfoCache = playingInfoCache,
+                        playRecordViewModel = playRecordViewModel,
+                        onSuccess = { logger.i("Seek时调用playRecord成功") },
+                        onError = { logger.i("Seek时调用playRecord失败：缓存为空") }
+                    )
+                }
+
+                Key.DirectionRight, Key.MediaStepForward -> {
+                    val seekPosition =
+                        (mediaPlayer.currentPositionMillis.value + 10000).coerceAtMost(playerManager.playerState.duration)
+                    mediaPlayer.seekTo(seekPosition)
+                    val dateTime = FnDataConvertor.formatDurationToDateTime(seekPosition)
+                    toastManager.showToast("快进至：$dateTime", ToastType.Info, category = "seek")
+                    callPlayRecord(
+                        ts = (seekPosition / 1000).toInt(),
+                        playingInfoCache = playingInfoCache,
+                        playRecordViewModel = playRecordViewModel,
+                        onSuccess = { logger.i("Seek时调用playRecord成功") },
+                        onError = { logger.i("Seek时调用playRecord失败：缓存为空") }
+                    )
+                }
+
+                Key.DirectionUp, Key.VolumeUp -> {
+                    audioLevelController?.let {
+                        val newVolume =
+                            (((it.volume.value + 0.1f) * 10).roundToInt() / 10f).coerceIn(0f, 1f)
+                        it.setVolume(newVolume)
+                        toastManager.showToast(
+                            "当前音量：${(newVolume * 100).toInt()}%",
+                            ToastType.Info,
+                            category = "volume"
+                        )
+                        PlayingSettingsStore.saveVolume(newVolume)
+                        onLastVolumeChange(0f)
+                    }
+                }
+
+                Key.DirectionDown, Key.VolumeDown -> {
+                    audioLevelController?.let {
+                        val newVolume =
+                            (((it.volume.value - 0.1f) * 10).roundToInt() / 10f).coerceIn(0f, 1f)
+                        it.setVolume(newVolume)
+                        toastManager.showToast(
+                            "当前音量：${(newVolume * 100).toInt()}%",
+                            ToastType.Info,
+                            category = "volume"
+                        )
+                        PlayingSettingsStore.saveVolume(newVolume)
+                        onLastVolumeChange(0f)
+                    }
+                }
+
+                Key.Spacebar, Key.MediaPlayPause -> {
+                    mediaPlayer.togglePause()
+                }
+
+                Key.MediaStop -> {
+                    mediaPlayer.pause()
+                }
+
+                Key.F -> {
                     if (windowState.placement == WindowPlacement.Fullscreen) {
                         windowState.placement = WindowPlacement.Floating
                         AppSettingsStore.playerIsFullscreen = false
@@ -1551,867 +2521,251 @@ fun PlayerControlRow(
                         AppSettingsStore.playerIsFullscreen = true
                     }
                 }
-            )
-        }
-    }
-}
 
-suspend fun MediampPlayer.playUri(
-    uri: String,
-    headers: Map<String, String> = emptyMap(),
-    extraFiles: MediaExtraFiles
-): Unit =
-    setMediaData(UriMediaData(uri, headers, extraFiles))
-
-@Composable
-fun rememberPlayMediaFunction(
-    guid: String,
-    player: MediampPlayer,
-    mediaGuid: String? = null,
-    currentAudioGuid: String? = null,
-    currentSubtitleGuid: String? = null
-): () -> Unit {
-    val streamViewModel: StreamViewModel = koinViewModel()
-    val playPlayViewModel: PlayPlayViewModel = koinViewModel()
-    val playInfoViewModel: PlayInfoViewModel = koinViewModel()
-    val userInfoViewModel: UserInfoViewModel = koinViewModel()
-    val playRecordViewModel: PlayRecordViewModel = koinViewModel()
-    val playerViewModel: PlayerViewModel = koinViewModel()
-    val mp4Parser: Mp4Parser = koinInject()
-    val playerManager = LocalPlayerManager.current
-    return remember(
-        streamViewModel,
-        playPlayViewModel,
-        playerViewModel,
-        guid,
-        player,
-        playerManager,
-        mediaGuid,
-        currentAudioGuid,
-        currentSubtitleGuid,
-        mp4Parser
-    ) {
-        {
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                try {
-                    playerManager.setLoading(true)
-                    playMedia(
-                        guid = guid,
-                        player = player,
-                        playInfoViewModel = playInfoViewModel,
-                        userInfoViewModel = userInfoViewModel,
-                        streamViewModel = streamViewModel,
-                        playPlayViewModel = playPlayViewModel,
-                        playRecordViewModel = playRecordViewModel,
-                        playerViewModel = playerViewModel,
-                        playerManager = playerManager,
-                        mediaGuid = mediaGuid,
-                        currentAudioGuid = currentAudioGuid,
-                        currentSubtitleGuid = currentSubtitleGuid,
-                        mp4Parser = mp4Parser
-                    )
-                } finally {
-                    playerManager.setLoading(false)
-                }
-            }
-        }
-    }
-}
-
-private suspend fun playMedia(
-    guid: String,
-    player: MediampPlayer,
-    playInfoViewModel: PlayInfoViewModel,
-    userInfoViewModel: UserInfoViewModel,
-    streamViewModel: StreamViewModel,
-    playPlayViewModel: PlayPlayViewModel,
-    playRecordViewModel: PlayRecordViewModel,
-    playerViewModel: PlayerViewModel,
-    playerManager: PlayerManager,
-    mediaGuid: String?,
-    currentAudioGuid: String?,
-    currentSubtitleGuid: String?,
-    mp4Parser: Mp4Parser
-) {
-    try {
-        // 1. Fetch Basic Info (IO)
-        val (playInfoResponse, userInfo, streamInfo) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val p = playInfoViewModel.loadDataAndWait(guid, mediaGuid)
-            val u = getUserInfo(userInfoViewModel)
-            val s = fetchStreamInfo(p, u, streamViewModel)
-            Triple(p, u, s)
-        }
-
-        val startPosition: Long = playInfoResponse.ts.toLong() * 1000
-        val videoStream = streamInfo.videoStream
-        val audioStream =
-            streamInfo.audioStreams.first { audioStream -> audioStream.guid == playInfoResponse.audioGuid }
-        val audioGuid = currentAudioGuid ?: audioStream.guid
-//        val subtitleStream = streamInfo.subtitleStreams?.first{ it.guid == playInfoResponse.subtitleGuid}
-        val subtitleStream = streamInfo.subtitleStreams?.find {
-            it.guid == playInfoResponse.subtitleGuid
-        }
-        val subtitleGuid = currentSubtitleGuid ?: subtitleStream?.guid
-        val fileStream = streamInfo.fileStream
-
-        // 缓存播放信息 (提前初始化，确保LocalFileInfo可用)
-        val cache = createPlayingInfoCache(
-            streamInfo,
-            fileStream,
-            videoStream,
-            audioStream,
-            subtitleStream,
-            playInfoResponse
-        )
-        playerViewModel.updatePlayingInfo(cache)
-
-        // 显示播放器
-        showPlayerUI(playInfoResponse, videoStream, playerManager, guid)
-
-        // VLC 播放器对 HDR 颜色空间有兼容问题，强制使用 SDR
-//        val forcedSdr = if (videoStream.colorRangeType != "SDR") 1 else 0
-        val forcedSdr = 0
-
-        // 构造播放请求
-        val playRequest =
-            createPlayRequest(videoStream, fileStream, audioGuid, subtitleGuid, forcedSdr)
-
-        // 获取播放链接
-        val playLinkResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            resolvePlayLink(
-                playRequest,
-                cache,
-                streamInfo,
-                startPosition,
-                mp4Parser,
-                playPlayViewModel,
-                playInfoResponse
-            )
-        }
-
-        // 缓存播放信息
-        val finalCache = cache.copy(
-            playLink = playLinkResult.playLink,
-            isUseDirectLink = playLinkResult.isDirectLink
-        )
-        playerViewModel.updatePlayingInfo(finalCache)
-
-        logger.i("startPosition: $startPosition, effectiveStartPosition: ${playLinkResult.effectiveStartPosition}")
-        // 设置字幕
-        val extraFiles = subtitleStream?.let {
-            val mediaExtraFiles = getMediaExtraFiles(it, playLinkResult.playLink)
-            mediaExtraFiles
-        } ?: MediaExtraFiles()
-        // 启动播放器
-        var actualPlayLink = playLinkResult.playLink
-        var isM3u8 = false
-        if (playLinkResult.playLink.contains(".m3u8")) {
-            isM3u8 = true
-            try {
-                // If it's HLS, check if it contains subtitles
-                // If so, we need to extract the video stream URL to pass to VLC
-                // to avoid VLC parsing subtitles itself
-                val m3u8Content =
-                    HlsSubtitleUtil.fetchContent(fnOfficialClient, playLinkResult.playLink)
-                if (m3u8Content.contains("#EXT-X-MEDIA:TYPE=SUBTITLES")) {
-                    val videoStreamUrl =
-                        HlsSubtitleUtil.extractVideoStreamUrl(m3u8Content, playLinkResult.playLink)
-                    if (videoStreamUrl != null) {
-                        actualPlayLink = videoStreamUrl
-                        logger.i("Extracted video stream URL for VLC: $actualPlayLink")
+                Key.Escape -> {
+                    if (windowState.placement == WindowPlacement.Fullscreen) {
+                        windowState.placement = WindowPlacement.Floating
+                        AppSettingsStore.playerIsFullscreen = false
                     }
                 }
-            } catch (e: Exception) {
-                logger.w("Failed to parse m3u8 for video stream extraction: ${e.message}")
+
+                else -> handled = false
             }
-        }
-
-        startPlayback(
-            player,
-            actualPlayLink,
-            playLinkResult.effectiveStartPosition,
-            extraFiles,
-            isM3u8
-        )
-        // 调用playRecord接口
-        callPlayRecord(
-//            itemGuid = guid,
-            ts = if ((startPosition / 1000).toInt() == 0) 1 else (startPosition / 1000).toInt(),
-            playingInfoCache = finalCache,
-            playRecordViewModel = playRecordViewModel,
-            onSuccess = {
-                logger.i("起播时调用playRecord成功")
-            },
-            onError = {
-                logger.e("起播时调用playRecord失败：缓存为空")
-            },
-        )
-    } catch (e: Exception) {
-        logger.e("播放失败: ${e.message}", e)
-    }
-}
-
-private fun getMediaExtraFiles(
-    subtitleStream: SubtitleStream,
-    playLink: String? = null
-): MediaExtraFiles {
-    // HLS subtitles are handled manually by HlsSubtitleRepository and overlay
-    if (!playLink.isNullOrBlank() && playLink.contains(".m3u8") && subtitleStream.isExternal == 0) {
-        return MediaExtraFiles()
-    }
-
-    if (subtitleStream.isExternal == 1) {
-        if (subtitleStream.format in listOf("srt", "ass", "vtt")) {
-//            val subtitleLink =
-//                "${AccountDataCache.getProxyBaseUrl()}/v/api/v1/subtitle/dl/${subtitleStream.guid}"
-//            val subtitle = Subtitle(subtitleLink)
-//            return MediaExtraFiles(listOf(subtitle))
-            // Handled manually by ExternalSubtitleUtil
-            return MediaExtraFiles()
-        }
-    }
-    return MediaExtraFiles()
-}
-
-private suspend fun fetchStreamInfo(
-    playInfoResponse: PlayInfoResponse,
-    userInfo: UserInfoResponse,
-    streamViewModel: StreamViewModel
-): StreamResponse {
-    // 获取用户信息以获取source_name
-    val sourceName = userInfo.userSources.firstOrNull()?.sourceName ?: ""
-    val ip = MD5.digest(sourceName.toByteArray()).hex
-
-    // 调用 getStreamList 接口
-    return streamViewModel.loadDataAndWait(
-        StreamRequest(
-            playInfoResponse.mediaGuid,
-            ip = ip,
-            level = 1,
-            header = StreamRequest.Header(
-                listOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
-            )
-        )
-    )
-}
-
-private suspend fun getDirectPlayLink(
-    mediaGuid: String,
-    startPosition: Long,
-    mp4Parser: Mp4Parser
-): Pair<String, Long> {
-    val directLinkBase = "/v/api/v1/media/range/${mediaGuid}"
-    val fullUrl = "${AccountDataCache.getProxyBaseUrl()}$directLinkBase"
-    val ts = startPosition / 1000.0
-
-    return try {
-        val offset = mp4Parser.getOffset(fullUrl, ts)
-        if (offset > 0) {
-            val link = "$directLinkBase?range=bytes=$offset-"
-            link to 0L
+            return handled
         } else {
-            directLinkBase to startPosition
-        }
-    } catch (ex: Exception) {
-        logger.e(ex) { "Failed to calculate offset" }
-        directLinkBase to startPosition
-    }
-}
-
-private fun createPlayRequest(
-    videoStream: VideoStream,
-    fileStream: FileInfo,
-    audioGuid: String,
-    subtitleGuid: String?,
-    forcedSdr: Int
-): PlayPlayRequest {
-    return PlayPlayRequest(
-        videoGuid = videoStream.guid,
-        mediaGuid = fileStream.guid,
-        audioEncoder = "aac",
-        audioGuid = audioGuid,
-        bitrate = videoStream.bps,
-        channels = 2,
-        forcedSdr = forcedSdr,
-        resolution = videoStream.resolutionType,
-        startTimestamp = 0,
-        subtitleGuid = subtitleGuid ?: "",
-        videoEncoder = videoStream.codecName,
-    )
-}
-
-private suspend fun startPlayback(
-    player: MediampPlayer,
-    playLink: String,
-    startPosition: Long,
-    extraFiles: MediaExtraFiles,
-    isM3u8: Boolean = false
-) {
-    val isDirectLink = playLink.contains("/v/api/v1/media/range/")
-    var baseUrl = if (AccountDataCache.cookieState.isNotBlank() && isDirectLink) {
-        AccountDataCache.getProxyBaseUrl()
-    } else {
-        AccountDataCache.getFnOfficialBaseUrl()
-    }
-
-    // If it's a full URL (e.g. extracted m3u8 video stream), don't prepend base URL
-    if (playLink.startsWith("http")) {
-        baseUrl = ""
-    }
-
-    if (AccountDataCache.cookieState.isNotBlank()) {
-        val headers = mapOf(
-            "cookie" to AccountDataCache.cookieState,
-            "Authorization" to AccountDataCache.authorization
-        )
-//        headers["Authorization"] = AccountDataCache.authorization
-        val extraFilesStr = PlayerScreen.mapper.writeValueAsString(extraFiles)
-        logger.i("play param: headers: $headers, playUri: $baseUrl$playLink, extraFiles: $extraFilesStr")
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            player.playUri("$baseUrl$playLink", headers, extraFiles)
-        }
-    } else {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            player.playUri(
-                "$baseUrl$playLink",
-                extraFiles = extraFiles
-            )
+            return false
         }
     }
-    if (!isDirectLink) {
-        delay(1000) // 等待播放器初始化
-    } else {
-        delay(200)
-    }
-    player.features[PlaybackSpeed]?.set(1.0f)
-    // 恢复音量
-    val savedVolume = PlayingSettingsStore.getVolume()
-    player.features[AudioLevelController]?.setVolume(savedVolume)
-
-    logger.i("startPlayback startPosition: $startPosition")
-    player.seekTo(startPosition)
-}
-
-private data class PlayLinkResult(
-    val playLink: String,
-    val effectiveStartPosition: Long,
-    val isDirectLink: Boolean
-)
-
-private suspend fun getUserInfo(userInfoViewModel: UserInfoViewModel): UserInfoResponse {
-    userInfoViewModel.loadUserInfo()
-    val userInfoState = userInfoViewModel.uiState
-        .filter { it is UiState.Success || it is UiState.Error }
-        .first()
-
-    return when (userInfoState) {
-        is UiState.Success -> userInfoState.data
-        is UiState.Error -> throw Exception(userInfoState.message)
-        else -> throw Exception("Unknown Error")
-    }
-}
-
-private fun initializeQuality(qualities: List<QualityResponse>?): QualityResponse? {
-    if (qualities.isNullOrEmpty()) return null
-
-    val saved = PlayingSettingsStore.getQuality()
-    var result: QualityResponse? = null
-
-    if (saved != null) {
-        val matched =
-            qualities.find { it.resolution == saved.resolution && (saved.bitrate == null || it.bitrate == saved.bitrate) }
-        if (matched != null) {
-            result = matched
-        } else {
-            // Try match resolution only, pick highest bitrate
-            val matchedRes = qualities.filter { it.resolution == saved.resolution }
-                .maxByOrNull { it.bitrate }
-            if (matchedRes != null) {
-                result = matchedRes
-            }
-        }
-    }
-
-    if (result == null) {
-        result = qualities.firstOrNull()
-    }
-
-    logger.i("Initialize quality, Current resolution: ${result?.resolution}, bitrate: ${result?.bitrate}")
-    return result
-}
-
-private fun createPlayingInfoCache(
-    streamInfo: StreamResponse,
-    fileStream: FileInfo,
-    videoStream: VideoStream,
-    audioStream: AudioStream,
-    subtitleStream: SubtitleStream?,
-    playInfoResponse: PlayInfoResponse
-): PlayingInfoCache {
-    val currentQuality = initializeQuality(streamInfo.qualities)
-    return PlayingInfoCache(
-        streamInfo,
-        "",
-        fileStream,
-        videoStream,
-        audioStream,
-        subtitleStream,
-        playInfoResponse.item.guid,
-        playInfoResponse.item.parentGuid,
-        playInfoResponse.item.parentTitle,
-        streamInfo.qualities,
-        currentQuality = currentQuality,
-        currentAudioStreamList = streamInfo.audioStreams,
-        currentSubtitleStreamList = streamInfo.subtitleStreams,
-        isEpisode = playInfoResponse.type == FnTvMediaType.EPISODE.value
-    )
-}
-
-private fun showPlayerUI(
-    playInfoResponse: PlayInfoResponse,
-    videoStream: VideoStream,
-    playerManager: PlayerManager,
-    guid: String
-) {
-    val videoDuration = videoStream.duration * 1000L
-    if (playInfoResponse.type == FnTvMediaType.EPISODE.value) {
-        val season = playInfoResponse.item.parentTitle
-        val episode = "第${playInfoResponse.item.episodeNumber}集"
-        val episodeTitle = playInfoResponse.item.title
-        val subhead =
-            if (episodeTitle.isNullOrEmpty()) "$season · $episode" else "$season · $episode $episodeTitle"
-        playerManager.showPlayer(
-            guid,
-            playInfoResponse.item.tvTitle,
-            subhead,
-            videoDuration,
-            isEpisode = true,
-            isLoading = true
-        )
-    } else {
-        playerManager.showPlayer(
-            guid,
-            playInfoResponse.item.title ?: "",
-            duration = videoDuration,
-            isLoading = true
-        )
-    }
-}
-
-private suspend fun resolvePlayLink(
-    playRequest: PlayPlayRequest,
-    cache: PlayingInfoCache,
-    streamInfo: StreamResponse,
-    startPosition: Long,
-    mp4Parser: Mp4Parser,
-    playPlayViewModel: PlayPlayViewModel,
-    playInfoResponse: PlayInfoResponse
-): PlayLinkResult {
-    val currentQuality = cache.currentQuality ?: streamInfo.qualities.firstOrNull()
-    val originalQuality = streamInfo.qualities.firstOrNull()
-    val isOriginalQuality = currentQuality != null && originalQuality != null &&
-            currentQuality.resolution == originalQuality.resolution &&
-            currentQuality.bitrate == originalQuality.bitrate
-
-    val videoStream = cache.currentVideoStream
-    val streamMatchesSelected = videoStream.resolutionType == currentQuality?.resolution &&
-            videoStream.bps == currentQuality.bitrate
-
-    val useDirectLink = videoStream.wrapper == "MP4" &&
-            videoStream.colorRangeType == "SDR" &&
-            isOriginalQuality && streamMatchesSelected
-
-    if (useDirectLink) {
-        logger.i("满足直链播放条件: wrapper=MP4, colorRangeType=SDR, isOriginalQuality=true")
-        val (link, start) = getDirectPlayLink(
-            videoStream.mediaGuid,
-            startPosition,
-            mp4Parser
-        )
-        return PlayLinkResult(link, start, isDirectLink = true)
-    } else {
-        try {
-            val playResponse = playPlayViewModel.loadDataAndWait(playRequest)
-            return PlayLinkResult(playResponse.playLink, startPosition, isDirectLink = false)
-        } catch (e: Exception) {
-            if (e.message?.contains("8192") == true) {
-                logger.i("播放接口返回8192，降级使用直链播放")
-                val (link, start) = getDirectPlayLink(
-                    playInfoResponse.mediaGuid,
-                    startPosition,
-                    mp4Parser
-                )
-                return PlayLinkResult(link, start, isDirectLink = false)
-            }
-            throw e
-        }
-    }
-}
-
-private fun calculateOptimalPlayerWindowSize(
-    videoStream: VideoStream,
-    baseWidth: Float,
-    baseHeight: Float,
-    aspectRatioSetting: String = "AUTO"
-): DpSize? {
-    val videoW = videoStream.width.toFloat()
-    val videoH = videoStream.height.toFloat()
-
-    if (videoW <= 0 || videoH <= 0) return null
-
-    // Determine target aspect ratio
-    val targetAspectRatio = when (aspectRatioSetting) {
-        "4:3" -> 4f / 3f
-        "16:9" -> 16f / 9f
-        "21:9" -> 21f / 9f
-        else -> parseAspectRatio(videoStream.displayAspectRatio) ?: (videoW / videoH)
-    }
-
-    var targetH = baseHeight
-    var targetW = baseWidth
-
-    val currentAspectRatio = if (baseHeight > 0) baseWidth / baseHeight else targetAspectRatio
-
-    // Compensation only applies in AUTO mode
-    val compensation =
-        if (aspectRatioSetting == "AUTO") AppSettingsStore.playerWindowWidthCompensation else 0f
-
-    // Logic to expand window rather than shrink content
-    if (targetAspectRatio > currentAspectRatio) {
-        // Wider target: Keep Height, Expand Width
-        targetH = baseHeight
-        targetW = targetH * targetAspectRatio
-        targetW += compensation
-    } else {
-        // Narrower/Taller target: Keep Width, Expand Height
-        targetW = baseWidth
-        targetH = targetW / targetAspectRatio
-        // No width compensation needed when keeping baseWidth
-    }
-
-    // Constraints: +/- 50% of Base (Applied to Result)
-    val minW = baseWidth * 0.5f
-    val maxW = baseWidth * 1.5f
-
-    // Clamp width if needed (though Expand logic usually stays reasonable unless base was very distorted)
-    if (targetW < minW) targetW = minW
-    if (targetW > maxW) targetW = maxW
-
-    if (targetW != (if (targetAspectRatio > currentAspectRatio) baseHeight * targetAspectRatio + compensation else baseWidth)) {
-
-        val effectiveW = targetW - compensation
-        targetH = effectiveW / targetAspectRatio
-    }
-
-    return DpSize(targetW.dp, targetH.dp)
-}
-
-private fun parseAspectRatio(dar: String?): Float? {
-    if (dar.isNullOrBlank()) return null
-    return try {
-        val parts = dar.split(":")
-        if (parts.size == 2) {
-            val w = parts[0].toFloat()
-            val h = parts[1].toFloat()
-            if (h > 0) w / h else null
-        } else {
-            null
-        }
-    } catch (e: Exception) {
-        null
-    }
-}
-
-private fun handlePlayerKeyEvent(
-    event: KeyEvent,
-    mediaPlayer: MediampPlayer,
-    playingInfoCache: PlayingInfoCache?,
-    playRecordViewModel: PlayRecordViewModel,
-    playerManager: PlayerManager,
-    audioLevelController: AudioLevelController?,
-    windowState: WindowState,
-    toastManager: ToastManager,
-    lastVolume: Float,
-    onLastVolumeChange: (Float) -> Unit
-): Boolean {
-    if (event.type == KeyEventType.KeyDown) {
-        var handled = true
-        when (event.key) {
-            Key.M, Key.VolumeMute -> {
-                audioLevelController?.let {
-                    val currentVolume = it.volume.value
-                    if (currentVolume > 0) {
-                        onLastVolumeChange(currentVolume)
-                        it.setVolume(0f)
-                        PlayingSettingsStore.saveVolume(0f)
-                        toastManager.showToast("静音", ToastType.Info, category = "volume")
-                    } else {
-                        val restoreVolume = if (lastVolume > 0) lastVolume else 0.05f
-                        it.setVolume(restoreVolume)
-                        PlayingSettingsStore.saveVolume(restoreVolume)
-                        toastManager.showToast(
-                            "解除静音：${(restoreVolume * 100).toInt()}%",
-                            ToastType.Info,
-                            category = "volume"
-                        )
-                    }
-                }
-            }
-
-            Key.DirectionLeft, Key.MediaStepBackward -> {
-                val seekPosition =
-                    (mediaPlayer.currentPositionMillis.value - 10000).coerceAtLeast(0)
-                mediaPlayer.seekTo(seekPosition)
-                val dateTime = FnDataConvertor.formatDurationToDateTime(seekPosition)
-                toastManager.showToast("快退至：$dateTime", ToastType.Info, category = "seek")
-                callPlayRecord(
-                    ts = (seekPosition / 1000).toInt(),
-                    playingInfoCache = playingInfoCache,
-                    playRecordViewModel = playRecordViewModel,
-                    onSuccess = { logger.i("Seek时调用playRecord成功") },
-                    onError = { logger.i("Seek时调用playRecord失败：缓存为空") }
-                )
-            }
-
-            Key.DirectionRight, Key.MediaStepForward -> {
-                val seekPosition =
-                    (mediaPlayer.currentPositionMillis.value + 10000).coerceAtMost(playerManager.playerState.duration)
-                mediaPlayer.seekTo(seekPosition)
-                val dateTime = FnDataConvertor.formatDurationToDateTime(seekPosition)
-                toastManager.showToast("快进至：$dateTime", ToastType.Info, category = "seek")
-                callPlayRecord(
-                    ts = (seekPosition / 1000).toInt(),
-                    playingInfoCache = playingInfoCache,
-                    playRecordViewModel = playRecordViewModel,
-                    onSuccess = { logger.i("Seek时调用playRecord成功") },
-                    onError = { logger.i("Seek时调用playRecord失败：缓存为空") }
-                )
-            }
-
-            Key.DirectionUp, Key.VolumeUp -> {
-                audioLevelController?.let {
-                    val newVolume =
-                        (((it.volume.value + 0.1f) * 10).roundToInt() / 10f).coerceIn(0f, 1f)
-                    it.setVolume(newVolume)
-                    toastManager.showToast(
-                        "当前音量：${(newVolume * 100).toInt()}%",
-                        ToastType.Info,
-                        category = "volume"
-                    )
-                    PlayingSettingsStore.saveVolume(newVolume)
-                    onLastVolumeChange(0f)
-                }
-            }
-
-            Key.DirectionDown, Key.VolumeDown -> {
-                audioLevelController?.let {
-                    val newVolume =
-                        (((it.volume.value - 0.1f) * 10).roundToInt() / 10f).coerceIn(0f, 1f)
-                    it.setVolume(newVolume)
-                    toastManager.showToast(
-                        "当前音量：${(newVolume * 100).toInt()}%",
-                        ToastType.Info,
-                        category = "volume"
-                    )
-                    PlayingSettingsStore.saveVolume(newVolume)
-                    onLastVolumeChange(0f)
-                }
-            }
-
-            Key.Spacebar, Key.MediaPlayPause -> {
-                mediaPlayer.togglePause()
-            }
-
-            Key.MediaStop -> {
-                mediaPlayer.pause()
-            }
-
-            Key.F -> {
-                if (windowState.placement == WindowPlacement.Fullscreen) {
-                    windowState.placement = WindowPlacement.Floating
-                    AppSettingsStore.playerIsFullscreen = false
-                } else {
-                    windowState.placement = WindowPlacement.Fullscreen
-                    AppSettingsStore.playerIsFullscreen = true
-                }
-            }
-
-            Key.Escape -> {
-                if (windowState.placement == WindowPlacement.Fullscreen) {
-                    windowState.placement = WindowPlacement.Floating
-                    AppSettingsStore.playerIsFullscreen = false
-                }
-            }
-
-            else -> handled = false
-        }
-        return handled
-    } else {
-        return false
-    }
-}
 
 private fun handleQualitySelection(
-    quality: QualityResponse,
-    playingInfoCache: PlayingInfoCache?,
-    mediaPlayer: MediampPlayer,
-    playerViewModel: PlayerViewModel,
-    mediaPViewModel: MediaPViewModel,
-    playPlayViewModel: PlayPlayViewModel,
-    playRecordViewModel: PlayRecordViewModel
-) {
-    PlayingSettingsStore.saveQuality(quality.resolution, quality.bitrate)
+        quality: QualityResponse,
+        playingInfoCache: PlayingInfoCache?,
+        mediaPlayer: MediampPlayer,
+        playerViewModel: PlayerViewModel,
+        mediaPViewModel: MediaPViewModel,
+        playPlayViewModel: PlayPlayViewModel,
+        playRecordViewModel: PlayRecordViewModel
+    ) {
+        PlayingSettingsStore.saveQuality(quality.resolution, quality.bitrate)
 //    logger.i("1 change quality to: ${quality.resolution}")
-    if (playingInfoCache != null) {
-        val currentQuality = playingInfoCache.currentQuality
-        val originalQuality = playingInfoCache.streamInfo.qualities.firstOrNull()
-        val videoStream = playingInfoCache.currentVideoStream
-        val currentResolution = quality.resolution
-        val currentBitrate = quality.bitrate
-        val isTargetOriginalQuality =
-            currentQuality != null && originalQuality != null &&
-                    currentResolution == originalQuality.resolution &&
-                    currentBitrate == originalQuality.bitrate
+        if (playingInfoCache != null) {
+            val currentQuality = playingInfoCache.currentQuality
+            val originalQuality = playingInfoCache.streamInfo.qualities.firstOrNull()
+            val videoStream = playingInfoCache.currentVideoStream
+            val currentResolution = quality.resolution
+            val currentBitrate = quality.bitrate
+            val isTargetOriginalQuality =
+                currentQuality != null && originalQuality != null &&
+                        currentResolution == originalQuality.resolution &&
+                        currentBitrate == originalQuality.bitrate
 
-        val canUseDirectLink = videoStream.wrapper == "MP4" &&
-                videoStream.colorRangeType == "SDR"
-        logger.i(
-            "change quality to: ${quality.resolution}, useDirectLink: ${playingInfoCache.isUseDirectLink}, " +
-                    "originalQuality: ${originalQuality}, canUseDirectLink: ${canUseDirectLink}, isTargetOriginalQuality: $isTargetOriginalQuality"
-        )
-        // If currently not using direct link, and video can be direct linked, and target quality is original, call media.quit
-        if (!playingInfoCache.isUseDirectLink && isTargetOriginalQuality && canUseDirectLink) {
-            logger.i("switch to direct link")
-            playerViewModel.updatePlayingInfo(
-                playingInfoCache.copy(
-                    currentQuality = quality,
-                    isUseDirectLink = true,
-                    playLink = null
-                )
+            val canUseDirectLink = videoStream.wrapper == "MP4" &&
+                    videoStream.colorRangeType == "SDR"
+            logger.i(
+                "change quality to: ${quality.resolution}, useDirectLink: ${playingInfoCache.isUseDirectLink}, " +
+                        "originalQuality: ${originalQuality}, canUseDirectLink: ${canUseDirectLink}, isTargetOriginalQuality: $isTargetOriginalQuality"
             )
-            mediaPViewModel.quit(
-                MediaPRequest(
-                    playLink = playingInfoCache.playLink ?: ""
-                )
-            )
-        }
-        // If current video can be direct linked and target is not original, or cannot be direct linked and target is original, call media.resetQuality
-        if (!playingInfoCache.isUseDirectLink) {
-            if ((!isTargetOriginalQuality && canUseDirectLink) || !canUseDirectLink) {
-                logger.i("call reset quality")
+            // If currently not using direct link, and video can be direct linked, and target quality is original, call media.quit
+            if (!playingInfoCache.isUseDirectLink && isTargetOriginalQuality && canUseDirectLink) {
+                logger.i("switch to direct link")
                 playerViewModel.updatePlayingInfo(
                     playingInfoCache.copy(
                         currentQuality = quality,
-                        isUseDirectLink = false
+                        isUseDirectLink = true,
+                        playLink = null
                     )
                 )
-                val request = MediaPRequest(
-                    req = "media.resetQuality",
-                    reqId = "${System.currentTimeMillis()}",
-                    playLink = playingInfoCache.playLink ?: "",
-                    quality = MediaPRequest.Quality(
-                        quality.resolution,
-                        quality.bitrate
-                    ),
-                    startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
-                    clearCache = true
-                )
-                mediaPViewModel.resetQuality(request)
-                playerViewModel.updatePlayingInfo(
-                    playingInfoCache.copy(
-                        currentQuality = quality,
-                        isUseDirectLink = false
+                mediaPViewModel.quit(
+                    MediaPRequest(
+                        playLink = playingInfoCache.playLink ?: ""
                     )
                 )
             }
-        }
-        if (playingInfoCache.isUseDirectLink) {
-            logger.i("switch to HLS")
+            // If current video can be direct linked and target is not original, or cannot be direct linked and target is original, call media.resetQuality
+            if (!playingInfoCache.isUseDirectLink) {
+                if ((!isTargetOriginalQuality && canUseDirectLink) || !canUseDirectLink) {
+                    logger.i("call reset quality")
+                    playerViewModel.updatePlayingInfo(
+                        playingInfoCache.copy(
+                            currentQuality = quality,
+                            isUseDirectLink = false
+                        )
+                    )
+                    val request = MediaPRequest(
+                        req = "media.resetQuality",
+                        reqId = "${System.currentTimeMillis()}",
+                        playLink = playingInfoCache.playLink ?: "",
+                        quality = MediaPRequest.Quality(
+                            quality.resolution,
+                            quality.bitrate
+                        ),
+                        startTimestamp = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
+                        clearCache = true
+                    )
+                    mediaPViewModel.resetQuality(request)
+                    playerViewModel.updatePlayingInfo(
+                        playingInfoCache.copy(
+                            currentQuality = quality,
+                            isUseDirectLink = false
+                        )
+                    )
+                }
+            }
+            if (playingInfoCache.isUseDirectLink) {
+                logger.i("switch to HLS")
 //            val forcedSdr = if (videoStream.colorRangeType != "SDR") 1 else 0
-            val forcedSdr = 0
-            val playRequest = createPlayRequest(
-                videoStream,
-                playingInfoCache.currentFileStream,
-                playingInfoCache.currentAudioStream?.guid ?: "",
-                playingInfoCache.currentSubtitleStream?.guid,
-                forcedSdr
-            )
-            playerViewModel.updatePlayingInfo(
-                playingInfoCache.copy(
-                    currentQuality = quality,
-                    isUseDirectLink = false
+                val forcedSdr = 0
+                val playRequest = createPlayRequest(
+                    videoStream,
+                    playingInfoCache.currentFileStream,
+                    playingInfoCache.currentAudioStream?.guid ?: "",
+                    playingInfoCache.currentSubtitleStream?.guid,
+                    forcedSdr
                 )
-            )
-            try {
-                playPlayViewModel.loadData(playRequest)
-            } catch (e: Exception) {
-                logger.e("Failed to fetch HLS link", e)
+                playerViewModel.updatePlayingInfo(
+                    playingInfoCache.copy(
+                        currentQuality = quality,
+                        isUseDirectLink = false
+                    )
+                )
+                try {
+                    playPlayViewModel.loadData(playRequest)
+                } catch (e: Exception) {
+                    logger.e("Failed to fetch HLS link", e)
+                }
             }
+            callPlayRecord(
+                ts = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
+                playingInfoCache = playingInfoCache,
+                playRecordViewModel = playRecordViewModel,
+                onSuccess = {
+                    logger.i("切换画质时调用playRecord成功")
+                },
+                onError = {
+                    logger.i("切换画质时调用playRecord失败：缓存为空")
+                },
+            )
         }
-        callPlayRecord(
-            ts = (mediaPlayer.getCurrentPositionMillis() / 1000).toInt(),
-            playingInfoCache = playingInfoCache,
-            playRecordViewModel = playRecordViewModel,
-            onSuccess = {
-                logger.i("切换画质时调用playRecord成功")
-            },
-            onError = {
-                logger.i("切换画质时调用playRecord失败：缓存为空")
-            },
-        )
     }
-}
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun PlayerTopBar(
-    mediaTitle: String,
-    subhead: String,
-    isEpisode: Boolean,
-    onBack: () -> Unit,
-    mediaPlayer: MediampPlayer,
-    windowState: WindowState,
-    platform: Platform
-) {
-    val mediaPViewModel: MediaPViewModel = koinViewModel()
-    val playerViewModel: PlayerViewModel = koinViewModel()
-    val playingInfoCache by playerViewModel.playingInfoCache.collectAsState()
-    if (platform is Platform.MacOS) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-            contentAlignment = Alignment.Center
-        ) {
+        mediaTitle: String,
+        subhead: String,
+        isEpisode: Boolean,
+        onBack: () -> Unit,
+        mediaPlayer: MediampPlayer,
+        windowState: WindowState,
+        platform: Platform
+    ) {
+        val mediaPViewModel: MediaPViewModel = koinViewModel()
+        val playerViewModel: PlayerViewModel = koinViewModel()
+        val playingInfoCache by playerViewModel.playingInfoCache.collectAsState()
+        if (platform is Platform.MacOS) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 80.dp),
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
-                val interaction = remember { MutableInteractionSource() }
-                NavigationDefaults.BackButton(
-                    onClick = {
-                        mediaPlayer.stopPlayback()
-                        playerViewModel.updatePlayingInfo(null)
-                        onBack()
-                    },
-                    interaction = interaction,
-                    icon = {
-                        FontIconDefaults.BackIcon(interaction, size = FontIconSize(16f))
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 80.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val interaction = remember { MutableInteractionSource() }
+                    NavigationDefaults.BackButton(
+                        onClick = {
+                            mediaPlayer.stopPlayback()
+                            playerViewModel.updatePlayingInfo(null)
+                            onBack()
+                        },
+                        interaction = interaction,
+                        icon = {
+                            FontIconDefaults.BackIcon(interaction, size = FontIconSize(16f))
+                        }
+                    )
+                }
+                Box(
+                    modifier = Modifier.align(Alignment.Center),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isEpisode) {
+                        Text(
+                            text = buildMacOsEpisodeTitle(mediaTitle, subhead),
+                            style = LocalTypography.current.title,
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    } else {
+                        Text(
+                            text = mediaTitle,
+                            style = LocalTypography.current.title,
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
-                )
+                }
             }
-            Box(
-                modifier = Modifier.align(Alignment.Center),
-                contentAlignment = Alignment.Center
+        } else {
+            Row(
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .padding(start = 20.dp, top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                var isHovered by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .background(
+                            color = if (isHovered) Color.White.copy(alpha = 0.1f) else Color.Transparent,
+                            shape = CircleShape
+                        )
+                        .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+                        .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {
+                                mediaPlayer.stopPlayback()
+                                playingInfoCache?.isUseDirectLink?.let {
+                                    if (!it) {
+                                        mediaPViewModel.quit(
+                                            MediaPRequest(
+                                                playLink = playingInfoCache?.playLink
+                                                    ?: ""
+                                            ),
+                                            updateState = false
+                                        )
+                                    }
+                                }
+                                // 清除缓存
+                                playerViewModel.updatePlayingInfo(null)
+                                onBack()
+                            }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = ArrowLeft,
+                        contentDescription = "返回",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(20.dp)
+                    )
+                }
                 if (isEpisode) {
                     Text(
-                        text = buildMacOsEpisodeTitle(mediaTitle, subhead),
+                        text = buildEpisodeTitle(mediaTitle, subhead),
                         style = LocalTypography.current.title,
                         color = Color.White,
-                        fontSize = 16.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Medium
                     )
                 } else {
@@ -2419,263 +2773,195 @@ fun PlayerTopBar(
                         text = mediaTitle,
                         style = LocalTypography.current.title,
                         color = Color.White,
-                        fontSize = 16.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
             }
         }
-    } else {
-        Row(
-            modifier = Modifier
-                .padding(top = 12.dp)
-                .padding(start = 20.dp, top = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            var isHovered by remember { mutableStateOf(false) }
-            Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .background(
-                        color = if (isHovered) Color.White.copy(alpha = 0.1f) else Color.Transparent,
-                        shape = CircleShape
-                    )
-                    .onPointerEvent(PointerEventType.Enter) { isHovered = true }
-                    .onPointerEvent(PointerEventType.Exit) { isHovered = false }
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {
-                            mediaPlayer.stopPlayback()
-                            playingInfoCache?.isUseDirectLink?.let {
-                                if (!it) {
-                                    mediaPViewModel.quit(
-                                        MediaPRequest(
-                                            playLink = playingInfoCache?.playLink
-                                                ?: ""
-                                        ),
-                                        updateState = false
-                                    )
-                                }
-                            }
-                            // 清除缓存
-                            playerViewModel.updatePlayingInfo(null)
-                            onBack()
-                        }
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = ArrowLeft,
-                    contentDescription = "返回",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(20.dp)
-                )
-            }
-            if (isEpisode) {
-                Text(
-                    text = buildEpisodeTitle(mediaTitle, subhead),
-                    style = LocalTypography.current.title,
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            } else {
-                Text(
-                    text = mediaTitle,
-                    style = LocalTypography.current.title,
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
     }
-}
 
 @Composable
 fun PlayerDialogs(
-    showSubtitleSearchDialog: Boolean,
-    onSubtitleSearchDialogDismiss: () -> Unit,
-    showAddNasSubtitleDialog: Boolean,
-    onAddNasSubtitleDialogDismiss: () -> Unit,
-    showDeleteSubtitleDialog: Boolean,
-    onDeleteSubtitleDialogDismiss: () -> Unit,
-    playingInfoCache: PlayingInfoCache?,
-    subtitleToDelete: SubtitleStream?,
-    onSubtitleDeleteConfirm: () -> Unit,
-    refreshSubtitleList: (String?) -> Unit
-) {
-    if (showSubtitleSearchDialog) {
-        val mediaGuid = playingInfoCache?.currentFileStream?.guid ?: ""
-        val trimIdList = playingInfoCache?.currentSubtitleStreamList?.map { it.trimId }
-            ?.filter { it.isNotBlank() } ?: emptyList()
-        val mediaFileName = playingInfoCache?.currentFileStream?.fileName ?: ""
+        showSubtitleSearchDialog: Boolean,
+        onSubtitleSearchDialogDismiss: () -> Unit,
+        showAddNasSubtitleDialog: Boolean,
+        onAddNasSubtitleDialogDismiss: () -> Unit,
+        showDeleteSubtitleDialog: Boolean,
+        onDeleteSubtitleDialogDismiss: () -> Unit,
+        playingInfoCache: PlayingInfoCache?,
+        subtitleToDelete: SubtitleStream?,
+        onSubtitleDeleteConfirm: () -> Unit,
+        refreshSubtitleList: (String?) -> Unit
+    ) {
+        if (showSubtitleSearchDialog) {
+            val mediaGuid = playingInfoCache?.currentFileStream?.guid ?: ""
+            val trimIdList = playingInfoCache?.currentSubtitleStreamList?.map { it.trimId }
+                ?.filter { it.isNotBlank() } ?: emptyList()
+            val mediaFileName = playingInfoCache?.currentFileStream?.fileName ?: ""
 
-        SubtitleSearchDialog(
-            title = "搜索字幕",
-            visible = showSubtitleSearchDialog,
-            mediaGuid = mediaGuid,
-            trimIdList = trimIdList,
-            mediaFileName = mediaFileName,
-            onDismissRequest = onSubtitleSearchDialogDismiss,
-            onSubtitleDownloadSuccess = { trimId ->
-                refreshSubtitleList(trimId)
-            }
-        )
-    }
-
-    if (showAddNasSubtitleDialog) {
-        val subtitleMarkViewModel: SubtitleMarkViewModel = koinViewModel()
-        val mediaGuid = playingInfoCache?.currentFileStream?.guid ?: ""
-
-        AddNasSubtitleDialog(
-            title = "添加 NAS 字幕文件",
-            visible = showAddNasSubtitleDialog,
-            primaryButtonText = "添加",
-            closeButtonText = "关闭",
-            onButtonClick = { button, paths ->
-                if (button == ContentDialogButton.Primary && !paths.isNullOrEmpty()) {
-                    subtitleMarkViewModel.markSubtitles(mediaGuid, paths.toList())
-                    refreshSubtitleList(null)
-                    onAddNasSubtitleDialogDismiss()
-                } else if (button == ContentDialogButton.Close) {
-                    onAddNasSubtitleDialogDismiss()
+            SubtitleSearchDialog(
+                title = "搜索字幕",
+                visible = showSubtitleSearchDialog,
+                mediaGuid = mediaGuid,
+                trimIdList = trimIdList,
+                mediaFileName = mediaFileName,
+                onDismissRequest = onSubtitleSearchDialogDismiss,
+                onSubtitleDownloadSuccess = { trimId ->
+                    refreshSubtitleList(trimId)
                 }
-            }
-        )
-    }
-
-    CustomContentDialog(
-        title = "删除外挂字幕",
-        visible = showDeleteSubtitleDialog,
-        size = DialogSize.Standard,
-        primaryButtonText = "删除",
-        secondaryButtonText = "取消",
-        onButtonClick = { contentDialogButton ->
-            when (contentDialogButton) {
-                ContentDialogButton.Primary -> {
-                    onSubtitleDeleteConfirm()
-                }
-
-                else -> {}
-            }
-            onDeleteSubtitleDialogDismiss()
-        },
-        isWarning = true,
-        content = {
-            Text(
-                "确定要删除 ${subtitleToDelete?.title} 外挂字幕吗？",
-                style = LocalTypography.current.body,
-                color = FluentTheme.colors.text.text.primary
             )
         }
-    )
-}
+
+        if (showAddNasSubtitleDialog) {
+            val subtitleMarkViewModel: SubtitleMarkViewModel = koinViewModel()
+            val mediaGuid = playingInfoCache?.currentFileStream?.guid ?: ""
+
+            AddNasSubtitleDialog(
+                title = "添加 NAS 字幕文件",
+                visible = showAddNasSubtitleDialog,
+                primaryButtonText = "添加",
+                closeButtonText = "关闭",
+                onButtonClick = { button, paths ->
+                    if (button == ContentDialogButton.Primary && !paths.isNullOrEmpty()) {
+                        subtitleMarkViewModel.markSubtitles(mediaGuid, paths.toList())
+                        refreshSubtitleList(null)
+                        onAddNasSubtitleDialogDismiss()
+                    } else if (button == ContentDialogButton.Close) {
+                        onAddNasSubtitleDialogDismiss()
+                    }
+                }
+            )
+        }
+
+        CustomContentDialog(
+            title = "删除外挂字幕",
+            visible = showDeleteSubtitleDialog,
+            size = DialogSize.Standard,
+            primaryButtonText = "删除",
+            secondaryButtonText = "取消",
+            onButtonClick = { contentDialogButton ->
+                when (contentDialogButton) {
+                    ContentDialogButton.Primary -> {
+                        onSubtitleDeleteConfirm()
+                    }
+
+                    else -> {}
+                }
+                onDeleteSubtitleDialogDismiss()
+            },
+            isWarning = true,
+            content = {
+                Text(
+                    "确定要删除 ${subtitleToDelete?.title} 外挂字幕吗？",
+                    style = LocalTypography.current.body,
+                    color = FluentTheme.colors.text.text.primary
+                )
+            }
+        )
+    }
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun PlayerBottomBar(
-    mediaPlayer: MediampPlayer,
-    playerManager: PlayerManager,
-    playState: PlaybackState,
-    videoProgress: Float,
-    totalDuration: Long,
-    playingInfoCache: PlayingInfoCache?,
-    isoTagData: IsoTagData,
-    lastVolume: Float,
-    onProgressBarHoverChanged: (Boolean) -> Unit,
-    onResetMouseMoveTimer: () -> Unit,
-    onSeek: (Float) -> Unit,
-    onSpeedControlHoverChanged: (Boolean) -> Unit,
-    onVolumeControlHoverChanged: (Boolean) -> Unit,
-    onQualityControlHoverChanged: (Boolean) -> Unit,
-    onQualitySelected: (QualityResponse) -> Unit,
-    onAudioSelected: (AudioStream) -> Unit,
-    subtitleSettings: SubtitleSettings = SubtitleSettings(),
-    onSubtitleSettingsChanged: (SubtitleSettings) -> Unit = {},
-    onSubtitleSelected: (SubtitleStream?) -> Unit,
-    onOpenSubtitleSearch: () -> Unit,
-    onOpenAddNasSubtitle: () -> Unit,
-    onOpenAddLocalSubtitle: () -> Unit,
-    onSubtitleControlHoverChanged: (Boolean) -> Unit,
-    onSettingsMenuHoverChanged: (Boolean) -> Unit,
-    onRequestDeleteSubtitle: (SubtitleStream) -> Unit,
-    onLastVolumeChange: (Float) -> Unit,
-    onWindowAspectRatioChanged: (String) -> Unit,
-    episodeList: List<EpisodeListResponse> = emptyList(),
-    currentEpisodeGuid: String = "",
-    onEpisodeSelected: ((EpisodeListResponse) -> Unit)? = null,
-    isAutoPlay: Boolean = false,
-    onAutoPlayChanged: ((Boolean) -> Unit)? = null,
-    onEpisodeControlHoverChanged: ((Boolean) -> Unit)? = null,
-    nextEpisode: EpisodeListResponse? = null,
-    onNextEpisode: (() -> Unit)? = null,
-    isNextEpisodeHovered: Boolean = false,
-    onNextEpisodeHoverChanged: ((Boolean) -> Unit)? = null
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = 48.dp), // 为标题栏留出空间
-        verticalArrangement = Arrangement.Bottom,
-        horizontalAlignment = Alignment.Start
+        mediaPlayer: MediampPlayer,
+        playerManager: PlayerManager,
+        playState: PlaybackState,
+        videoProgress: Float,
+        totalDuration: Long,
+        playingInfoCache: PlayingInfoCache?,
+        isoTagData: IsoTagData,
+        lastVolume: Float,
+        onProgressBarHoverChanged: (Boolean) -> Unit,
+        onResetMouseMoveTimer: () -> Unit,
+        onSeek: (Float) -> Unit,
+        onSpeedControlHoverChanged: (Boolean) -> Unit,
+        onVolumeControlHoverChanged: (Boolean) -> Unit,
+        onQualityControlHoverChanged: (Boolean) -> Unit,
+        onQualitySelected: (QualityResponse) -> Unit,
+        onAudioSelected: (AudioStream) -> Unit,
+        subtitleSettings: SubtitleSettings = SubtitleSettings(),
+        onSubtitleSettingsChanged: (SubtitleSettings) -> Unit = {},
+        onSubtitleSelected: (SubtitleStream?) -> Unit,
+        onOpenSubtitleSearch: () -> Unit,
+        onOpenAddNasSubtitle: () -> Unit,
+        onOpenAddLocalSubtitle: () -> Unit,
+        onSubtitleControlHoverChanged: (Boolean) -> Unit,
+        onSettingsMenuHoverChanged: (Boolean) -> Unit,
+        onRequestDeleteSubtitle: (SubtitleStream) -> Unit,
+        onLastVolumeChange: (Float) -> Unit,
+        onWindowAspectRatioChanged: (String) -> Unit,
+        episodeList: List<EpisodeListResponse> = emptyList(),
+        currentEpisodeGuid: String = "",
+        onEpisodeSelected: ((EpisodeListResponse) -> Unit)? = null,
+        isAutoPlay: Boolean = false,
+        onAutoPlayChanged: ((Boolean) -> Unit)? = null,
+        onEpisodeControlHoverChanged: ((Boolean) -> Unit)? = null,
+        nextEpisode: EpisodeListResponse? = null,
+        onNextEpisode: (() -> Unit)? = null,
+        isNextEpisodeHovered: Boolean = false,
+        onNextEpisodeHoverChanged: ((Boolean) -> Unit)? = null
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .onPointerEvent(PointerEventType.Enter) {
-                    onProgressBarHoverChanged(true)
-                }
-                .onPointerEvent(PointerEventType.Exit) {
-                    onProgressBarHoverChanged(false)
-                    onResetMouseMoveTimer()
-                }
+                .fillMaxSize()
+                .padding(top = 48.dp), // 为标题栏留出空间
+            verticalArrangement = Arrangement.Bottom,
+            horizontalAlignment = Alignment.Start
         ) {
-            VideoPlayerProgressBar(
-                player = mediaPlayer,
-                totalDuration = playerManager.playerState.duration,
-                onSeek = onSeek,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
-            )
-            // 播放器控制行
-            PlayerControlRow(
-                playState,
-                mediaPlayer,
-                videoProgress,
-                totalDuration,
-                playingInfoCache = playingInfoCache,
-                onSpeedControlHoverChanged = onSpeedControlHoverChanged,
-                onVolumeControlHoverChanged = onVolumeControlHoverChanged,
-                onQualityControlHoverChanged = onQualityControlHoverChanged,
-                onQualitySelected = onQualitySelected,
-                isoTagData = isoTagData,
-                onAudioSelected = onAudioSelected,
-                subtitleSettings = subtitleSettings,
-                onSubtitleSettingsChanged = onSubtitleSettingsChanged,
-                onSubtitleSelected = onSubtitleSelected,
-                onOpenSubtitleSearch = onOpenSubtitleSearch,
-                onOpenAddNasSubtitle = onOpenAddNasSubtitle,
-                onOpenAddLocalSubtitle = onOpenAddLocalSubtitle,
-                onSubtitleControlHoverChanged = onSubtitleControlHoverChanged,
-                onSettingsMenuHoverChanged = onSettingsMenuHoverChanged,
-                onRequestDeleteSubtitle = onRequestDeleteSubtitle,
-                lastVolume = lastVolume,
-                onLastVolumeChange = onLastVolumeChange,
-                onWindowAspectRatioChanged = onWindowAspectRatioChanged,
-                episodeList = episodeList,
-                currentEpisodeGuid = currentEpisodeGuid,
-                onEpisodeSelected = onEpisodeSelected,
-                isAutoPlay = isAutoPlay,
-                onAutoPlayChanged = onAutoPlayChanged,
-                onEpisodeControlHoverChanged = onEpisodeControlHoverChanged,
-                nextEpisode = nextEpisode,
-                onPlayNextEpisode = onNextEpisode,
-                isNextEpisodeHovered = isNextEpisodeHovered,
-                onNextEpisodeHoverChanged = onNextEpisodeHoverChanged
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onPointerEvent(PointerEventType.Enter) {
+                        onProgressBarHoverChanged(true)
+                    }
+                    .onPointerEvent(PointerEventType.Exit) {
+                        onProgressBarHoverChanged(false)
+                        onResetMouseMoveTimer()
+                    }
+            ) {
+                VideoPlayerProgressBar(
+                    player = mediaPlayer,
+                    totalDuration = playerManager.playerState.duration,
+                    onSeek = onSeek,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                )
+                // 播放器控制行
+                PlayerControlRow(
+                    playState,
+                    mediaPlayer,
+                    videoProgress,
+                    totalDuration,
+                    playingInfoCache = playingInfoCache,
+                    onSpeedControlHoverChanged = onSpeedControlHoverChanged,
+                    onVolumeControlHoverChanged = onVolumeControlHoverChanged,
+                    onQualityControlHoverChanged = onQualityControlHoverChanged,
+                    onQualitySelected = onQualitySelected,
+                    isoTagData = isoTagData,
+                    onAudioSelected = onAudioSelected,
+                    subtitleSettings = subtitleSettings,
+                    onSubtitleSettingsChanged = onSubtitleSettingsChanged,
+                    onSubtitleSelected = onSubtitleSelected,
+                    onOpenSubtitleSearch = onOpenSubtitleSearch,
+                    onOpenAddNasSubtitle = onOpenAddNasSubtitle,
+                    onOpenAddLocalSubtitle = onOpenAddLocalSubtitle,
+                    onSubtitleControlHoverChanged = onSubtitleControlHoverChanged,
+                    onSettingsMenuHoverChanged = onSettingsMenuHoverChanged,
+                    onRequestDeleteSubtitle = onRequestDeleteSubtitle,
+                    lastVolume = lastVolume,
+                    onLastVolumeChange = onLastVolumeChange,
+                    onWindowAspectRatioChanged = onWindowAspectRatioChanged,
+                    episodeList = episodeList,
+                    currentEpisodeGuid = currentEpisodeGuid,
+                    onEpisodeSelected = onEpisodeSelected,
+                    isAutoPlay = isAutoPlay,
+                    onAutoPlayChanged = onAutoPlayChanged,
+                    onEpisodeControlHoverChanged = onEpisodeControlHoverChanged,
+                    nextEpisode = nextEpisode,
+                    onPlayNextEpisode = onNextEpisode,
+                    isNextEpisodeHovered = isNextEpisodeHovered,
+                    onNextEpisodeHoverChanged = onNextEpisodeHoverChanged
+                )
+            }
         }
     }
-}
