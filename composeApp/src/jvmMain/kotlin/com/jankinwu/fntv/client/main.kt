@@ -25,6 +25,7 @@ import com.jankinwu.fntv.client.data.store.AppSettingsStore
 import com.jankinwu.fntv.client.manager.LoginStateManager
 import com.jankinwu.fntv.client.manager.PreferencesManager
 import com.jankinwu.fntv.client.manager.ProxyManager
+import com.jankinwu.fntv.client.player.CustomVlcMediampPlayer
 import com.jankinwu.fntv.client.ui.component.common.rememberComponentNavigator
 import com.jankinwu.fntv.client.ui.providable.LocalFrameWindowScope
 import com.jankinwu.fntv.client.ui.providable.LocalMediaPlayer
@@ -47,7 +48,7 @@ import kotlinx.coroutines.flow.debounce
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.KoinApplication
 import org.koin.compose.viewmodel.koinViewModel
-import org.openani.mediamp.compose.rememberMediampPlayer
+import com.jankinwu.fntv.client.player.rememberCustomMediampPlayer
 import java.awt.Dimension
 import java.io.File
 
@@ -80,7 +81,9 @@ fun main() = application {
         ) {
             val navigator = rememberComponentNavigator()
             val playerManager = remember { PlayerManager() }
-            val player = rememberMediampPlayer()
+            val player = rememberCustomMediampPlayer(
+                mode = CustomVlcMediampPlayer.VlcRenderMode.EMBEDDED
+            )
             val userInfoViewModel: UserInfoViewModel = koinViewModel()
             val userInfoState by userInfoViewModel.uiState.collectAsState()
             LaunchedEffect(Unit) {

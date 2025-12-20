@@ -1669,7 +1669,8 @@ private suspend fun playMedia(
         showPlayerUI(playInfoResponse, videoStream, playerManager, guid)
 
         // VLC 播放器对 HDR 颜色空间有兼容问题，强制使用 SDR
-        val forcedSdr = if (videoStream.colorRangeType != "SDR") 1 else 0
+//        val forcedSdr = if (videoStream.colorRangeType != "SDR") 1 else 0
+        val forcedSdr = 0
 
         // 构造播放请求
         val playRequest =
@@ -2326,7 +2327,8 @@ private fun handleQualitySelection(
         }
         if (playingInfoCache.isUseDirectLink) {
             logger.i("switch to HLS")
-            val forcedSdr = if (videoStream.colorRangeType != "SDR") 1 else 0
+//            val forcedSdr = if (videoStream.colorRangeType != "SDR") 1 else 0
+            val forcedSdr = 0
             val playRequest = createPlayRequest(
                 videoStream,
                 playingInfoCache.currentFileStream,
