@@ -67,6 +67,7 @@ internal class ComposeWindowProcedure(
     companion object {
         private const val WM_ERASEBKGND = 0x0014
         private const val WM_WINDOWPOSCHANGED = 0x0047
+        private const val WVR_REDRAW = 0x0300
     }
 
     private val logger = Logger.withTag("ComposeWindowProcedure")
@@ -193,7 +194,9 @@ internal class ComposeWindowProcedure(
                             }
                         )
                     )
-                    LRESULT(0)
+                    // Return WVR_REDRAW to force the window to be redrawn when the client area is resized,
+                    // preventing visual artifacts (like white stripes or ghosting) during resize or fullscreen toggle.
+                    LRESULT(WVR_REDRAW.toLong())
                 }
 
             }
@@ -214,7 +217,17 @@ internal class ComposeWindowProcedure(
             WM_SIZE -> {
                 width = lParam.toInt() and 0xFFFF
                 height = (lParam.toInt() shr 16) and 0xFFFF
-                User32Extend.Companion.instance?.CallWindowProc(defaultWindowProcedure, hWnd, uMsg, wParam, lParam) ?: LRESULT(0)
+                User32Extend.Companion.instance?.let { user32 ->
+                    user32.CallWindowProc(defaultWindowProcedure, hWnd, uMsg, wParam, lParam)
+                    // Ensure redraw on size change
+                    user32.RedrawWindow(
+                        hWnd,
+                        null,
+                        null,
+                        WinUser.RDW_INVALIDATE or WinUser.RDW_UPDATENOW or WinUser.RDW_FRAME or WinUser.RDW_ALLCHILDREN or WinUser.RDW_ERASE
+                    )
+                    LRESULT(0)
+                } ?: LRESULT(0)
             }
 
             WM_WINDOWPOSCHANGED -> {
@@ -225,7 +238,7 @@ internal class ComposeWindowProcedure(
                         hWnd,
                         null,
                         null,
-                        WinUser.RDW_INVALIDATE or WinUser.RDW_UPDATENOW or WinUser.RDW_FRAME or WinUser.RDW_ALLCHILDREN
+                        WinUser.RDW_INVALIDATE or WinUser.RDW_UPDATENOW or WinUser.RDW_FRAME or WinUser.RDW_ALLCHILDREN or WinUser.RDW_ERASE
                     )
                     LRESULT(0)
                 } ?: LRESULT(0)
