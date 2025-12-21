@@ -1,4 +1,4 @@
-# 	fntv-client-multiplatform
+# 	Fntv Client Multiplatform
 
 [![GitHub stars](https://img.shields.io/github/stars/FNOSP/fntv-client-multiplatform)](https://github.com/FNOSP/fntv-client-multiplatform/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/FNOSP/fntv-client-multiplatform)](https://github.com/FNOSP/fntv-client-multiplatform/network)
@@ -107,7 +107,7 @@
 
 #### 2. 此客户端是否支持使用 FN Connect 域名登录？
 
-目前暂时不支持，只支持使用 ip 或自己的域名登录，后面会支持使用 FN Connect 登录。
+目前暂时不支持，只支持使用 IP 或非飞牛中继域名登录，后面会支持使用 FN Connect 登录。
 
 #### 3. 此客户端是否支持使用飞牛 OS 中的自签证书进行 HTTPS 连接？
 
