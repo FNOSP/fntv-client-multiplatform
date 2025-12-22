@@ -214,13 +214,14 @@ jobs:
         shell: bash
         run: |
           # Define common release notes
-          NOTES="1.剧集季详情页中的剧集列表现在会滚动至当前播放的剧集  
-          2.播放器支持双击切换全屏/窗口模式
-          3.优化视频起播延迟时间
-          4.优化 UI 方面用户体验
+          NOTES="1.修复切换用户后导航栏媒体库列表未更新的问题  
+          2.修复切换用户后 VLC 代理信息未更新的问题  
           　  
           感谢以下飞牛共建团成员反馈问题并协助排查：  
-          @[zhengbf](https://club.fnnas.com/home.php?mod=space&uid=187) @[空城](https://club.fnnas.com/home.php?mod=space&uid=2332)  "
+          @[zhengbf](https://club.fnnas.com/home.php?mod=space&uid=187) @[空城](https://club.fnnas.com/home.php?mod=space&uid=2332)  
+          　  
+          > **当前应用中没有展示出来或者点击没有反应的就是还没做的功能，后面陆续都会实现，请仅对已实现的功能提出合理意见，感谢理解**  
+          　  "
 
           # Define warning for Alpha versions
           WARNING=""
