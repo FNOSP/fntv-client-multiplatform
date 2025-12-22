@@ -1883,7 +1883,7 @@ private suspend fun startPlayback(
     isM3u8: Boolean = false
 ) {
     val isDirectLink = playLink.contains("/v/api/v1/media/range/")
-    var baseUrl = if (AccountDataCache.cookieState.isNotBlank() && isDirectLink) {
+    var baseUrl = if (AccountDataCache.cookieState.isNotBlank()) {
         AccountDataCache.getProxyBaseUrl()
     } else {
         AccountDataCache.getFnOfficialBaseUrl()
