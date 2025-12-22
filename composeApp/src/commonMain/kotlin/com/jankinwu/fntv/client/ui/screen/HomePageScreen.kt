@@ -29,6 +29,7 @@ import com.jankinwu.fntv.client.data.model.ScrollRowItemData
 import com.jankinwu.fntv.client.data.model.request.Tags
 import com.jankinwu.fntv.client.data.model.response.UserInfoResponse
 import com.jankinwu.fntv.client.data.store.AccountDataCache
+import com.jankinwu.fntv.client.data.store.UserInfoMemoryCache
 import com.jankinwu.fntv.client.enums.FnTvMediaType
 import com.jankinwu.fntv.client.manager.HandleFavoriteResult
 import com.jankinwu.fntv.client.manager.HandleWatchedResult
@@ -370,6 +371,7 @@ fun FntvProxy(toastManager: ToastManager) {
     val store = LocalStore.current
     val proxySettingViewModel = koinViewModel<ProxySettingViewModel>()
     val proxyUiState by proxySettingViewModel.uiState.collectAsState()
+    val userInfo by UserInfoMemoryCache.userInfo.collectAsState()
     LaunchedEffect(Unit) {
         if (!store.proxyInitialized) {
             proxySettingViewModel.clearError()
@@ -378,6 +380,14 @@ fun FntvProxy(toastManager: ToastManager) {
                 cookie = AccountDataCache.cookieState
             )
         }
+    }
+    // 监听用户信息变化，当切换用户时重新设置 VLC 代理信息
+    LaunchedEffect(userInfo) {
+        proxySettingViewModel.clearError()
+        proxySettingViewModel.setProxyInfo(
+            url = AccountDataCache.getFnOfficialBaseUrl(),
+            cookie = AccountDataCache.cookieState
+        )
     }
     LaunchedEffect(proxyUiState) {
         if (!store.proxyInitialized) {
