@@ -102,7 +102,7 @@ class DesktopUpdateManager : UpdateManager {
                 }
             } catch (e: Exception) {
                 logger.e("Update check failed", e)
-                _status.value = UpdateStatus.Error("Update check failed: ${e.message}")
+                _status.value = UpdateStatus.Error("网络请求异常")
             }
         }
     }
@@ -125,15 +125,23 @@ class DesktopUpdateManager : UpdateManager {
             if (response.status == HttpStatusCode.NotFound) {
                 shouldContinue = false
             } else {
-                val pageReleases = response.body<List<GitHubRelease>>()
-                if (pageReleases.isEmpty()) {
-                    shouldContinue = false
-                } else {
-                    if (shouldStopFetching(pageReleases, currentVersion)) {
+                try {
+                    logger.i("Fetch releases response status: ${response.status}, body: ${response.body<String>()}")
+                    val pageReleases = response.body<List<GitHubRelease>>()
+                    if (pageReleases.isEmpty()) {
                         shouldContinue = false
+                    } else {
+                        if (shouldStopFetching(pageReleases, currentVersion)) {
+                            shouldContinue = false
+                        }
+                        allReleases.addAll(pageReleases)
+                        page++
                     }
-                    allReleases.addAll(pageReleases)
-                    page++
+                } catch (e: Exception) {
+                    logger.e("Failed to parse response body", e)
+                    // 在出现解析错误时停止继续获取分页数据
+                    shouldContinue = false
+                    throw e
                 }
             }
         }
