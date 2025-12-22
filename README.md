@@ -115,28 +115,33 @@
 
 目前不支持。
 
+#### 4. 此客户端是否支持直链播放？
+
+目前支持 NAS 本地 SDR 动态范围下的 MP4 格式视频在原画质下使用直链播放。
+
 ## 开发进度
 
 ### 桌面端
 
-| 功能         | 进度                                        |
-|------------|-------------------------------------------|
-| 登录页        | ![Progress](https://progress-bar.xyz/80/) |
-| 首页         | ![Progress](https://progress-bar.xyz/90/) |
-| 收藏页        | ![Progress](https://progress-bar.xyz/0/)  |
-| 媒体库页       | ![Progress](https://progress-bar.xyz/90/) |
+| 功能            | 进度                                      |
+| --------------- | ----------------------------------------- |
+| 登录页          | ![Progress](https://progress-bar.xyz/80/) |
+| 首页            | ![Progress](https://progress-bar.xyz/90/) |
+| 收藏页          | ![Progress](https://progress-bar.xyz/0/)  |
+| 媒体库页        | ![Progress](https://progress-bar.xyz/90/) |
 | 媒体详情页      | ![Progress](https://progress-bar.xyz/60/) |
-| 播放器        | ![Progress](https://progress-bar.xyz/80/) |
-| 通用设置       | ![Progress](https://progress-bar.xyz/0/)  |
+| 播放器          | ![Progress](https://progress-bar.xyz/80/) |
+| 通用设置        | ![Progress](https://progress-bar.xyz/0/)  |
 | 媒体库管理      | ![Progress](https://progress-bar.xyz/0/)  |
-| 影视服务器设置    | ![Progress](https://progress-bar.xyz/0/)  |
-| 用户设置       | ![Progress](https://progress-bar.xyz/0/)  |
-| 任务计划       | ![Progress](https://progress-bar.xyz/0/)  |
-| 搜索         | ![Progress](https://progress-bar.xyz/0/)  |
-| 弹幕         | ![Progress](https://progress-bar.xyz/0/)  |
-| 版本更新       | ![Progress](https://progress-bar.xyz/90/) |
+| 影视服务器设置  | ![Progress](https://progress-bar.xyz/0/)  |
+| 用户设置        | ![Progress](https://progress-bar.xyz/0/)  |
+| 任务计划        | ![Progress](https://progress-bar.xyz/0/)  |
+| 搜索            | ![Progress](https://progress-bar.xyz/0/)  |
+| 弹幕            | ![Progress](https://progress-bar.xyz/0/)  |
+| 版本更新        | ![Progress](https://progress-bar.xyz/90/) |
 | 集成 mpv 播放器 | ![Progress](https://progress-bar.xyz/0/)  |
 | 文件夹视图      | ![Progress](https://progress-bar.xyz/0/)  |
+| 网盘视频播放    |  ![Progress](https://progress-bar.xyz/0/) |
 
 ## 🙏 特别感谢
 
