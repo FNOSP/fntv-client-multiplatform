@@ -19,6 +19,8 @@ import io.ktor.serialization.jackson.jackson
 import korlibs.crypto.MD5
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.time.ExperimentalTime
 
 /**
@@ -28,7 +30,7 @@ import kotlin.time.ExperimentalTime
 class ReportingService(private val context: Context) {
     private val logger = Logger.withTag("ReportingService")
     private val settings = Settings()
-    private val reportKey = "last_report_version"
+    private val lastReportInfoKey = "last_report_info"
     
     // Values injected during build from GitHub Secrets or environment variables
     private val apiSecret = BuildConfig.REPORT_API_SECRET
@@ -42,12 +44,15 @@ class ReportingService(private val context: Context) {
 
     /**
      * Reports the app launch to the backend.
-     * Ensures reporting happens only once per app version to avoid redundant traffic.
+     * Ensures reporting happens only once per day for the same version to avoid redundant traffic.
      */
     @OptIn(ExperimentalTime::class)
     suspend fun reportLaunch() {
         val currentVersion = BuildConfig.VERSION_NAME
-        val lastReportedVersion = settings.getString(reportKey, "")
+        val today = kotlin.time.Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+        val currentReportInfo = "$currentVersion|$today"
+        
+        val lastReportInfo = settings.getString(lastReportInfoKey, "")
 
         if (apiSecret.isBlank() || reportUrl.isBlank()) {
             // This is expected in development environments where secrets are not configured.
@@ -55,8 +60,8 @@ class ReportingService(private val context: Context) {
             return
         }
 
-        if (lastReportedVersion == currentVersion) {
-            logger.i { "Already reported for version $currentVersion" }
+        if (lastReportInfo == currentReportInfo) {
+            logger.i { "Already reported for version $currentVersion today ($today)" }
             return
         }
 
@@ -65,7 +70,7 @@ class ReportingService(private val context: Context) {
                 val deviceId = getDeviceId(context)
                 val timestamp = kotlin.time.Clock.System.now().toEpochMilliseconds()
                 
-                val bodyMap = mutableMapOf<String, Any>(
+                val bodyMap = mapOf<String, Any>(
                     "deviceId" to deviceId,
                     "osName" to PlatformInfo.osName,
                     "osArch" to PlatformInfo.osArch,
@@ -87,8 +92,8 @@ class ReportingService(private val context: Context) {
                 }
                 logger.i("Reporting request body: $sortedBody, signature=$signature")
                 if (response.status.isSuccess()) {
-                    settings[reportKey] = currentVersion
-                    logger.i { "Successfully reported launch for version $currentVersion" }
+                    settings[lastReportInfoKey] = currentReportInfo
+                    logger.i { "Successfully reported launch for version $currentVersion on $today" }
                 } else {
                     logger.e { "Failed to report launch: ${response.status}" }
                 }
