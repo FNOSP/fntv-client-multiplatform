@@ -87,8 +87,15 @@ val generateBuildConfig by tasks.registering {
     val outputDir = buildConfigDir
     val version = appVersion
     val suffix = appVersionSuffix
+    
+    // Read secrets from environment variables or project properties
+    val reportApiSecret = System.getenv("REPORT_API_SECRET") ?: project.findProperty("REPORT_API_SECRET")?.toString() ?: ""
+    val reportUrl = System.getenv("REPORT_URL") ?: project.findProperty("REPORT_URL")?.toString() ?: ""
+
     inputs.property("version", version)
     inputs.property("suffix", suffix)
+    inputs.property("reportApiSecret", reportApiSecret)
+    inputs.property("reportUrl", reportUrl)
     outputs.dir(outputDir)
 
     doLast {
@@ -100,6 +107,8 @@ val generateBuildConfig by tasks.registering {
 
             object BuildConfig {
                 const val VERSION_NAME = "$fullVersion"
+                const val REPORT_API_SECRET = "$reportApiSecret"
+                const val REPORT_URL = "$reportUrl"
             }
         """.trimIndent())
     }

@@ -32,6 +32,9 @@ jobs:
       - name: Build MacOS DMG (Apple Silicon)
         # 执行 Compose Desktop 的打包任务
         run: ./gradlew :composeApp:packageReleaseDmg
+        env:
+          REPORT_API_SECRET: ${{ secrets.REPORT_API_SECRET }}
+          REPORT_URL: ${{ secrets.REPORT_URL }}
 
       - name: Upload DMG Artifact
         uses: actions/upload-artifact@v4
@@ -64,6 +67,9 @@ jobs:
       - name: Build MacOS DMG (Intel)
         # 执行 Compose Desktop 的打包任务
         run: ./gradlew :composeApp:packageReleaseDmg
+        env:
+          REPORT_API_SECRET: ${{ secrets.REPORT_API_SECRET }}
+          REPORT_URL: ${{ secrets.REPORT_URL }}
 
       - name: Upload DMG Artifact
         uses: actions/upload-artifact@v4
@@ -101,6 +107,9 @@ jobs:
       - name: Build Linux Deb
         # 执行 Compose Desktop 的打包任务
         run: ./gradlew :composeApp:packageReleaseDeb
+        env:
+          REPORT_API_SECRET: ${{ secrets.REPORT_API_SECRET }}
+          REPORT_URL: ${{ secrets.REPORT_URL }}
 
       - name: Upload Deb Artifact
         uses: actions/upload-artifact@v4
@@ -129,6 +138,9 @@ jobs:
 
       - name: Create Release Distributable
         run: ./gradlew :composeApp:createReleaseDistributable
+        env:
+          REPORT_API_SECRET: ${{ secrets.REPORT_API_SECRET }}
+          REPORT_URL: ${{ secrets.REPORT_URL }}
 
       - name: Setup Inno Setup
         run: |
