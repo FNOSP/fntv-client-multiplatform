@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.window.WindowState
 import java.io.File
 import kotlin.contracts.ExperimentalContracts
@@ -42,7 +43,7 @@ class DesktopContext(
 @Stable
 class ExtraWindowProperties
 
-actual val LocalContext: ProvidableCompositionLocal<Context> = compositionLocalOf {
+actual val LocalContext: ProvidableCompositionLocal<Context> = staticCompositionLocalOf {
     error("No Context provided")
 }
 

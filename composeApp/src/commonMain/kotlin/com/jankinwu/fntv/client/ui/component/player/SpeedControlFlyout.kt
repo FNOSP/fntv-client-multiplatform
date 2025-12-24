@@ -93,7 +93,7 @@ fun SpeedControlFlyout(
     onHoverStateChanged: ((Boolean) -> Unit)? = null,
     onSpeedSelected: (SpeedItem) -> Unit = {}
 ) {
-    var selectedSpeed by remember { mutableStateOf(defaultSpeed) }
+    var selectedSpeed by remember(defaultSpeed) { mutableStateOf(defaultSpeed) }
     var isExpanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     var hideJob by remember { mutableStateOf<Job?>(null) }

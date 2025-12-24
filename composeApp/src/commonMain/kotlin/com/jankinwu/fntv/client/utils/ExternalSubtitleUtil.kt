@@ -82,6 +82,7 @@ class ExternalSubtitleUtil(
                 
                 cues.clear()
                 cues.addAll(parsedCues)
+                cues.sortBy { it.startTime }
                 isInitialized = true
                 logger.i { "Initialized ExternalSubtitleUtil with ${cues.size} cues (${subtitleStream.format})" }
             } catch (e: Exception) {
@@ -91,9 +92,41 @@ class ExternalSubtitleUtil(
     }
 
     fun getCurrentSubtitle(currentPositionMs: Long): List<SubtitleCue> {
-        return cues.filter { cue ->
-            currentPositionMs >= cue.startTime && currentPositionMs < cue.endTime
-        }.distinctBy { it.text to it.assProps }
+        if (cues.isEmpty()) return emptyList()
+
+        var low = 0
+        var high = cues.size - 1
+        var index = -1
+
+        // Find the last cue that starts before or at currentPositionMs
+        while (low <= high) {
+            val mid = (low + high) / 2
+            if (cues[mid].startTime <= currentPositionMs) {
+                index = mid
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+
+        if (index == -1) return emptyList()
+
+        val result = mutableListOf<SubtitleCue>()
+
+        // Iterate backwards from the found index
+        for (i in index downTo 0) {
+            val cue = cues[i]
+            if (currentPositionMs < cue.endTime) {
+                result.add(cue)
+            }
+
+            // Optimization: Stop if we go back too far (e.g., 5 minutes)
+            if (currentPositionMs - cue.startTime > 300000) {
+                break
+            }
+        }
+
+        return result.reversed().distinctBy { it.text to it.assProps }
     }
 
     private fun parseSrt(content: String): List<SubtitleCue> {

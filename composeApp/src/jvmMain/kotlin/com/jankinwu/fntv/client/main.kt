@@ -35,8 +35,11 @@ import com.jankinwu.fntv.client.ui.screen.LoginScreen
 import com.jankinwu.fntv.client.ui.screen.PlayerManager
 import com.jankinwu.fntv.client.ui.screen.PlayerOverlay
 import com.jankinwu.fntv.client.utils.ConsoleLogWriter
+import com.jankinwu.fntv.client.utils.DesktopContext
 import com.jankinwu.fntv.client.utils.ExecutableDirectoryDetector
+import com.jankinwu.fntv.client.utils.ExtraWindowProperties
 import com.jankinwu.fntv.client.utils.FileLogWriter
+import com.jankinwu.fntv.client.utils.LocalContext
 import com.jankinwu.fntv.client.viewmodel.UiState
 import com.jankinwu.fntv.client.viewmodel.UserInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.viewModelModule
@@ -111,7 +114,14 @@ fun main() = application {
                     }
             }
 
+            val desktopContext = remember(state) {
+                val dataDir = logDir.parentFile.resolve("data").apply { if (!exists()) mkdirs() }
+                val cacheDir = logDir.parentFile.resolve("cache").apply { if (!exists()) mkdirs() }
+                DesktopContext(state, dataDir, cacheDir, logDir, ExtraWindowProperties())
+            }
+
             CompositionLocalProvider(
+                LocalContext provides desktopContext,
                 LocalPlayerManager provides playerManager,
                 LocalMediaPlayer provides player,
                 LocalFrameWindowScope provides this@Window,

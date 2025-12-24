@@ -82,6 +82,8 @@ import okhttp3.Response
 import okio.FileSystem
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
+import com.jankinwu.fntv.client.data.network.impl.ReportingService
+import com.jankinwu.fntv.client.utils.LocalContext
 
 val components = mutableStateListOf<ComponentItem>()
 
@@ -117,8 +119,10 @@ fun App(
     icon: Painter? = null,
     title: String = ""
 ) {
+    val context = LocalContext.current
     LaunchedEffect(Unit) {
         PlayerResourceManager.preload()
+        ReportingService(context).reportLaunch()
     }
     CoilSetting()
     Navigation(navigator, windowInset, contentInset, collapseWindowInset, icon, title)

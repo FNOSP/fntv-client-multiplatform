@@ -4,7 +4,6 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 pluginManagement {
     repositories {
         mavenLocal()
-        maven("https://jitpack.io")
         google {
             mavenContent {
                 includeGroupAndSubgroups("androidx")
@@ -14,13 +13,13 @@ pluginManagement {
         }
         mavenCentral()
         gradlePluginPortal()
+        maven("https://jitpack.io")
     }
 }
 
 dependencyResolutionManagement {
     repositories {
         mavenLocal()
-        maven("https://jitpack.io")
         google {
             mavenContent {
                 includeGroupAndSubgroups("androidx")
@@ -28,8 +27,9 @@ dependencyResolutionManagement {
                 includeGroupAndSubgroups("com.google")
             }
         }
-        maven("https://artifacts.alfresco.com/nexus/content/repositories/public/")
         mavenCentral()
+        maven("https://jitpack.io")
+        maven("https://artifacts.alfresco.com/nexus/content/repositories/public/")
         maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
         maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
         maven("https://jogamp.org/deployment/maven/")

@@ -115,6 +115,7 @@ import com.jankinwu.fntv.client.ui.component.player.NextEpisodePreviewFlyout
 import com.jankinwu.fntv.client.ui.component.player.PlayerSettingsMenu
 import com.jankinwu.fntv.client.ui.component.player.QualityControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
+import com.jankinwu.fntv.client.ui.component.player.speeds
 import com.jankinwu.fntv.client.ui.component.player.SubtitleControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SubtitleOverlay
 import com.jankinwu.fntv.client.data.model.SubtitleSettings
@@ -192,6 +193,11 @@ data class PlayerState(
 
 class PlayerManager {
     var playerState: PlayerState by mutableStateOf(PlayerState())
+    var keyFocusRequestSerial: Int by mutableIntStateOf(0)
+
+    fun requestKeyFocus() {
+        keyFocusRequestSerial++
+    }
 
     fun showPlayer(
         itemGuid: String,
@@ -514,8 +520,11 @@ fun PlayerOverlay(
                 while (isActive) {
                     val currentPos = mediaPlayer.getCurrentPositionMillis()
                     val adjustedPos = currentPos - (subtitleSettings.offsetSeconds * 1000).toLong()
-                    subtitleCues = hlsSubtitleUtil.getCurrentSubtitle(adjustedPos)
-                    delay(50)
+                    val newCues = hlsSubtitleUtil.getCurrentSubtitle(adjustedPos)
+                    if (subtitleCues != newCues) {
+                        subtitleCues = newCues
+                    }
+                    delay(16)
                 }
             }
         } else if (externalSubtitleUtil != null) {
@@ -523,8 +532,11 @@ fun PlayerOverlay(
                 while (isActive) {
                     val currentPos = mediaPlayer.getCurrentPositionMillis()
                     val adjustedPos = currentPos - (subtitleSettings.offsetSeconds * 1000).toLong()
-                    subtitleCues = externalSubtitleUtil.getCurrentSubtitle(adjustedPos)
-                    delay(50)
+                    val newCues = externalSubtitleUtil.getCurrentSubtitle(adjustedPos)
+                    if (subtitleCues != newCues) {
+                        subtitleCues = newCues
+                    }
+                    delay(16)
                 }
             }
         } else {
@@ -892,15 +904,28 @@ fun PlayerOverlay(
     var surfaceRecreateKey by remember { mutableIntStateOf(0) }
     var lastMinimized by remember { mutableStateOf(isMinimized) }
     var lastWindowFocused by remember { mutableStateOf(isWindowFocused) }
+    val focusRequester = remember { FocusRequester() }
+    val keyFocusRequestSerial = playerManager.keyFocusRequestSerial
 
     LaunchedEffect(isMinimized, isWindowFocused) {
         val restoredFromMinimize = lastMinimized && !isMinimized
         val regainedFocus = !lastWindowFocused && isWindowFocused
         if (restoredFromMinimize || regainedFocus) {
             surfaceRecreateKey++
+            if (isWindowFocused) {
+                focusRequester.requestFocus()
+                delay(50)
+                focusRequester.requestFocus()
+            }
         }
         lastMinimized = isMinimized
         lastWindowFocused = isWindowFocused
+    }
+
+    LaunchedEffect(keyFocusRequestSerial) {
+        focusRequester.requestFocus()
+        delay(50)
+        focusRequester.requestFocus()
     }
 
     // region Window Resize Logic
@@ -998,10 +1023,10 @@ fun PlayerOverlay(
             }
     }
     // endregion
-
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit, windowState.placement) {
-        focusRequester.requestFocus()
+    LaunchedEffect(windowState.placement, isWindowFocused) {
+        if (isWindowFocused) {
+            focusRequester.requestFocus()
+        }
     }
 
     CompositionLocalProvider(
@@ -1494,7 +1519,18 @@ fun PlayerControlRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 倍速
+            val playbackSpeedFeature = remember(mediaPlayer) { mediaPlayer.features[PlaybackSpeed] }
+            
+            // 直接访问 State 的 value 属性以触发重组
+            val speedStateValue = playbackSpeedFeature?.value
+            val currentSpeedValue = (speedStateValue as? Number)?.toFloat() ?: 1f
+
+            val currentSpeedItem = remember(currentSpeedValue) {
+                speeds.find { kotlin.math.abs(it.value - currentSpeedValue) < 0.01f } ?: speeds.find { it.value == 1.0f } ?: speeds[4]
+            }
+
             SpeedControlFlyout(
+                defaultSpeed = currentSpeedItem,
                 yOffset = 70,
                 onHoverStateChanged = onSpeedControlHoverChanged,
                 onSpeedSelected = { item ->

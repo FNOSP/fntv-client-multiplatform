@@ -180,10 +180,35 @@ class HlsSubtitleUtil(
     
     suspend fun getCurrentSubtitle(currentPositionMs: Long): List<SubtitleCue> {
         mutex.withLock {
-            val activeCues = cues.filter { cue ->
-                currentPositionMs >= cue.startTime && currentPositionMs < cue.endTime
+            if (cues.isEmpty()) return emptyList()
+
+            var low = 0
+            var high = cues.size - 1
+            var index = -1
+
+            while (low <= high) {
+                val mid = (low + high) / 2
+                if (cues[mid].startTime <= currentPositionMs) {
+                    index = mid
+                    low = mid + 1
+                } else {
+                    high = mid - 1
+                }
             }
-            return activeCues
+
+            if (index == -1) return emptyList()
+
+            val result = mutableListOf<SubtitleCue>()
+            for (i in index downTo 0) {
+                val cue = cues[i]
+                if (currentPositionMs < cue.endTime) {
+                    result.add(cue)
+                }
+                if (currentPositionMs - cue.startTime > 300000) {
+                    break
+                }
+            }
+            return result.reversed()
         }
     }
     

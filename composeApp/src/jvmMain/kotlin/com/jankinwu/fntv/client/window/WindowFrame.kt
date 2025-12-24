@@ -14,6 +14,7 @@ import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
 import com.jankinwu.fntv.client.AppTheme
 import com.jankinwu.fntv.client.RefreshManager
+import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.jankinwu.fntv.client.ui.providable.LocalStore
 import io.github.composefluent.component.NavigationDisplayMode
 import io.github.composefluent.gallery.jna.windows.structure.isWindows10OrLater
@@ -37,8 +38,10 @@ fun FrameWindowScope.WindowFrame(
     var isRefreshing by remember { mutableStateOf(false) }
     var isAlwaysOnTop by remember { mutableStateOf(false) }
 
-     LaunchedEffect(isAlwaysOnTop) {
+    LaunchedEffect(isAlwaysOnTop) {
         window.isAlwaysOnTop = isAlwaysOnTop
+        window.requestFocus()
+        window.rootPane.requestFocusInWindow()
     }
 
     AppTheme(
@@ -46,6 +49,7 @@ fun FrameWindowScope.WindowFrame(
         state,
         refreshManager
     ) {
+        val playerManager = LocalPlayerManager.current
         val isCollapsed = LocalStore.current.navigationDisplayMode == NavigationDisplayMode.LeftCollapsed
         when {
             hostOs.isWindows && isWindows10OrLater() -> {
@@ -60,7 +64,12 @@ fun FrameWindowScope.WindowFrame(
                     backButtonEnabled = backButtonEnabled,
                     backButtonClick = backButtonClick,
                     isAlwaysOnTop = isAlwaysOnTop,
-                    onToggleAlwaysOnTop = { isAlwaysOnTop = !isAlwaysOnTop },
+                    onToggleAlwaysOnTop = {
+                        isAlwaysOnTop = !isAlwaysOnTop
+                        if (playerManager.playerState.isVisible) {
+                            playerManager.requestKeyFocus()
+                        }
+                    },
                     onRefreshClick = {
                         // 执行刷新操作
                         refreshManager.requestRefresh {
@@ -89,7 +98,12 @@ fun FrameWindowScope.WindowFrame(
                     title = if (isCollapsed) "" else title,
                     state = state,
                     isAlwaysOnTop = isAlwaysOnTop,
-                    onToggleAlwaysOnTop = { isAlwaysOnTop = !isAlwaysOnTop },
+                    onToggleAlwaysOnTop = {
+                        isAlwaysOnTop = !isAlwaysOnTop
+                        if (playerManager.playerState.isVisible) {
+                            playerManager.requestKeyFocus()
+                        }
+                    },
                     onRefreshClick = {
                         // 执行刷新操作
                         refreshManager.requestRefresh {

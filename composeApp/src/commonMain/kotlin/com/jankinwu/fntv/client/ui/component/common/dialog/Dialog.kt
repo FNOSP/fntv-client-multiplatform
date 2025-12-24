@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -27,12 +28,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.jankinwu.fntv.client.data.constants.Colors
+import com.jankinwu.fntv.client.data.constants.Constants
+import com.jankinwu.fntv.client.icons.SkipLink
 import com.jankinwu.fntv.client.icons.Warning
 import com.jankinwu.fntv.client.ui.customAccentButtonColors
 import com.jankinwu.fntv.client.ui.customDangerButtonColors
@@ -77,6 +81,53 @@ fun ForgotPasswordDialog() {
     }
     TextButton(onClick = { displayDialog = true }) {
         androidx.compose.material3.Text("忘记密码?", color = HintColor, fontSize = 14.sp)
+    }
+}
+
+@Composable
+fun AboutDialog() {
+    var displayDialog by remember { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
+    if (displayDialog) {
+        FluentDialog(
+            visible = true,
+            size = DialogSize.Standard
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("支持作者", style = FluentTheme.typography.subtitle)
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    "您的支持就是我持续更新的动力，如果觉得好用的话，请给项目点一个 Star ⭐，谢谢！(^_−)☆" +
+                            "\n" +
+                            "\n" +
+                            "项目诚然还有很多地方需要完善，如果遇到软件问题或者 Bug 欢迎提交 Issue 或者 PR。" +
+                            "\n" +
+                            "\n" +
+                            Constants.PROJECT_URL
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    DialogAccentButtonWithIcon("打开 Github 仓库", SkipLink, onClick = {
+                        displayDialog = false
+                        uriHandler.openUri(Constants.PROJECT_URL)
+                    })
+                    Spacer(Modifier.width(8.dp))
+                    DialogSecondaryButton("稍后再说", onClick = { displayDialog = false })
+                }
+            }
+        }
+    }
+    io.github.composefluent.component.Button(
+        onClick = {
+            displayDialog = true
+        },
+        modifier = Modifier
+            .pointerHoverIcon(PointerIcon.Hand)
+    ) {
+        Text("支持作者", color = FluentTheme.colors.text.text.primary, fontSize = 14.sp)
     }
 }
 
@@ -234,8 +285,10 @@ fun CustomContentDialog(
                     LocalTextStyle provides FluentTheme.typography.body,
                     LocalContentColor provides FluentTheme.colors.text.text.primary
                 ) {
-                    Box(Modifier
-                        .padding(start = if (isWarning) 32.dp else 0.dp)) {
+                    Box(
+                        Modifier
+                            .padding(start = if (isWarning) 32.dp else 0.dp)
+                    ) {
                         content()
                     }
                 }
@@ -255,18 +308,24 @@ fun CustomContentDialog(
                     if (secondaryButtonText != null) Button(
                         modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
                         onClick = { onButtonClick(ContentDialogButton.Secondary) },
-                    ) { Text(secondaryButtonText,
-                        style = LocalTypography.current.bodyStrong,
-                        color = FluentTheme.colors.text.text.primary) }
+                    ) {
+                        Text(
+                            secondaryButtonText,
+                            style = LocalTypography.current.bodyStrong,
+                            color = FluentTheme.colors.text.text.primary
+                        )
+                    }
                     AccentButton(
                         modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
                         onClick = { onButtonClick(ContentDialogButton.Primary) },
                         buttonColors = if (isWarning) customDangerButtonColors() else customAccentButtonColors()
-                    ) { Text(
-                        primaryButtonText,
-                        style = LocalTypography.current.bodyStrong,
-                        color = FluentTheme.colors.text.text.primary
-                    ) }
+                    ) {
+                        Text(
+                            primaryButtonText,
+                            style = LocalTypography.current.bodyStrong,
+                            color = FluentTheme.colors.text.text.primary
+                        )
+                    }
                 }
             }
         }

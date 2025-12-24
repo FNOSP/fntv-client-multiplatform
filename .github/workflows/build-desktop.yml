@@ -31,7 +31,10 @@ jobs:
 
       - name: Build MacOS DMG (Apple Silicon)
         # 执行 Compose Desktop 的打包任务
-        run: ./gradlew :composeApp:packageReleaseDmg
+        run: ./gradlew :composeApp:packageReleaseDmg --no-configuration-cache
+        env:
+          REPORT_API_SECRET: ${{ secrets.REPORT_API_SECRET }}
+          REPORT_URL: ${{ secrets.REPORT_URL }}
 
       - name: Upload DMG Artifact
         uses: actions/upload-artifact@v4
@@ -64,6 +67,9 @@ jobs:
       - name: Build MacOS DMG (Intel)
         # 执行 Compose Desktop 的打包任务
         run: ./gradlew :composeApp:packageReleaseDmg
+        env:
+          REPORT_API_SECRET: ${{ secrets.REPORT_API_SECRET }}
+          REPORT_URL: ${{ secrets.REPORT_URL }}
 
       - name: Upload DMG Artifact
         uses: actions/upload-artifact@v4
@@ -101,6 +107,9 @@ jobs:
       - name: Build Linux Deb
         # 执行 Compose Desktop 的打包任务
         run: ./gradlew :composeApp:packageReleaseDeb
+        env:
+          REPORT_API_SECRET: ${{ secrets.REPORT_API_SECRET }}
+          REPORT_URL: ${{ secrets.REPORT_URL }}
 
       - name: Upload Deb Artifact
         uses: actions/upload-artifact@v4
@@ -128,7 +137,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Create Release Distributable
-        run: ./gradlew :composeApp:createReleaseDistributable
+        run: ./gradlew :composeApp:createReleaseDistributable --no-configuration-cache
+        env:
+          REPORT_API_SECRET: ${{ secrets.REPORT_API_SECRET }}
+          REPORT_URL: ${{ secrets.REPORT_URL }}
 
       - name: Setup Inno Setup
         run: |
@@ -214,8 +226,10 @@ jobs:
         shell: bash
         run: |
           # Define common release notes
-          NOTES="1.修复切换用户后导航栏媒体库列表未更新的问题  
-          2.修复切换用户后 VLC 代理信息未更新的问题  
+          NOTES="1.修复倍速播放时字幕被跳过的问题  
+          2.修复切换窗口置顶后快捷键不生效的问题  
+          3.优化更新弹窗错误信息显示  
+          4.其他若干 UI 方面的优化  
           　  
           感谢以下飞牛共建团成员反馈问题并协助排查：  
           @[zhengbf](https://club.fnnas.com/home.php?mod=space&uid=187) @[空城](https://club.fnnas.com/home.php?mod=space&uid=2332)  
