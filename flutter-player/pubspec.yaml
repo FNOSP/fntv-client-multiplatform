@@ -16,7 +16,12 @@ dependencies:
   window_manager: ^0.3.7
   shelf: ^1.4.1
   shelf_router: ^1.1.4
-  http: ^1.1.0
+  http: ^1.6.0
+  provider: ^6.1.5+1
+  google_fonts: ^6.3.3
+  lottie: ^3.3.2
+  path_provider: ^2.1.5
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
@@ -25,3 +30,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/

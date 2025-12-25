@@ -14,165 +14,35 @@
  */
 package com.jankinwu.fntv.client
 
-import com.jankinwu.fntv.client.utils.ExecutableDirectoryDetector
-import co.touchlab.kermit.Logger
-import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
+import com.jankinwu.fntv.client.bridge.FlutterPlayerBridge
+import java.util.Locale
 
-private var externalPlayerProcess: Process? = null
-private const val PLAYER_PORT = 47920
-
-internal actual fun currentPlatformImpl(): Platform {
-    val os = System.getProperty("os.name")?.lowercase() ?: error("Cannot determine platform, 'os.name' is null.")
-    val arch = getArch()
-    return when {
-        "mac" in os || "os x" in os || "darwin" in os -> Platform.MacOS(arch)
-        "windows" in os -> Platform.Windows(arch)
-//        "linux" in os || "redhat" in os || "debian" in os || "ubuntu" in os -> Platform.Linux(arch)
-        "linux" in os -> Platform.Linux(arch)
-        else -> throw UnsupportedOperationException("Unsupported platform: $os")
-    }
+actual fun launchExternalPlayer(url: String, title: String, startPos: Long) {
+    FlutterPlayerBridge.launchExternalPlayer(url, title, startPos)
 }
 
-private fun getArch() = System.getProperty("os.arch").lowercase().let {
-    when {
-        "x86" in it || "x64" in it || "amd64" in it -> Arch.X86_64
-        "arm" in it || "aarch" in it -> Arch.AARCH64
+internal actual fun currentPlatformImpl(): Platform {
+    val os = System.getProperty("os.name").lowercase(Locale.getDefault())
+    val archStr = System.getProperty("os.arch").lowercase(Locale.getDefault())
+
+    val arch = when {
+        archStr.contains("aarch64") || archStr.contains("arm64") -> Arch.AARCH64
+        archStr.contains("arm") -> Arch.ARMV7A // Simplified, can be refined if needed
         else -> Arch.X86_64
+    }
+
+    return when {
+        os.contains("win") -> Platform.Windows(arch)
+        os.contains("mac") -> Platform.MacOS(arch)
+        os.contains("nix") || os.contains("nux") || os.contains("aix") -> Platform.Linux(arch)
+        else -> error("Unsupported desktop platform: $os")
     }
 }
 
 fun currentPlatformDesktop(): Platform.Desktop {
     val platform = currentPlatform()
-    check(platform is Platform.Desktop)
+    if (platform !is Platform.Desktop) {
+        error("Current platform is not a desktop platform: $platform")
+    }
     return platform
-}
-
-actual fun launchExternalPlayer(url: String, title: String, startPos: Long) {
-    val platform = currentPlatformDesktop()
-    val logger = Logger.withTag("ExternalPlayer")
-
-    // Try to send to existing player first
-    if (sendToExistingPlayer(url, title, startPos)) {
-        logger.i { "Successfully sent play request to existing external player." }
-        return
-    }
-
-    val executableDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
-    val candidates = buildExternalPlayerCandidates(platform, executableDir)
-    val playerExe = candidates.firstOrNull { it.exists() }
-        ?: throw IllegalStateException(
-            "External player executable not found. Tried: ${candidates.joinToString { it.absolutePath }}"
-        )
-
-    logger.i { "Launching new external player instance: $url, title: $title, startPos: $startPos ms" }
-    try {
-        // Kill previous process if it exists (safety)
-        externalPlayerProcess?.destroy()
-
-        // Keep working directory next to the executable so Flutter can find "data/" and native libs.
-        val process = ProcessBuilder(playerExe.absolutePath, url, title, startPos.toString())
-            .directory(playerExe.parentFile)
-            .start()
-        
-        externalPlayerProcess = process
-
-        // Ensure subprocess is killed when main app exits
-        Runtime.getRuntime().addShutdownHook(Thread {
-            process.destroy()
-        })
-    } catch (e: Exception) {
-        logger.e(e) { "Failed to start external player process." }
-        throw e
-    }
-}
-
-private fun sendToExistingPlayer(url: String, title: String, startPos: Long): Boolean {
-    return try {
-        val connection = URL("http://127.0.0.1:$PLAYER_PORT/play").openConnection() as HttpURLConnection
-        connection.requestMethod = "POST"
-        connection.doOutput = true
-        connection.setRequestProperty("Content-Type", "application/json")
-        connection.connectTimeout = 500 // Short timeout
-        connection.readTimeout = 1000
-
-        val json = """
-            {
-                "url": "$url",
-                "title": "$title",
-                "startPos": $startPos
-            }
-        """.trimIndent()
-
-        connection.outputStream.use { it.write(json.toByteArray()) }
-        val responseCode = connection.responseCode
-        responseCode == 200
-    } catch (e: Exception) {
-        // If connection fails, player probably not running
-        false
-    }
-}
-
-private fun buildExternalPlayerCandidates(
-    platform: Platform.Desktop,
-    executableDir: File
-): List<File> {
-    val exeNames = when (platform) {
-        is Platform.Windows -> listOf("flutter-player.exe", "flutter_player.exe")
-        is Platform.MacOS -> listOf(
-            "flutter-player.app/Contents/MacOS/flutter-player",
-            "flutter_player.app/Contents/MacOS/flutter_player"
-        )
-        is Platform.Linux -> listOf("flutter-player", "flutter_player")
-    }
-
-    val packagedResources = File(File(executableDir, "app"), "resources")
-    val packagedExes = exeNames.map { File(packagedResources, it) }
-
-    val userDir = File(System.getProperty("user.dir") ?: ".").absoluteFile
-    val projectRoot = findProjectRoot(userDir)
-
-    val devBuildExes = projectRoot?.let { root ->
-        val flutterDir = if (File(root, "flutter-player").exists()) "flutter-player" else "flutter_player"
-        exeNames.flatMap { name ->
-            when (platform) {
-                is Platform.Windows -> listOf(
-                    File(root, "$flutterDir/build/windows/x64/runner/Release/$name"),
-                    File(root, "$flutterDir/build/windows/runner/Release/$name"),
-                )
-                is Platform.MacOS -> {
-                    val appName = name.split("/").first()
-                    val binaryName = name.split("/").last()
-                    listOf(
-                        File(root, "$flutterDir/build/macos/Build/Products/Release/$appName/Contents/MacOS/$binaryName"),
-                    )
-                }
-                is Platform.Linux -> listOf(
-                    File(root, "$flutterDir/build/linux/x64/release/bundle/$name"),
-                )
-            }
-        }
-    }.orEmpty()
-
-    val bundledExes = projectRoot?.let { root ->
-        exeNames.flatMap { name ->
-            listOf(
-                File(root, "composeApp/build/compose/all-app-resources/$name"),
-                File(root, "composeApp/build/compose/all-app-resources/${name.replace(".exe", "")}"),
-            )
-        }
-    }.orEmpty()
-
-    return packagedExes + bundledExes + devBuildExes
-}
-
-private fun findProjectRoot(startDir: File): File? {
-    var current: File? = startDir
-    repeat(8) {
-        val dir = current ?: return null
-        if (File(dir, "flutter-player").exists() || File(dir, "flutter_player").exists()) return dir
-        current = dir.parentFile
-    }
-    return null
 }

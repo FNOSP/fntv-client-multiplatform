@@ -28,11 +28,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -72,10 +72,10 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.jankinwu.fntv.client.Platform
 import com.jankinwu.fntv.client.currentPlatform
-import com.jankinwu.fntv.client.launchExternalPlayer
 import com.jankinwu.fntv.client.data.constants.Colors
 import com.jankinwu.fntv.client.data.convertor.FnDataConvertor
 import com.jankinwu.fntv.client.data.model.PlayingInfoCache
+import com.jankinwu.fntv.client.data.model.SubtitleSettings
 import com.jankinwu.fntv.client.data.model.request.MediaPRequest
 import com.jankinwu.fntv.client.data.model.request.PlayPlayRequest
 import com.jankinwu.fntv.client.data.model.request.PlayRecordRequest
@@ -102,6 +102,7 @@ import com.jankinwu.fntv.client.icons.Back10S
 import com.jankinwu.fntv.client.icons.Forward10S
 import com.jankinwu.fntv.client.icons.Pause
 import com.jankinwu.fntv.client.icons.Play
+import com.jankinwu.fntv.client.launchExternalPlayer
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
 import com.jankinwu.fntv.client.ui.component.common.ToastManager
@@ -116,16 +117,16 @@ import com.jankinwu.fntv.client.ui.component.player.NextEpisodePreviewFlyout
 import com.jankinwu.fntv.client.ui.component.player.PlayerSettingsMenu
 import com.jankinwu.fntv.client.ui.component.player.QualityControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SpeedControlFlyout
-import com.jankinwu.fntv.client.ui.component.player.speeds
 import com.jankinwu.fntv.client.ui.component.player.SubtitleControlFlyout
 import com.jankinwu.fntv.client.ui.component.player.SubtitleOverlay
-import com.jankinwu.fntv.client.data.model.SubtitleSettings
 import com.jankinwu.fntv.client.ui.component.player.VideoPlayerProgressBar
 import com.jankinwu.fntv.client.ui.component.player.VolumeControl
+import com.jankinwu.fntv.client.ui.component.player.speeds
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
 import com.jankinwu.fntv.client.ui.providable.LocalFileInfo
 import com.jankinwu.fntv.client.ui.providable.LocalFrameWindowScope
 import com.jankinwu.fntv.client.ui.providable.LocalIsoTagData
+import com.jankinwu.fntv.client.ui.providable.LocalMediaPlayer
 import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import com.jankinwu.fntv.client.ui.providable.LocalStore
 import com.jankinwu.fntv.client.ui.providable.LocalToastManager
@@ -178,6 +179,47 @@ import org.openani.mediamp.source.UriMediaData
 import org.openani.mediamp.togglePause
 import kotlin.math.abs
 import kotlin.math.roundToInt
+
+@Composable
+fun PlayerScreen(
+    guid: String,
+    mediaGuid: String? = null,
+    videoStream: VideoStream? = null,
+    audioStream: AudioStream? = null,
+    subtitleStream: SubtitleStream? = null,
+    startPosition: Long = 0L,
+    playInfoResponse: PlayInfoResponse? = null
+) {
+    InternalPlayerScreen(guid, mediaGuid, videoStream, audioStream, subtitleStream, startPosition, playInfoResponse)
+}
+
+
+
+@OptIn(ExperimentalResourceApi::class, kotlinx.coroutines.FlowPreview::class)
+@Composable
+private fun InternalPlayerScreen(
+    guid: String,
+    mediaGuid: String? = null,
+    videoStream: VideoStream? = null,
+    audioStream: AudioStream? = null,
+    subtitleStream: SubtitleStream? = null,
+    startPosition: Long = 0L,
+    playInfoResponse: PlayInfoResponse? = null
+) {
+    val mediaPlayer = LocalMediaPlayer.current
+    val playMedia = rememberPlayMediaFunction(
+        guid = guid,
+        player = mediaPlayer,
+        mediaGuid = mediaGuid,
+        currentAudioGuid = audioStream?.guid,
+        currentSubtitleGuid = subtitleStream?.guid
+    )
+    
+    LaunchedEffect(guid, mediaGuid) {
+        playMedia()
+    }
+}
+
 
 private val logger = Logger.withTag("PlayerScreen")
 
