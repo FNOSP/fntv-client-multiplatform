@@ -118,48 +118,60 @@ private fun buildExternalPlayerCandidates(
     platform: Platform.Desktop,
     executableDir: File
 ): List<File> {
-    val exeName = when (platform) {
-        is Platform.Windows -> "flutter_player.exe"
-        is Platform.MacOS -> "flutter_player.app/Contents/MacOS/flutter_player"
-        is Platform.Linux -> "flutter_player"
+    val exeNames = when (platform) {
+        is Platform.Windows -> listOf("flutter-player.exe", "flutter_player.exe")
+        is Platform.MacOS -> listOf(
+            "flutter-player.app/Contents/MacOS/flutter-player",
+            "flutter_player.app/Contents/MacOS/flutter_player"
+        )
+        is Platform.Linux -> listOf("flutter-player", "flutter_player")
     }
 
     val packagedResources = File(File(executableDir, "app"), "resources")
-    val packagedExe = File(packagedResources, exeName)
+    val packagedExes = exeNames.map { File(packagedResources, it) }
 
     val userDir = File(System.getProperty("user.dir") ?: ".").absoluteFile
     val projectRoot = findProjectRoot(userDir)
 
-    val devBuildExe = projectRoot?.let { root ->
-        when (platform) {
-            is Platform.Windows -> listOf(
-                File(root, "flutter_player/build/windows/x64/runner/Release/flutter_player.exe"),
-                File(root, "flutter_player/build/windows/runner/Release/flutter_player.exe"),
-            )
-            is Platform.MacOS -> listOf(
-                File(root, "flutter_player/build/macos/Build/Products/Release/flutter_player.app/Contents/MacOS/flutter_player"),
-            )
-            is Platform.Linux -> listOf(
-                File(root, "flutter_player/build/linux/x64/release/bundle/flutter_player"),
+    val devBuildExes = projectRoot?.let { root ->
+        val flutterDir = if (File(root, "flutter-player").exists()) "flutter-player" else "flutter_player"
+        exeNames.flatMap { name ->
+            when (platform) {
+                is Platform.Windows -> listOf(
+                    File(root, "$flutterDir/build/windows/x64/runner/Release/$name"),
+                    File(root, "$flutterDir/build/windows/runner/Release/$name"),
+                )
+                is Platform.MacOS -> {
+                    val appName = name.split("/").first()
+                    val binaryName = name.split("/").last()
+                    listOf(
+                        File(root, "$flutterDir/build/macos/Build/Products/Release/$appName/Contents/MacOS/$binaryName"),
+                    )
+                }
+                is Platform.Linux -> listOf(
+                    File(root, "$flutterDir/build/linux/x64/release/bundle/$name"),
+                )
+            }
+        }
+    }.orEmpty()
+
+    val bundledExes = projectRoot?.let { root ->
+        exeNames.flatMap { name ->
+            listOf(
+                File(root, "composeApp/build/compose/all-app-resources/$name"),
+                File(root, "composeApp/build/compose/all-app-resources/${name.replace(".exe", "")}"),
             )
         }
     }.orEmpty()
 
-    val bundledExe = projectRoot?.let { root ->
-        listOf(
-            File(root, "composeApp/build/compose/all-app-resources/$exeName"),
-            File(root, "composeApp/build/compose/all-app-resources/${exeName.replace(".exe", "")}"),
-        )
-    }.orEmpty()
-
-    return listOf(packagedExe) + bundledExe + devBuildExe
+    return packagedExes + bundledExes + devBuildExes
 }
 
 private fun findProjectRoot(startDir: File): File? {
     var current: File? = startDir
     repeat(8) {
         val dir = current ?: return null
-        if (File(dir, "flutter_player").exists()) return dir
+        if (File(dir, "flutter-player").exists() || File(dir, "flutter_player").exists()) return dir
         current = dir.parentFile
     }
     return null

@@ -65,7 +65,7 @@ fun resolveFlutterExecutable(project: Project): File? {
 }
 
 val buildFlutterPlayer by tasks.registering(Exec::class) {
-    val flutterProjectDir = project.rootDir.resolve("flutter_player")
+    val flutterProjectDir = project.rootDir.resolve("flutter-player")
     workingDir = flutterProjectDir
 
     val targetOs = when {
@@ -115,7 +115,7 @@ val prepareAllAppResources by tasks.registering(Copy::class) {
     from(proxyResourcesDir)
 
     // 3. Copy Flutter player output
-    val flutterProjectDir = project.rootDir.resolve("flutter_player")
+    val flutterProjectDir = project.rootDir.resolve("flutter-player")
     val flutterSourceDir = when {
         osName.contains("win") -> {
             listOf(
@@ -131,12 +131,15 @@ val prepareAllAppResources by tasks.registering(Copy::class) {
         if (flutterSourceDir.exists()) {
             if (osName.contains("win")) {
                 include("flutter-player.exe")
+                include("flutter_player.exe")
                 include("*.dll")
                 include("data/**")
             } else if (osName.contains("mac")) {
                 include("flutter-player.app/**")
+                include("flutter_player.app/**")
             } else {
                 include("flutter-player")
+                include("flutter_player")
                 include("lib/**")
                 include("data/**")
             }

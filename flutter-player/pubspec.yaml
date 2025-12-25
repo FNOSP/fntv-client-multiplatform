@@ -1,4 +1,4 @@
-name: flutter-player
+name: flutter_player
 description: A Flutter-based external player for FnTV Client.
 version: 1.0.0+1
 publish_to: 'none'
@@ -12,6 +12,7 @@ dependencies:
   media_kit: ^1.1.10
   media_kit_video: ^1.2.4
   media_kit_libs_video: ^1.0.4
+  media_kit_libs_windows_video: ^1.0.8
   window_manager: ^0.3.7
   shelf: ^1.4.1
   shelf_router: ^1.1.4

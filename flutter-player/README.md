@@ -1,4 +1,4 @@
-# flutter_player
+# flutter-player
 
 A flutter sub-program to play video.
 
