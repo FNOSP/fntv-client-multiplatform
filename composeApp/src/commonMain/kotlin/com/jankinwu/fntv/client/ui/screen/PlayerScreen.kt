@@ -386,6 +386,7 @@ fun PlayerOverlay(
         isNextEpisodeHovered = false
         isSettingsMenuHovered = false
         isSubtitleControlHovered = false
+        playerManager.requestKeyFocus()
     }
 
     LaunchedEffect(playingInfoCache?.parentGuid) {
@@ -402,7 +403,9 @@ fun PlayerOverlay(
     }
 
     val playEpisode = remember(
+        playingInfoCache,
         mediaPlayer,
+        mediaPViewModel,
         playInfoViewModel,
         userInfoViewModel,
         streamViewModel,
