@@ -7,8 +7,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -31,9 +29,11 @@ import com.jankinwu.fntv.client.ui.component.common.rememberComponentNavigator
 import com.jankinwu.fntv.client.ui.providable.LocalFrameWindowScope
 import com.jankinwu.fntv.client.ui.providable.LocalMediaPlayer
 import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
+import com.jankinwu.fntv.client.ui.providable.LocalWebViewInitError
+import com.jankinwu.fntv.client.ui.providable.LocalWebViewInitialized
+import com.jankinwu.fntv.client.ui.providable.LocalWebViewRestartRequired
 import com.jankinwu.fntv.client.ui.providable.LocalWindowHandle
 import com.jankinwu.fntv.client.ui.providable.LocalWindowState
-import com.jankinwu.fntv.client.ui.screen.FnConnectWebViewScreen
 import com.jankinwu.fntv.client.ui.screen.LoginScreen
 import com.jankinwu.fntv.client.ui.screen.PlayerManager
 import com.jankinwu.fntv.client.ui.screen.PlayerOverlay
@@ -47,18 +47,15 @@ import com.jankinwu.fntv.client.viewmodel.UiState
 import com.jankinwu.fntv.client.viewmodel.UserInfoViewModel
 import com.jankinwu.fntv.client.viewmodel.viewModelModule
 import com.jankinwu.fntv.client.window.WindowFrame
-import com.jankinwu.fntv.client.ui.providable.LocalWebViewInitialized
-import com.jankinwu.fntv.client.ui.providable.LocalWebViewInitError
-import com.jankinwu.fntv.client.ui.providable.LocalWebViewRestartRequired
 import dev.datlag.kcef.KCEF
 import fntv_client_multiplatform.composeapp.generated.resources.Res
 import fntv_client_multiplatform.composeapp.generated.resources.icon
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.KoinApplication
@@ -210,7 +207,10 @@ fun main() {
 
                     // 只有在未登录状态下才显示登录界面
                     if (!isLoggedIn) {
-                        LoginScreen(navigator)
+                        LoginScreen(
+                            navigator = navigator,
+                            draggableArea = { content -> WindowDraggableArea(content = content) }
+                        )
                     } else {
                         App(
                             windowInset = windowInset,

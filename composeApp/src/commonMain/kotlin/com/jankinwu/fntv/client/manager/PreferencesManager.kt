@@ -62,6 +62,8 @@ class PreferencesManager private constructor() {
             AccountDataCache.refreshCookie()
         }
         AccountDataCache.rememberMe = settings.getBoolean("rememberMe", false)
+        AccountDataCache.isFnConnect = settings.getBoolean("isFnConnect", false)
+        AccountDataCache.fnId = settings.getString("fnId", "")
     }
 
     fun saveAllLoginInfo() {
@@ -75,6 +77,8 @@ class PreferencesManager private constructor() {
         val cookie = AccountDataCache.cookieState
         settings.putString("cookie", cookie)
         settings.putBoolean("rememberMe", AccountDataCache.rememberMe)
+        settings.putBoolean("isFnConnect", AccountDataCache.isFnConnect)
+        settings.putString("fnId", AccountDataCache.fnId)
     }
 
     fun saveToken(token: String) {

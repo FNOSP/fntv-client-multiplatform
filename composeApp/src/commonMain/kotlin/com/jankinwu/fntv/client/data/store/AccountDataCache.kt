@@ -26,6 +26,10 @@ object AccountDataCache {
 
     var rememberMe: Boolean = false
 
+    var isFnConnect: Boolean = false
+
+    var fnId: String = ""
+
     fun getFnOfficialBaseUrl(): String {
         var endpoint = host
         if (port != 0) {

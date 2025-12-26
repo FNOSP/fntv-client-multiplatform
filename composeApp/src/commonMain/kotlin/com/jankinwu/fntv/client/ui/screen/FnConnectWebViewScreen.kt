@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowLeft
@@ -30,16 +29,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
-import com.jankinwu.fntv.client.data.network.impl.FnOfficialApiImpl
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.consumeEach
-import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,7 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import co.touchlab.kermit.Logger
 import com.jankinwu.fntv.client.data.constants.Colors
+import com.jankinwu.fntv.client.data.model.LoginHistory
 import com.jankinwu.fntv.client.data.model.request.AuthRequest
+import com.jankinwu.fntv.client.data.network.impl.FnOfficialApiImpl
 import com.jankinwu.fntv.client.data.store.AccountDataCache
 import com.jankinwu.fntv.client.manager.LoginStateManager
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
@@ -80,6 +73,14 @@ import dev.chrisbanes.haze.materials.FluentMaterials
 import dev.chrisbanes.haze.rememberHazeState
 import fntv_client_multiplatform.composeapp.generated.resources.Res
 import fntv_client_multiplatform.composeapp.generated.resources.login_background
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.consumeEach
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.compose.resources.painterResource
 
 private val logger = Logger.withTag("FnConnectWebViewScreen")
@@ -87,9 +88,15 @@ private val logger = Logger.withTag("FnConnectWebViewScreen")
 @OptIn(ExperimentalHazeMaterialsApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun FnConnectWebViewScreen(
+    modifier: Modifier = Modifier,
     initialUrl: String,
+    fnId: String,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    onLoginSuccess: (LoginHistory) -> Unit,
+    autoLoginUsername: String? = null,
+    autoLoginPassword: String? = null,
+    allowAutoLogin: Boolean = false,
+    draggableArea: @Composable (content: @Composable () -> Unit) -> Unit = { it() }
 ) {
     val toastManager = rememberToastManager()
     val hazeState = rememberHazeState()
@@ -106,10 +113,20 @@ fun FnConnectWebViewScreen(
     val navigator = rememberWebViewNavigator()
     val jsBridge = rememberWebViewJsBridge(navigator)
     val messageChannel = remember { Channel<String>(Channel.UNLIMITED) }
+    
+    var capturedUsername by remember { mutableStateOf("") }
+    var capturedPassword by remember { mutableStateOf("") }
+    var capturedRememberMe by remember { mutableStateOf(false) }
 
     LaunchedEffect(jsBridge) {
         jsBridge.register(NetworkLogHandler { params ->
             messageChannel.trySend(params)
+        })
+        jsBridge.register(CaptureLoginInfoHandler { username, password, rememberMe ->
+            capturedUsername = username
+            capturedPassword = password
+            capturedRememberMe = rememberMe
+            logger.i("Captured login info: user=$username, remember=$rememberMe")
         })
     }
 
@@ -177,16 +194,28 @@ fun FnConnectWebViewScreen(
                                                 AccountDataCache.insertCookie("Trim-MC-token" to token)
                                                 logger.i("cookie: ${AccountDataCache.cookieState}")
                                                 LoginStateManager.updateLoginStatus(true)
-                                                toastManager.showToast("授权成功", ToastType.Success)
-                                                onBack()
+                                                toastManager.showToast("登录成功", ToastType.Success)
+                                                
+                                                val history = LoginHistory(
+                                                    host = "",
+                                                    port = 0,
+                                                    username = capturedUsername.ifBlank { autoLoginUsername ?: "Unknown" },
+                                                    password = if (capturedRememberMe) capturedPassword else null,
+                                                    isHttps = baseUrl.startsWith("https"),
+                                                    rememberMe = capturedRememberMe,
+                                                    isFnConnect = true,
+                                                    fnConnectUrl = baseUrl,
+                                                    fnId = fnId
+                                                )
+                                                onLoginSuccess(history)
                                             } else {
                                                 isAuthRequested = false
-                                                toastManager.showToast("授权失败: Token 为空", ToastType.Failed)
+                                                toastManager.showToast("登录失败: Token 为空", ToastType.Failed)
                                             }
                                         } catch (e: Exception) {
                                             isAuthRequested = false
                                             logger.e("OAuth result failed", e)
-                                            toastManager.showToast("授权失败: ${e.message}", ToastType.Failed)
+                                            toastManager.showToast("登录失败: ${e.message}", ToastType.Failed)
                                         }
                                     }
                                 }
@@ -211,27 +240,6 @@ fun FnConnectWebViewScreen(
                     baseUrl = url.substringBefore("/login")
                     logger.i("Base url: $baseUrl")
                 }
-//                if (url == baseUrl) {
-//                    AccountDataCache.updateFnOfficialBaseUrlFromUrl(url)
-////                    AccountDataCache.isLoggedIn = true
-//                    try {
-//                        val cookies = webViewState.cookieManager.getCookies(url)
-//                        val cookieMap = cookies.associate { it.name to it.value }
-//                        AccountDataCache.insertCookies(cookieMap)
-//                        logger.i("Cookies: $cookies")
-//                        val token = cookieMap["Trim-MC-token"] ?: cookieMap["Authorization"]
-//                        if (!token.isNullOrBlank()) {
-//                            AccountDataCache.authorization = token
-//                            logger.i("Token: $token")
-//                        }
-//                        // LoginStateManager.updateLoginStatus(true)
-//                        // onBack()
-//                        // toastManager.showToast("登录成功", ToastType.Success)
-//                    } catch (e: Exception) {
-//                        e.printStackTrace()
-//                        toastManager.showToast("获取登录信息失败: ${e.message}", ToastType.Failed)
-//                    }
-//                }
             }
         }
     }
@@ -242,6 +250,10 @@ fun FnConnectWebViewScreen(
             val jsScript = """
                 (function() {
                     console.log("Injecting Network Interceptor...");
+                    
+                    var AUTO_LOGIN_USER = "${autoLoginUsername ?: ""}";
+                    var AUTO_LOGIN_PASS = "${autoLoginPassword ?: ""}";
+                    var ALLOW_AUTO_LOGIN = ${allowAutoLogin};
                     
                     function logToNative(type, url, method, headers, body) {
                         if (window.kmpJsBridge) {
@@ -255,8 +267,130 @@ fun FnConnectWebViewScreen(
                             }));
                         }
                     }
+                    
+                    function triggerInput(input, value) {
+                        var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                        nativeInputValueSetter.call(input, value);
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
 
-                    // Hook XMLHttpRequest
+                    function injectUI() {
+                        if (window.location.href.indexOf('/login') !== -1) {
+                             var stayCheckbox = document.getElementById('stay');
+                             // 尝试查找包含“保持登录”文本的元素作为备选
+                             if (!stayCheckbox) {
+                                 var allDivs = document.querySelectorAll('div');
+                                 for (var i = 0; i < allDivs.length; i++) {
+                                     if (allDivs[i].innerText === '保持登录') {
+                                         var potentialCheckbox = allDivs[i].closest('.semi-checkbox');
+                                         if (potentialCheckbox) {
+                                             stayCheckbox = potentialCheckbox;
+                                             // 给它加个ID方便后续查找
+                                             stayCheckbox.id = 'stay';
+                                             break;
+                                         }
+                                     }
+                                 }
+                             }
+
+                             if (stayCheckbox && !document.getElementById('remember-password-container')) {
+                                 var stayField = stayCheckbox.closest('.semi-form-field');
+                                 if (stayField) {
+                                     var rememberField = stayField.cloneNode(true);
+                                     rememberField.id = 'remember-password-container';
+                                     var input = rememberField.querySelector('input');
+                                     if (input) {
+                                         input.id = 'remember-password';
+                                         input.checked = false; 
+                                     }
+                                     
+                                     var label = rememberField.querySelector('.text-\\[16px\\]');
+                                     if (label) label.innerText = '记住密码';
+                                     
+                                     var checkboxSpan = rememberField.querySelector('.semi-checkbox');
+                                     if (checkboxSpan) {
+                                         checkboxSpan.className = 'semi-checkbox semi-checkbox-unChecked semi-checkbox-cardType_enable h-[22px] [&_.semi-checkbox-inner]:h-full !gap-x-1';
+                                         
+                                         checkboxSpan.onclick = function(e) {
+                                             e.preventDefault();
+                                             var inp = document.getElementById('remember-password');
+                                             if (inp) {
+                                                 inp.checked = !inp.checked;
+                                                 if (inp.checked) {
+                                                     this.className = this.className.replace('semi-checkbox-unChecked', 'semi-checkbox-checked');
+                                                 } else {
+                                                     this.className = this.className.replace('semi-checkbox-checked', 'semi-checkbox-unChecked');
+                                                 }
+                                             }
+                                         };
+                                     }
+                                     
+                                     stayField.parentNode.insertBefore(rememberField, stayField.nextSibling);
+                                     rememberField.style.marginTop = '10px';
+                                 }
+                             }
+                             
+                             var loginBtn = document.querySelector('button[type="submit"]');
+                             if (loginBtn && !loginBtn.getAttribute('data-intercepted')) {
+                                 loginBtn.setAttribute('data-intercepted', 'true');
+                                 loginBtn.addEventListener('click', function() {
+                                     var u = document.getElementById('username') ? document.getElementById('username').value : "";
+                                     var p = document.getElementById('password') ? document.getElementById('password').value : "";
+                                     var r = document.getElementById('remember-password') ? document.getElementById('remember-password').checked : false;
+                                     
+                                     if (window.kmpJsBridge) {
+                                         window.kmpJsBridge.callNative("CaptureLoginInfo", JSON.stringify({
+                                             username: u,
+                                             password: p,
+                                             rememberMe: r
+                                         }));
+                                     }
+                                 });
+                             }
+                        }
+                    }
+
+                    // 每500ms尝试注入一次，确保动态渲染也能捕获
+                    setInterval(injectUI, 500);
+
+                    if (window.location.href.indexOf('/login') !== -1) {
+                         if (ALLOW_AUTO_LOGIN && AUTO_LOGIN_USER) {
+                             setTimeout(function() {
+                                  var uInput = document.getElementById('username');
+                                  var pInput = document.getElementById('password');
+                                  if (uInput && pInput) {
+                                      triggerInput(uInput, AUTO_LOGIN_USER);
+                                      if (AUTO_LOGIN_PASS) {
+                                          triggerInput(pInput, AUTO_LOGIN_PASS);
+                                          
+                                          var rememberSpan = document.querySelector('#remember-password-container .semi-checkbox');
+                                          if (rememberSpan && rememberSpan.className.indexOf('semi-checkbox-unChecked') !== -1) {
+                                              rememberSpan.click();
+                                          }
+                                          
+                                          setTimeout(function() {
+                                              var btn = document.querySelector('button[type="submit"]');
+                                              if (btn) btn.click();
+                                          }, 500);
+                                      }
+                                  }
+                             }, 1000);
+                          }
+                     }
+                     
+                     if (ALLOW_AUTO_LOGIN && window.location.href.indexOf('/signin') !== -1) {
+                         setTimeout(function() {
+                             var btns = document.querySelectorAll('button');
+                             for (var i = 0; i < btns.length; i++) {
+                                 if (btns[i].innerText.indexOf('授权') !== -1) {
+                                     btns[i].click();
+                                     break;
+                                 }
+                             }
+                         }, 1000);
+                     }
+ 
+                     // Hook XMLHttpRequest
                     var originalOpen = XMLHttpRequest.prototype.open;
                     XMLHttpRequest.prototype.open = function(method, url) {
                         this._method = method;
@@ -345,6 +479,8 @@ fun FnConnectWebViewScreen(
                 .hazeSource(state = hazeState)
         )
 
+
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -361,6 +497,15 @@ fun FnConnectWebViewScreen(
                         style = FluentMaterials.acrylicDefault(true)
                     )
             ) {
+                // Window Draggable Area
+                draggableArea {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .align(Alignment.TopCenter)
+                    )
+                }
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -398,17 +543,17 @@ fun FnConnectWebViewScreen(
                                 keyboardType = KeyboardType.Uri,
                                 imeAction = ImeAction.Go
                             ),
-                            keyboardActions = KeyboardActions(
-                                onGo = {
-                                    val target = normalizeFnConnectUrl(addressBarValue)
-                                    if (target.isNotBlank()) {
-                                        currentUrl = target
-                                        addressBarValue = target
-                                    } else {
-                                        toastManager.showToast("请输入有效地址", ToastType.Info)
-                                    }
-                                }
-                            ),
+//                            keyboardActions = KeyboardActions(
+//                                onGo = {
+//                                    val target = normalizeFnConnectUrl(addressBarValue, isHttps)
+//                                    if (target.isNotBlank()) {
+//                                        currentUrl = target
+//                                        addressBarValue = target
+//                                    } else {
+//                                        toastManager.showToast("请输入有效地址", ToastType.Info)
+//                                    }
+//                                }
+//                            ),
                             decorationBox = { innerTextField ->
                                 OutlinedTextFieldDefaults.DecorationBox(
                                     value = addressBarValue,
@@ -508,7 +653,7 @@ private fun getTextFieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedTextColor = Colors.TextSecondaryColor
 )
 
-internal fun normalizeFnConnectUrl(value: String): String {
+internal fun normalizeFnConnectUrl(value: String, isHttps: Boolean): String {
     // Normalize FN Connect host and ensure HTTPS is always used.
     val trimmed = value.trim()
     if (trimmed.isBlank()) return ""
@@ -520,7 +665,12 @@ internal fun normalizeFnConnectUrl(value: String): String {
     val host = trimmed.substringBefore("/")
     val path = trimmed.removePrefix(host)
     val normalizedHost = if (host.contains('.')) host else "$host.5ddd.com"
-    return "https://$normalizedHost$path"
+    val protocolPrefix = if (normalizedHost.contains("5ddd.com")) {
+        "https://"
+    } else {
+        if (isHttps) "https://" else "http://"
+    }
+    return "$protocolPrefix$normalizedHost$path"
 }
 
 class NetworkLogHandler(private val onMessage: (String) -> Unit) : IJsMessageHandler {
@@ -528,6 +678,23 @@ class NetworkLogHandler(private val onMessage: (String) -> Unit) : IJsMessageHan
 
     override fun handle(message: JsMessage, navigator: WebViewNavigator?, callback: (String) -> Unit) {
         onMessage(message.params)
+        callback("OK")
+    }
+}
+
+class CaptureLoginInfoHandler(private val onCapture: (String, String, Boolean) -> Unit) : IJsMessageHandler {
+    override fun methodName(): String = "CaptureLoginInfo"
+
+    override fun handle(message: JsMessage, navigator: WebViewNavigator?, callback: (String) -> Unit) {
+        try {
+            val json = Json.parseToJsonElement(message.params).jsonObject
+            val username = json["username"]?.jsonPrimitive?.contentOrNull ?: ""
+            val password = json["password"]?.jsonPrimitive?.contentOrNull ?: ""
+            val rememberMe = json["rememberMe"]?.jsonPrimitive?.booleanOrNull ?: false
+            onCapture(username, password, rememberMe)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         callback("OK")
     }
 }

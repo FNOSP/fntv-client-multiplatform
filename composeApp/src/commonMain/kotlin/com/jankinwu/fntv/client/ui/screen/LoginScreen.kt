@@ -115,7 +115,10 @@ val HintColor = Color.Gray
 @OptIn(ExperimentalHazeMaterialsApi::class, ExperimentalComposeUiApi::class)
 @Suppress("RememberReturnType")
 @Composable
-fun LoginScreen(navigator: ComponentNavigator) {
+fun LoginScreen(
+    navigator: ComponentNavigator,
+    draggableArea: @Composable (content: @Composable () -> Unit) -> Unit = { it() }
+) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var host by remember { mutableStateOf("") }
@@ -133,6 +136,9 @@ fun LoginScreen(navigator: ComponentNavigator) {
     val hazeState = rememberHazeState()
     var showHistorySidebar by remember { mutableStateOf(false) }
     val windowHandle = LocalWindowHandle.current
+    var isAutoLogin by remember { mutableStateOf(false) }
+    var fnAutoUsername by remember { mutableStateOf("") }
+    var fnAutoPassword by remember { mutableStateOf("") }
     // 登录历史记录列表
     var loginHistoryList by remember { mutableStateOf<List<LoginHistory>>(emptyList()) }
 
@@ -144,7 +150,8 @@ fun LoginScreen(navigator: ComponentNavigator) {
         password = AccountDataCache.password
         isHttps = AccountDataCache.isHttps
         rememberMe = AccountDataCache.rememberMe
-
+        isFnConnect = AccountDataCache.isFnConnect
+        fnId = AccountDataCache.fnId
         // 加载历史记录
         val preferencesManager = PreferencesManager.getInstance()
         loginHistoryList = preferencesManager.loadLoginHistory()
@@ -213,7 +220,21 @@ fun LoginScreen(navigator: ComponentNavigator) {
     if (showFnConnectWebView) {
         FnConnectWebViewScreen(
             initialUrl = fnConnectUrl,
-            onBack = { showFnConnectWebView = false }
+            fnId = fnId,
+            onBack = { showFnConnectWebView = false },
+            onLoginSuccess = { history ->
+                // 更新历史记录列表
+                val updatedList = loginHistoryList.filterNot { it == history } + history
+                loginHistoryList = updatedList.sortedByDescending { it.lastLoginTimestamp }
+                // 保存到偏好设置
+                val preferencesManager = PreferencesManager.getInstance()
+                preferencesManager.saveLoginHistory(loginHistoryList)
+                showFnConnectWebView = false
+            },
+            autoLoginUsername = fnAutoUsername,
+            autoLoginPassword = fnAutoPassword,
+            allowAutoLogin = isAutoLogin,
+            draggableArea = draggableArea
         )
     } else {
         Box(
@@ -260,9 +281,9 @@ fun LoginScreen(navigator: ComponentNavigator) {
                         value = fnId,
                         onValueChange = { fnId = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("请输入 FN ID") },
+                        label = { Text("请输入 IP 地址、域名或 FN ID") },
                         singleLine = true,
-                        placeholder = { Text("请输入 FN ID") },
+                        placeholder = { Text("请输入 IP 地址、域名或 FN ID") },
                         colors = getTextFieldColors(),
                         textStyle = LocalTextStyle.current.copy(fontSize = 18.sp)
                     )
@@ -408,7 +429,7 @@ fun LoginScreen(navigator: ComponentNavigator) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("使用 FN Connect 登录", color = Colors.TextSecondaryColor, fontSize = 16.sp)
+                            Text("使用 NAS 或 FN Connect 登录", color = Colors.TextSecondaryColor, fontSize = 16.sp)
                             Switcher(
                                 isFnConnect,
                                 { isFnConnect = it },
@@ -439,13 +460,18 @@ fun LoginScreen(navigator: ComponentNavigator) {
                         Button(
                             onClick = {
                                 if (isFnConnect) {
-                                    val url = normalizeFnConnectUrl(fnId)
+                                    val url = normalizeFnConnectUrl(fnId, isHttps)
                                     if (url.isNotBlank()) {
                                         logger.i("fn connect url: $url")
                                         showHistorySidebar = false
+                                        AccountDataCache.isFnConnect = true
+                                        AccountDataCache.fnId = fnId
 //                                        onSwitchToFnConnect(url, fnId)
                                         showFnConnectWebView = true
                                         fnConnectUrl = url
+                                        isAutoLogin = false
+                                        fnAutoUsername = ""
+                                        fnAutoPassword = ""
                                     } else {
                                         toastManager.showToast("请输入 FN ID", ToastType.Info)
                                     }
@@ -493,24 +519,35 @@ fun LoginScreen(navigator: ComponentNavigator) {
                     preferencesManager.saveLoginHistory(updatedList)
                 },
                 onSelect = { history ->
-                    host = history.host
-                    port = history.port
-                    username = history.username
-                    isHttps = history.isHttps
-                    password = history.password ?: ""
-                    rememberMe = history.rememberMe
-                    // 如果有密码，则直接登录
-                    if (!history.password.isNullOrEmpty()) {
-                        handleLogin(
-                            host = history.host,
-                            port = history.port,
-                            username = history.username,
-                            password = history.password,
-                            isHttps = history.isHttps,
-                            toastManager = toastManager,
-                            loginViewModel = loginViewModel,
-                            rememberMe = true
-                        )
+                    if (history.isFnConnect) {
+                        isFnConnect = true
+                        fnId = history.fnId
+                        fnConnectUrl = normalizeFnConnectUrl(history.fnId, history.isHttps)
+                        fnAutoUsername = history.username
+                        fnAutoPassword = history.password ?: ""
+                        isAutoLogin = true
+                        showFnConnectWebView = true
+                    } else {
+                        isFnConnect = false
+                        host = history.host
+                        port = history.port
+                        username = history.username
+                        isHttps = history.isHttps
+                        password = history.password ?: ""
+                        rememberMe = history.rememberMe
+                        // 如果有密码，则直接登录
+                        if (!history.password.isNullOrEmpty()) {
+                            handleLogin(
+                                host = history.host,
+                                port = history.port,
+                                username = history.username,
+                                password = history.password,
+                                isHttps = history.isHttps,
+                                toastManager = toastManager,
+                                loginViewModel = loginViewModel,
+                                rememberMe = true
+                            )
+                        }
                     }
                     showHistorySidebar = false
                 }
