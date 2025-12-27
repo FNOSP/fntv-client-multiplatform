@@ -122,7 +122,7 @@ class PreferencesManager private constructor() {
         return try {
             mapper.readValue<List<LoginHistory>>(historyJson)
 //            json.decodeFromString<List<LoginHistory>>(historyJson)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }
@@ -131,7 +131,7 @@ class PreferencesManager private constructor() {
         val usernamesJson = settings.getString("loginUsernameHistory", "[]")
         return try {
             mapper.readValue<List<String>>(usernamesJson)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }
