@@ -5,6 +5,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -35,7 +36,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,6 +51,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -62,6 +64,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import co.touchlab.kermit.Logger
@@ -82,6 +85,7 @@ import com.jankinwu.fntv.client.ui.component.common.ToastHost
 import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.ui.component.common.dialog.ForgotPasswordDialog
 import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
+import com.jankinwu.fntv.client.ui.component.login.getTextFieldColors
 import com.jankinwu.fntv.client.ui.customSelectedCheckBoxColors
 import com.jankinwu.fntv.client.ui.providable.LocalWindowHandle
 import com.jankinwu.fntv.client.ui.selectedSwitcherStyle
@@ -96,6 +100,7 @@ import dev.chrisbanes.haze.rememberHazeState
 import fntv_client_multiplatform.composeapp.generated.resources.Res
 import fntv_client_multiplatform.composeapp.generated.resources.login_background
 import fntv_client_multiplatform.composeapp.generated.resources.login_fn_logo
+import io.github.composefluent.FluentTheme
 import io.github.composefluent.component.CheckBox
 import io.github.composefluent.component.CheckBoxDefaults
 import io.github.composefluent.component.ScrollbarContainer
@@ -112,38 +117,68 @@ val CardBackgroundColor = Color(0xFF1A1D26).copy(alpha = 1f)
 val PrimaryBlue = Color(0xFF3A7BFF)
 val HintColor = Color.Gray
 
+data class FnConnectWindowRequest(
+    val initialUrl: String,
+    val fnId: String,
+    val autoLoginUsername: String? = null,
+    val autoLoginPassword: String? = null,
+    val allowAutoLogin: Boolean = false
+)
+
 @OptIn(ExperimentalHazeMaterialsApi::class, ExperimentalComposeUiApi::class)
 @Suppress("RememberReturnType")
 @Composable
-fun LoginScreen(navigator: ComponentNavigator) {
+fun LoginScreen(
+    navigator: ComponentNavigator,
+    onOpenFnConnectWindow: ((FnConnectWindowRequest) -> Unit)? = null
+) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var host by remember { mutableStateOf("") }
     var port by remember { mutableIntStateOf(0) }
     var isHttps by remember { mutableStateOf(false) }
+    var isNasLogin by remember { mutableStateOf(false) }
+    var showFnConnectWebView by remember { mutableStateOf(false) }
+    var fnConnectUrl by remember { mutableStateOf("") }
+    var fnId by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var rememberMe by remember { mutableStateOf(false) }
+    var rememberPassword by remember { mutableStateOf(false) }
     val loginViewModel: LoginViewModel = koinViewModel()
     val loginUiState by loginViewModel.uiState.collectAsState()
     val toastManager = rememberToastManager()
     val hazeState = rememberHazeState()
     var showHistorySidebar by remember { mutableStateOf(false) }
     val windowHandle = LocalWindowHandle.current
+    var isAutoLogin by remember { mutableStateOf(false) }
+    var fnAutoUsername by remember { mutableStateOf("") }
+    var fnAutoPassword by remember { mutableStateOf("") }
     // 登录历史记录列表
     var loginHistoryList by remember { mutableStateOf<List<LoginHistory>>(emptyList()) }
 
+    val hostFocusRequester = remember { FocusRequester() }
+
     // 初始化时加载保存的账号信息
     remember {
-        host = AccountDataCache.host
+        host = AccountDataCache.displayHost
         port = AccountDataCache.port
         username = AccountDataCache.userName
         password = AccountDataCache.password
         isHttps = AccountDataCache.isHttps
-        rememberMe = AccountDataCache.rememberMe
-
+        rememberPassword = AccountDataCache.rememberPassword
+        isNasLogin = AccountDataCache.isNasLogin
+        fnId = AccountDataCache.fnId
         // 加载历史记录
         val preferencesManager = PreferencesManager.getInstance()
         loginHistoryList = preferencesManager.loadLoginHistory()
+    }
+
+    // 自动聚焦 host 输入框
+    LaunchedEffect(Unit) {
+        if (isNasLogin) {
+            if (fnId.isBlank()) hostFocusRequester.requestFocus()
+        } else {
+            if (host.isBlank()) hostFocusRequester.requestFocus()
+        }
     }
 
     // 处理登录结果
@@ -154,6 +189,7 @@ fun LoginScreen(navigator: ComponentNavigator) {
                 UserInfoMemoryCache.clear()
                 AccountDataCache.authorization = state.data.token
                 AccountDataCache.insertCookie("Trim-MC-token" to state.data.token)
+                AccountDataCache.isNasLogin = false
                 logger.i("登录成功，cookie: ${AccountDataCache.cookieState}")
                 val preferencesManager = PreferencesManager.getInstance()
                 preferencesManager.saveToken(state.data.token)
@@ -169,14 +205,13 @@ fun LoginScreen(navigator: ComponentNavigator) {
                     host = host,
                     port = port,
                     username = username,
-                    password = if (rememberMe) password else null,
+                    password = if (rememberPassword) password else null,
                     isHttps = isHttps,
-                    rememberMe = rememberMe
+                    rememberPassword = rememberPassword
                 )
 
                 // 更新历史记录列表
-                val updatedList = loginHistoryList.filterNot { it == loginHistory } + loginHistory
-                loginHistoryList = updatedList.sortedByDescending { it.lastLoginTimestamp }
+                loginHistoryList = upsertLoginHistory(loginHistoryList, loginHistory)
                 // 保存到偏好设置
                 preferencesManager.saveLoginHistory(loginHistoryList)
             }
@@ -206,295 +241,435 @@ fun LoginScreen(navigator: ComponentNavigator) {
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Image(
-            painterResource(Res.drawable.login_background),
-            contentDescription = "登录背景图",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .hazeSource(state = hazeState)
+    if (showFnConnectWebView) {
+        FnConnectWebViewScreen(
+            initialUrl = fnConnectUrl,
+            fnId = fnId,
+            onBack = { showFnConnectWebView = false },
+            onLoginSuccess = { history ->
+                // 更新历史记录列表
+                loginHistoryList = upsertLoginHistory(loginHistoryList, history)
+                // 保存到偏好设置
+                val preferencesManager = PreferencesManager.getInstance()
+                preferencesManager.saveLoginHistory(loginHistoryList)
+                showFnConnectWebView = false
+            },
+            autoLoginUsername = fnAutoUsername,
+            autoLoginPassword = fnAutoPassword,
+            allowAutoLogin = isAutoLogin,
         )
-        Surface(
-            color = Color.Transparent,
-            shape = RoundedCornerShape(16.dp),
+    } else {
+        Box(
             modifier = Modifier
-                .width(400.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .hazeEffect(
-                    state = hazeState,
-                    style = FluentMaterials.acrylicDefault(true)
-                )
+                .fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
+            Image(
+                painterResource(Res.drawable.login_background),
+                contentDescription = "登录背景图",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .padding(horizontal = 40.dp, vertical = 40.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .fillMaxSize()
+                    .hazeSource(state = hazeState)
+            )
+            Surface(
+                color = Color.Transparent,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .width(400.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .hazeEffect(
+                        state = hazeState,
+                        style = FluentMaterials.acrylicDefault(true)
+                    )
             ) {
-                // 1. Logo
-                Image(
-                    painterResource(Res.drawable.login_fn_logo),
-                    contentDescription = "飞牛logo",
+                Column(
                     modifier = Modifier
-                        .width(174.dp)
-                )
-                Text("FN_Media", color = HintColor, fontSize = 16.sp)
-
-//                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = 40.dp, vertical = 40.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    var isHistoryHovered by remember { mutableStateOf(false) }
-                    OutlinedTextField(
-                        value = host,
-                        onValueChange = { host = it },
+                    // 1. Logo
+                    Image(
+                        painterResource(Res.drawable.login_fn_logo),
+                        contentDescription = "飞牛logo",
                         modifier = Modifier
-                            .weight(2.0f),
-                        label = { Text("ip 或域名") },
-                        singleLine = true,
-                        placeholder = { Text("请输入ip或域名") },
-                        colors = getTextFieldColors(),
-                        textStyle = LocalTextStyle.current.copy(fontSize = 18.sp),
-                        trailingIcon = {
-                            val image = History
-                            val description = "历史登录记录"
-                            IconButton(onClick = { showHistorySidebar = !showHistorySidebar }) {
-                                Icon(
-                                    imageVector = image,
-                                    description,
-                                    tint = if (isHistoryHovered) Color.White else HintColor,
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .onPointerEvent(PointerEventType.Enter) {
-                                            isHistoryHovered = true
-                                        }
-                                        .onPointerEvent(PointerEventType.Exit) {
-                                            isHistoryHovered = false
-                                        }
-                                        .pointerHoverIcon(PointerIcon.Hand)
+                            .width(174.dp)
+                    )
+                    Text("FN_Media", color = HintColor, fontSize = 16.sp)
+                    var isHistoryHovered by remember { mutableStateOf(false) }
+                    if (isNasLogin) {
+                        OutlinedTextField(
+                            value = fnId,
+                            onValueChange = { fnId = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(hostFocusRequester),
+                            label = { Text("请输入 IP:Port、域名或 FN ID") },
+                            singleLine = true,
+                            placeholder = { Text("请输入 IP:Port、域名或 FN ID") },
+                            colors = getTextFieldColors(),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 18.sp),
+                            trailingIcon = {
+                                val image = History
+                                val description = "历史登录记录"
+                                IconButton(onClick = {
+                                    showHistorySidebar = !showHistorySidebar
+                                }) {
+                                    Icon(
+                                        imageVector = image,
+                                        description,
+                                        tint = if (isHistoryHovered) Color.White else HintColor,
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .onPointerEvent(PointerEventType.Enter) {
+                                                isHistoryHovered = true
+                                            }
+                                            .onPointerEvent(PointerEventType.Exit) {
+                                                isHistoryHovered = false
+                                            }
+                                            .pointerHoverIcon(PointerIcon.Hand)
+                                    )
+                                }
+                            },
+                        )
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = host,
+                                onValueChange = { host = it },
+                                modifier = Modifier
+                                    .weight(2.0f)
+                                    .focusRequester(hostFocusRequester),
+                                label = { Text("请输入IP、域名或 FN ID", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                singleLine = true,
+                                placeholder = { Text("IP、域名或 FN ID", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                colors = getTextFieldColors(),
+                                textStyle = LocalTextStyle.current.copy(fontSize = 18.sp),
+                                trailingIcon = {
+                                    val image = History
+                                    val description = "历史登录记录"
+                                    IconButton(onClick = {
+                                        showHistorySidebar = !showHistorySidebar
+                                    }) {
+                                        Icon(
+                                            imageVector = image,
+                                            description,
+                                            tint = if (isHistoryHovered) Color.White else HintColor,
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                                .onPointerEvent(PointerEventType.Enter) {
+                                                    isHistoryHovered = true
+                                                }
+                                                .onPointerEvent(PointerEventType.Exit) {
+                                                    isHistoryHovered = false
+                                                }
+                                                .pointerHoverIcon(PointerIcon.Hand)
+                                        )
+                                    }
+                                },
+                            )
+                            Text(
+                                ":",
+                                color = HintColor,
+                                fontSize = 30.sp,
+                                modifier = Modifier
+                                    .padding(horizontal = 4.dp, vertical = 12.dp)
+                            )
+                            NumberInput(
+                                onValueChange = { port = it },
+                                value = port,
+                                modifier = Modifier.weight(1.0f),
+                                placeholder = "端口",
+                                minValue = 0,
+                                label = "",
+                                textColor = Colors.TextSecondaryColor,
+                                defaultValue = 5666
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value = username,
+                            onValueChange = { username = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("用户名或邮箱") },
+                            singleLine = true,
+                            colors = getTextFieldColors(),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 18.sp)
+                        )
+                        var isPasswordVisibilityHovered by remember { mutableStateOf(false) }
+                        var isPasswordFocused by remember { mutableStateOf(false) }
+                        LaunchedEffect(windowHandle, isPasswordFocused) {
+                            if (windowHandle != null) {
+                                setWindowImeDisabled(windowHandle, isPasswordFocused)
+                            }
+                        }
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { isPasswordFocused = it.isFocused },
+                            label = { Text("密码") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = if (passwordVisible) KeyboardType.Ascii else KeyboardType.Password,
+                                autoCorrectEnabled  = false,
+                                imeAction = ImeAction.Done
+                            ),
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                val image =
+                                    if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                                val description = if (passwordVisible) "隐藏密码" else "显示密码"
+                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    Icon(
+                                        imageVector = image,
+                                        description,
+                                        tint = if (isPasswordVisibilityHovered) Color.White else HintColor,
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .onPointerEvent(PointerEventType.Enter) {
+                                                isPasswordVisibilityHovered = true
+                                            }
+                                            .onPointerEvent(PointerEventType.Exit) {
+                                                isPasswordVisibilityHovered = false
+                                            }
+                                            .pointerHoverIcon(PointerIcon.Hand)
+                                    )
+                                }
+                            },
+                            colors = getTextFieldColors(),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 18.sp)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                CheckBox(
+                                    rememberPassword,
+                                    "记住密码",
+                                    modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
+                                    onCheckStateChange = { rememberPassword = it },
+                                    colors = if (rememberPassword) {
+                                        customSelectedCheckBoxColors()
+                                    } else {
+                                        CheckBoxDefaults.defaultCheckBoxColors()
+                                    }
+                                )
+                            }
+                            ForgotPasswordDialog()
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "使用 NAS 登录",
+                            color = Colors.TextSecondaryColor,
+                            fontSize = 16.sp
+                        )
+                        Switcher(
+                            isNasLogin,
+                            { isNasLogin = it },
+                            styles = if (isNasLogin) {
+                                selectedSwitcherStyle()
+                            } else {
+                                SwitcherDefaults.defaultSwitcherStyle()
+                            },
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("HTTPS 安全访问", color = Colors.TextSecondaryColor, fontSize = 16.sp)
+                        Switcher(
+                            isHttps,
+                            { isHttps = it },
+                            styles = if (isHttps) {
+                                selectedSwitcherStyle()
+                            } else {
+                                SwitcherDefaults.defaultSwitcherStyle()
+                            },
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            if (isNasLogin) {
+                                val url = normalizeFnConnectUrl(fnId, isHttps)
+                                if (url.isNotBlank()) {
+                                    logger.i("fn connect url: $url")
+                                    showHistorySidebar = false
+                                    AccountDataCache.isNasLogin = true
+                                    AccountDataCache.fnId = fnId
+                                    val openWindow = onOpenFnConnectWindow
+                                    if (openWindow != null) {
+                                        openWindow(
+                                            FnConnectWindowRequest(
+                                                initialUrl = url,
+                                                fnId = fnId,
+                                                autoLoginUsername = null,
+                                                autoLoginPassword = null,
+                                                allowAutoLogin = false
+                                            )
+                                        )
+                                        isAutoLogin = false
+                                        fnAutoUsername = ""
+                                        fnAutoPassword = ""
+                                    } else {
+                                        showFnConnectWebView = true
+                                        fnConnectUrl = url
+                                        isAutoLogin = false
+                                        fnAutoUsername = ""
+                                        fnAutoPassword = ""
+                                    }
+                                } else {
+                                    toastManager.showToast("请输入 FN ID", ToastType.Info)
+                                }
+                            } else {
+                                handleLogin(
+                                    host = host,
+                                    port = port,
+                                    username = username,
+                                    password = password,
+                                    isHttps = isHttps,
+                                    toastManager = toastManager,
+                                    loginViewModel = loginViewModel,
+                                    rememberPassword = rememberPassword
                                 )
                             }
                         },
-
-                        )
-                    Text(
-                        ":",
-                        color = HintColor,
-                        fontSize = 30.sp,
                         modifier = Modifier
-                            .padding(horizontal = 4.dp, vertical = 12.dp)
-                    )
-                    NumberInput(
-                        onValueChange = { port = it },
-                        value = port,
-                        modifier = Modifier.weight(1.0f),
-                        placeholder = "请输入端口",
-                        minValue = 0,
-                        label = "",
-                        textColor = Colors.TextSecondaryColor,
-                        defaultValue = 5666
-                    )
-                }
-
-                // 2. 用户名输入框
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("用户名或邮箱") },
-                    singleLine = true,
-                    colors = getTextFieldColors(),
-                    textStyle = LocalTextStyle.current.copy(fontSize = 18.sp)
-                )
-                var isPasswordVisibilityHovered by remember { mutableStateOf(false) }
-                var isPasswordFocused by remember { mutableStateOf(false) }
-                LaunchedEffect(windowHandle, isPasswordFocused) {
-                    if (windowHandle != null) {
-                        setWindowImeDisabled(windowHandle, isPasswordFocused)
-                    }
-                }
-                // 3. 密码输入框
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { isPasswordFocused = it.isFocused },
-                    label = { Text("密码") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = if (passwordVisible) KeyboardType.Ascii else KeyboardType.Password,
-                        autoCorrect = false,
-                        imeAction = ImeAction.Done
-                    ),
-                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        val image =
-                            if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                        val description = if (passwordVisible) "隐藏密码" else "显示密码"
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                imageVector = image,
-                                description,
-                                tint = if (isPasswordVisibilityHovered) Color.White else HintColor,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .onPointerEvent(PointerEventType.Enter) {
-                                        isPasswordVisibilityHovered = true
-                                    }
-                                    .onPointerEvent(PointerEventType.Exit) {
-                                        isPasswordVisibilityHovered = false
-                                    }
-                                    .pointerHoverIcon(PointerIcon.Hand)
-                            )
-                        }
-                    },
-                    colors = getTextFieldColors(),
-                    textStyle = LocalTextStyle.current.copy(fontSize = 18.sp)
-                )
-
-                // 4. 记住账号 和 忘记密码
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .pointerHoverIcon(PointerIcon.Hand),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
                     ) {
-
-                        CheckBox(
-                            rememberMe,
-                            "记住密码",
-                            onCheckStateChange = { rememberMe = it },
-                            colors = if (rememberMe) {
-                                customSelectedCheckBoxColors()
-                            } else {
-                                CheckBoxDefaults.defaultCheckBoxColors()
-                            }
-                        )
+                        Text(if (isNasLogin) "下一步" else "登录", fontSize = 16.sp)
                     }
-                    ForgotPasswordDialog()
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("HTTPS 安全访问", color = Colors.TextSecondaryColor, fontSize = 16.sp)
-                    Switcher(
-                        isHttps,
-                        { isHttps = it },
-                        styles = if (isHttps) {
-                            selectedSwitcherStyle()
-                        } else {
-                            SwitcherDefaults.defaultSwitcherStyle()
-                        },
-                    )
-                }
-
-                // 5. 登录按钮
-                Button(
-                    onClick = {
-                        handleLogin(
-                            host = host,
-                            port = port,
-                            username = username,
-                            password = password,
-                            isHttps = isHttps,
-                            toastManager = toastManager,
-                            loginViewModel = loginViewModel,
-                            rememberMe = rememberMe
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .pointerHoverIcon(PointerIcon.Hand),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
-                ) {
-                    Text("登录", fontSize = 16.sp)
-                }
-
-                // 6. NAS 登录按钮
-//                Button(
-//                    onClick = { /* TODO: NAS 登录逻辑 */ },
-//                    modifier = Modifier
-//                        .fillMaxWidth()
-//                        .height(48.dp)
-//                        .pointerHoverIcon(PointerIcon.Hand),
-//                    shape = RoundedCornerShape(8.dp),
-//                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3C3C4D))
-//                ) {
-//                    Text("使用 NAS 登录", fontSize = 16.sp)
-//                }
             }
-        }
-        ToastHost(
-            toastManager = toastManager,
-            modifier = Modifier.fillMaxSize()
-        )
-        AnimatedVisibility(
-            visible = showHistorySidebar,
-            enter = slideInHorizontally(initialOffsetX = { -it }), // 从左侧滑入
-            exit = slideOutHorizontally(targetOffsetX = { -it }),   // 向左侧滑出
-            modifier = Modifier.align(Alignment.CenterStart) // 改为居左对齐
-        ) {
-            HistorySidebar(
-                loginHistoryList = loginHistoryList,
-                onDismiss = { showHistorySidebar = false },
-                onDelete = { history ->
-                    val updatedList = loginHistoryList.filterNot { it == history }
-                    loginHistoryList = updatedList
-                    val preferencesManager = PreferencesManager.getInstance()
-                    preferencesManager.saveLoginHistory(updatedList)
-                },
-                onSelect = { history ->
-                    host = history.host
-                    port = history.port
-                    username = history.username
-                    isHttps = history.isHttps
-                    password = history.password ?: ""
-                    rememberMe = history.rememberMe
-                    // 如果有密码，则直接登录
-                    if (!history.password.isNullOrEmpty()) {
-                        handleLogin(
-                            host = history.host,
-                            port = history.port,
-                            username = history.username,
-                            password = history.password,
-                            isHttps = history.isHttps,
-                            toastManager = toastManager,
-                            loginViewModel = loginViewModel,
-                            rememberMe = true
-                        )
-                    }
-                    showHistorySidebar = false
-                }
+            ToastHost(
+                toastManager = toastManager,
+                modifier = Modifier.fillMaxSize()
             )
+            AnimatedVisibility(
+                visible = showHistorySidebar,
+                enter = slideInHorizontally(initialOffsetX = { -it }), // 从左侧滑入
+                exit = slideOutHorizontally(targetOffsetX = { -it }),   // 向左侧滑出
+                modifier = Modifier.align(Alignment.CenterStart) // 改为居左对齐
+            ) {
+                HistorySidebar(
+                    loginHistoryList = loginHistoryList,
+                    onDismiss = { showHistorySidebar = false },
+                    onDelete = { history ->
+                        val updatedList = loginHistoryList.filterNot { it == history }
+                        loginHistoryList = updatedList
+                        val preferencesManager = PreferencesManager.getInstance()
+                        preferencesManager.saveLoginHistory(updatedList)
+                    },
+                    onSelect = { history ->
+                        if (history.isNasLogin) {
+                            isNasLogin = true
+                            fnId = history.fnId
+                            fnConnectUrl = normalizeFnConnectUrl(history.fnId, history.isHttps)
+                            fnAutoUsername = history.username
+                            val canUseSavedPassword = history.rememberPassword && !history.password.isNullOrEmpty()
+                            fnAutoPassword = if (canUseSavedPassword) history.password.orEmpty() else ""
+                            isAutoLogin = canUseSavedPassword
+
+                            if (!history.rememberPassword && history.password != null) {
+                                val preferencesManager = PreferencesManager.getInstance()
+                                loginHistoryList = upsertLoginHistory(loginHistoryList, history.copy(password = null))
+                                preferencesManager.saveLoginHistory(loginHistoryList)
+                            }
+                            val openWindow = onOpenFnConnectWindow
+                            if (openWindow != null) {
+                                openWindow(
+                                    FnConnectWindowRequest(
+                                        initialUrl = fnConnectUrl,
+                                        fnId = fnId,
+                                        autoLoginUsername = fnAutoUsername,
+                                        autoLoginPassword = fnAutoPassword,
+                                        allowAutoLogin = isAutoLogin
+                                    )
+                                )
+                            } else {
+                                showFnConnectWebView = true
+                            }
+                        } else {
+                            isNasLogin = false
+                            host = history.host
+                            port = history.port
+                            username = history.username
+                            isHttps = history.isHttps
+                            password = if (history.rememberPassword) history.password.orEmpty() else ""
+                            rememberPassword = history.rememberPassword
+                            // 如果有密码，则直接登录
+                            if (history.rememberPassword && !history.password.isNullOrEmpty()) {
+                                handleLogin(
+                                    host = history.host,
+                                    port = history.port,
+                                    username = history.username,
+                                    password = history.password,
+                                    isHttps = history.isHttps,
+                                    toastManager = toastManager,
+                                    loginViewModel = loginViewModel,
+                                    rememberPassword = true
+                                )
+                            }
+                        }
+                        showHistorySidebar = false
+                    }
+                )
+            }
         }
     }
 }
 
-@Composable
-private fun getTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = PrimaryBlue,
-    unfocusedBorderColor = Color.Gray,
-    focusedLabelColor = PrimaryBlue,
-    unfocusedLabelColor = HintColor,
-    cursorColor = PrimaryBlue,
-    focusedTextColor = Colors.TextSecondaryColor,
-    unfocusedTextColor = Colors.TextSecondaryColor
-)
+//@Composable
+//private fun getTextFieldColors() = OutlinedTextFieldDefaults.colors(
+//    focusedBorderColor = PrimaryBlue,
+//    unfocusedBorderColor = Color.Gray,
+//    focusedLabelColor = PrimaryBlue,
+//    unfocusedLabelColor = HintColor,
+//    cursorColor = PrimaryBlue,
+//    focusedTextColor = Colors.TextSecondaryColor,
+//    unfocusedTextColor = Colors.TextSecondaryColor
+//)
+
+internal fun upsertLoginHistory(current: List<LoginHistory>, incoming: LoginHistory): List<LoginHistory> {
+    fun normalize(value: String): String = value.trim().lowercase()
+
+    fun isSameIdentity(a: LoginHistory, b: LoginHistory): Boolean {
+        if (a.isNasLogin != b.isNasLogin) return false
+        return if (a.isNasLogin) {
+            normalize(a.fnId) == normalize(b.fnId) && normalize(a.username) == normalize(b.username)
+        } else {
+            normalize(a.host) == normalize(b.host) && a.port == b.port && normalize(a.username) == normalize(b.username)
+        }
+    }
+
+    val updated = current.filterNot { isSameIdentity(it, incoming) } + incoming
+    return updated.sortedByDescending { it.lastLoginTimestamp }
+}
 
 @Composable
 private fun HistorySidebar(
@@ -606,11 +781,32 @@ private fun HistoryItem(
                     onClick = { onSelect() }
                 )
         ) {
-            Text(
-                text = history.username,
-                color = Colors.TextSecondaryColor,
-                fontSize = 16.sp
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = history.username,
+                    color = Colors.TextSecondaryColor,
+                    fontSize = 16.sp
+                )
+                if (history.isNasLogin) {
+                    Row(
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .border(1.dp, Colors.AccentColorDefault, RoundedCornerShape(50))
+                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "NAS",
+                            style = FluentTheme.typography.caption,
+                            color = Colors.AccentColorDefault,
+                            modifier = Modifier
+//                                            .padding(start = 2.dp)
+                        )
+                    }
+                }
+            }
             Text(
                 text = history.getEndpoint(),
                 color = HintColor,

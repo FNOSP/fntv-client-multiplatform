@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.jankinwu.fntv.client.data.model.request.AuthRequest
 import com.jankinwu.fntv.client.data.model.request.FavoriteRequest
 import com.jankinwu.fntv.client.data.model.request.ItemListQueryRequest
 import com.jankinwu.fntv.client.data.model.request.LoginRequest
@@ -20,6 +21,7 @@ import com.jankinwu.fntv.client.data.model.request.SubtitleMarkRequest
 import com.jankinwu.fntv.client.data.model.request.SubtitleSearchRequest
 import com.jankinwu.fntv.client.data.model.request.WatchedRequest
 import com.jankinwu.fntv.client.data.model.response.AuthDirResponse
+import com.jankinwu.fntv.client.data.model.response.AuthResponse
 import com.jankinwu.fntv.client.data.model.response.EpisodeListResponse
 import com.jankinwu.fntv.client.data.model.response.FnBaseResponse
 import com.jankinwu.fntv.client.data.model.response.GenresResponse
@@ -44,6 +46,7 @@ import com.jankinwu.fntv.client.data.model.response.SubtitleDownloadResponse
 import com.jankinwu.fntv.client.data.model.response.SubtitleMarkResponse
 import com.jankinwu.fntv.client.data.model.response.SubtitleSearchResponse
 import com.jankinwu.fntv.client.data.model.response.SubtitleUploadResponse
+import com.jankinwu.fntv.client.data.model.response.SysConfigResponse
 import com.jankinwu.fntv.client.data.model.response.TagListResponse
 import com.jankinwu.fntv.client.data.model.response.UserInfoResponse
 import com.jankinwu.fntv.client.data.network.FnOfficialApi
@@ -85,6 +88,18 @@ class FnOfficialApiImpl() : FnOfficialApi {
             disable(SerializationFeature.WRITE_NULL_MAP_VALUES)
 //            setSerializationInclusion(JsonInclude.Include.NON_NULL)
         }
+    }
+
+    override suspend fun getSysConfig(): SysConfigResponse {
+        return get("/v/api/v1/sys/config")
+    }
+
+    override suspend fun oauthResult(code: String, state: String?): Boolean {
+        return post("/v/oauth/result?code=$code&state=${state ?: "undefined"}")
+    }
+
+    override suspend fun auth(request: AuthRequest): AuthResponse {
+        return post("/v/api/v1/auth", request)
     }
 
     override suspend fun getMediaDbList(): List<MediaDbListResponse> {
@@ -262,7 +277,7 @@ class FnOfficialApiImpl() : FnOfficialApi {
                 throw IllegalArgumentException("飞牛官方URL未配置")
             }
             val authx = genAuthx(url, parameters)
-            logger.i { "GET request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, parameters: $parameters" }
+            logger.i { "GET request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, parameters: $parameters, cookie: ${AccountDataCache.cookieState}" }
             val response = fnOfficialClient.get("${AccountDataCache.getFnOfficialBaseUrl()}$url") {
                 header("Authx", authx)
                 parameters?.forEach { (key, value) ->
@@ -304,7 +319,7 @@ class FnOfficialApiImpl() : FnOfficialApi {
             }
 
             val authx = genAuthx(url, data = body)
-            logger.i { "POST request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, body: $body" }
+            logger.i { "POST request, url: ${AccountDataCache.getFnOfficialBaseUrl()}$url, authx: $authx, body: $body, cookie: ${AccountDataCache.cookieState}" }
             val response = fnOfficialClient.post("${AccountDataCache.getFnOfficialBaseUrl()}$url") {
                 header(HttpHeaders.ContentType, "application/json; charset=utf-8")
                 header("Authx", authx)
