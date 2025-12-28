@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -38,12 +39,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
-import com.jankinwu.fntv.client.data.model.SubtitleSettings
 import com.jankinwu.fntv.client.data.network.fnOfficialClient
 import com.jankinwu.fntv.client.data.store.PlayingSettingsStore
 import com.jankinwu.fntv.client.icons.PlayCircle
 import com.jankinwu.fntv.client.manager.PlayerResourceManager
 import com.jankinwu.fntv.client.ui.component.player.SubtitleOverlay
+import com.jankinwu.fntv.client.ui.component.player.VolumeControl
 import com.jankinwu.fntv.client.ui.providable.LocalMediaPlayer
 import com.jankinwu.fntv.client.utils.ExternalSubtitleUtil
 import com.jankinwu.fntv.client.utils.HlsSubtitleUtil
@@ -64,6 +65,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.openani.mediamp.PlaybackState
 import org.openani.mediamp.compose.MediampPlayerSurface
+import org.openani.mediamp.features.AudioLevelController
 import java.awt.MouseInfo
 import java.awt.Point
 
@@ -79,6 +81,10 @@ fun PipPlayerWindow(
     val playingInfoCache by playerViewModel.playingInfoCache.collectAsState()
     val subtitleSettings by playerViewModel.subtitleSettings.collectAsState()
     val savedData = remember { PlayingSettingsStore.getPipWindowData() }
+
+    val audioLevelController = remember(mediaPlayer) { mediaPlayer.features[AudioLevelController] }
+    val volume by audioLevelController?.volume?.collectAsState() ?: remember { mutableFloatStateOf(1f) }
+    var isVolumeControlHovered by remember { mutableStateOf(false) }
 
     val hlsSubtitleUtil = remember(playingInfoCache) {
         val playLink = playingInfoCache?.playLink
@@ -335,6 +341,26 @@ fun PipPlayerWindow(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
                         tint = Color.White
+                    )
+                }
+            }
+
+            // Bottom Left: Volume Control
+            if (isHovered || isVolumeControlHovered) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .offset(y = 5.dp, x = (-5).dp)
+//                        .padding(8.dp)
+                ) {
+                    VolumeControl(
+                        volume = volume,
+                        onVolumeChange = {
+                            audioLevelController?.setVolume(it)
+                            PlayingSettingsStore.saveVolume(it)
+                        },
+                        onHoverStateChanged = { isVolumeControlHovered = it },
+                        modifier = Modifier.size(50.dp)
                     )
                 }
             }
