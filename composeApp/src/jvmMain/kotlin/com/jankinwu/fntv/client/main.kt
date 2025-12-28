@@ -21,6 +21,7 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import co.touchlab.kermit.Logger
 import com.jankinwu.fntv.client.data.network.apiModule
 import com.jankinwu.fntv.client.data.store.AppSettingsStore
@@ -44,7 +45,6 @@ import com.jankinwu.fntv.client.ui.screen.PlayerManager
 import com.jankinwu.fntv.client.ui.screen.PlayerOverlay
 import com.jankinwu.fntv.client.ui.screen.updateLoginHistory
 import com.jankinwu.fntv.client.ui.window.PipPlayerWindow
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.jankinwu.fntv.client.utils.ComposeViewModelStoreOwner
 import com.jankinwu.fntv.client.utils.ConsoleLogWriter
 import com.jankinwu.fntv.client.utils.DesktopContext
@@ -68,12 +68,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
-import org.openani.mediamp.PlaybackState
 import org.koin.compose.KoinApplication
 import org.koin.compose.viewmodel.koinViewModel
+import org.openani.mediamp.PlaybackState
 import org.openani.mediamp.compose.rememberMediampPlayer
 import java.awt.Dimension
-import java.awt.Frame
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 

@@ -296,8 +296,6 @@ private fun callPlayRecord(
     }
 }
 
-
-
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun PlayerOverlay(
@@ -335,12 +333,6 @@ fun PlayerOverlay(
             playerViewModel.updateSubtitleSettings(subtitleSettings)
         }
     }
-
-//    val onSubtitleSettingsChanged: (SubtitleSettings) -> Unit = remember {
-//        {
-//            subtitleSettings = it
-//        }
-//    }
 
     var isCursorVisible by remember { mutableStateOf(true) }
     var lastMouseMoveTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -551,62 +543,6 @@ fun PlayerOverlay(
 
     LaunchedEffect(resetSubtitleState) {
         if (resetSubtitleState is UiState.Success) {
-//            val cache = playingInfoCache
-//            val startPos = mediaPlayer.getCurrentPositionMillis()
-//            if (cache != null) {
-//                // Re-fetch play link or use existing one?
-//                // Usually resetSubtitle just changes state on server, we might need to re-request play link or just reuse.
-//                // Assuming we can reuse existing playLink logic but re-evaluate subtitles.
-//
-//                // We need to re-evaluate how to play based on new subtitle selection
-//                val subtitleStream = cache.currentSubtitleStream
-//                val playLink = cache.playLink ?: ""
-//
-//                var extraFiles = MediaExtraFiles()
-//                var actualPlayLink = playLink
-//                var isM3u8 = false
-//                var shouldStartPlayback = true
-//
-//                if (subtitleStream != null) {
-//                    extraFiles = getMediaExtraFiles(subtitleStream, playLink)
-//                }
-//
-//                if (playLink.contains(".m3u8")) {
-//                    isM3u8 = true
-//                    // HLS logic
-//                    try {
-//                        // Check if it's an internal subtitle
-//                        if (subtitleStream != null && subtitleStream.isExternal == 0) {
-//                            // Reload HLS subtitle repository to fetch new segments
-//                            // hlsSubtitleUtil?.reload() // Removed reload() to avoid re-initialization conflict
-//                            // Don't restart playback for internal subtitles
-//                            if (cache.previousSubtitle?.isExternal == 0) {
-//                                shouldStartPlayback = false
-//                            }
-//                        }
-//                    } catch (e: Exception) {
-//                        logger.w("ResetSubtitle: Failed to parse m3u8: ${e.message}")
-//                    }
-//                } else if (cache.isUseDirectLink) {
-//                    // Direct link logic (usually for external subtitles or non-HLS)
-//                    val (link, start) = getDirectPlayLink(
-//                        cache.currentVideoStream.mediaGuid,
-//                        startPos,
-//                        mp4Parser
-//                    )
-//                    actualPlayLink = link
-//                }
-//
-////                if (shouldStartPlayback) {
-////                    startPlayback(
-////                        mediaPlayer,
-////                        actualPlayLink,
-////                        startPos,
-////                        extraFiles,
-////                        isM3u8
-////                    )
-////                }
-//            }
             mediaPViewModel.clearError()
         }
     }
@@ -2188,7 +2124,6 @@ private suspend fun resolvePlayLink(
         }
     }
 }
-
 
 
 private fun handlePlayerKeyEvent(

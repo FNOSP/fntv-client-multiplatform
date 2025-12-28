@@ -83,7 +83,11 @@ fun PipPlayerWindow(
     val savedData = remember { PlayingSettingsStore.getPipWindowData() }
 
     val audioLevelController = remember(mediaPlayer) { mediaPlayer.features[AudioLevelController] }
-    val volume by audioLevelController?.volume?.collectAsState() ?: remember { mutableFloatStateOf(1f) }
+    val volume by audioLevelController?.volume?.collectAsState() ?: remember {
+        mutableFloatStateOf(
+            1f
+        )
+    }
     var isVolumeControlHovered by remember { mutableStateOf(false) }
 
     val hlsSubtitleUtil = remember(playingInfoCache) {
@@ -158,7 +162,10 @@ fun PipPlayerWindow(
     }
 
     val windowState = rememberWindowState(
-        position = if (savedData != null) WindowPosition(savedData.x.dp, savedData.y.dp) else WindowPosition.Aligned(Alignment.BottomEnd),
+        position = if (savedData != null) WindowPosition(
+            savedData.x.dp,
+            savedData.y.dp
+        ) else WindowPosition.Aligned(Alignment.BottomEnd),
         width = if (savedData != null) savedData.width.dp else 320.dp,
         height = if (savedData != null) savedData.height.dp else 180.dp
     )
@@ -174,7 +181,8 @@ fun PipPlayerWindow(
 
             // 确保有有效值
             val baseWidth = if (!currentWidth.isNaN() && currentWidth > 0f) currentWidth else 320f
-            val baseHeight = if (!currentHeight.isNaN() && currentHeight > 0f) currentHeight else 180f
+            val baseHeight =
+                if (!currentHeight.isNaN() && currentHeight > 0f) currentHeight else 180f
 
             val optimalSize = calculateOptimalPlayerWindowSize(
                 videoStream,
@@ -289,12 +297,14 @@ fun PipPlayerWindow(
                 BoxWithConstraints(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    val playerScreenSize = remember { PlayingSettingsStore.getLastPlayerScreenSize() }
-                    val fontScaleRatio = if (playerScreenSize != null && playerScreenSize.width > 0) {
-                        maxWidth.value / playerScreenSize.width
-                    } else {
-                        maxWidth.value / 1280f
-                    }
+                    val playerScreenSize =
+                        remember { PlayingSettingsStore.getLastPlayerScreenSize() }
+                    val fontScaleRatio =
+                        if (playerScreenSize != null && playerScreenSize.width > 0) {
+                            maxWidth.value / playerScreenSize.width
+                        } else {
+                            maxWidth.value / 1280f
+                        }
 
                     SubtitleOverlay(
                         subtitleCues = subtitleCues,
