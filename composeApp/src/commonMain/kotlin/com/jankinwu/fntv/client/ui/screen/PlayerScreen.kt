@@ -2,6 +2,7 @@
 
 package com.jankinwu.fntv.client.ui.screen
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -29,6 +30,10 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import com.jankinwu.fntv.client.manager.PlayerResourceManager
+import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
+import io.github.alexzhirkevich.compottie.rememberLottieComposition
+import io.github.alexzhirkevich.compottie.rememberLottiePainter
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -194,6 +199,7 @@ data class PlayerState(
 class PlayerManager {
     var playerState: PlayerState by mutableStateOf(PlayerState())
     var keyFocusRequestSerial: Int by mutableIntStateOf(0)
+    var isPipMode: Boolean by mutableStateOf(false)
 
     fun requestKeyFocus() {
         keyFocusRequestSerial++
@@ -1612,6 +1618,37 @@ fun PlayerControlRow(
                 onHoverStateChanged = onVolumeControlHoverChanged,
                 modifier = Modifier.size(50.dp)
             )
+
+            // 小窗模式
+            val pipSpec = PlayerResourceManager.toPipSpec
+            if (pipSpec != null) {
+                val pipComposition by rememberLottieComposition { pipSpec }
+                var isPipHovered by remember { mutableStateOf(false) }
+                val pipProgress by animateLottieCompositionAsState(
+                    composition = pipComposition,
+                    isPlaying = isPipHovered,
+                    iterations = 1
+                )
+                val playerManager = LocalPlayerManager.current
+
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clickable {
+                            playerManager.isPipMode = true
+                        }
+                        .onPointerEvent(PointerEventType.Enter) { isPipHovered = true }
+                        .onPointerEvent(PointerEventType.Exit) { isPipHovered = false },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = rememberLottiePainter(pipComposition, progress = { pipProgress }),
+                        contentDescription = "Picture in Picture",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+
             // 全屏
             val windowState = LocalWindowState.current
             val store = LocalStore.current

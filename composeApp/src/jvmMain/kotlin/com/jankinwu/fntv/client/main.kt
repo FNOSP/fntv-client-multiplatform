@@ -42,6 +42,7 @@ import com.jankinwu.fntv.client.ui.screen.LoginScreen
 import com.jankinwu.fntv.client.ui.screen.PlayerManager
 import com.jankinwu.fntv.client.ui.screen.PlayerOverlay
 import com.jankinwu.fntv.client.ui.screen.updateLoginHistory
+import com.jankinwu.fntv.client.ui.window.PipPlayerWindow
 import com.jankinwu.fntv.client.utils.ConsoleLogWriter
 import com.jankinwu.fntv.client.utils.DesktopContext
 import com.jankinwu.fntv.client.utils.ExecutableDirectoryDetector
@@ -229,14 +230,36 @@ fun main() {
                         )
                     }
                     // 显示播放器覆盖层
-                    if (playerManager.playerState.isVisible) {
+                    if (playerManager.playerState.isVisible && !playerManager.isPipMode) {
                         PlayerOverlay(
                             mediaTitle = playerManager.playerState.mediaTitle,
                             subhead = playerManager.playerState.subhead,
                             isEpisode = playerManager.playerState.isEpisode,
-                            onBack = { playerManager.hidePlayer() },
+                            onBack = {
+                                if (AppSettingsStore.playerIsFullscreen) {
+                                    state.placement = WindowPlacement.Floating
+                                    AppSettingsStore.playerIsFullscreen = false
+                                }
+                                playerManager.hidePlayer()
+                                // 停止播放
+                                player.stopPlayback()
+                            },
                             mediaPlayer = player,
                             draggableArea = { content -> WindowDraggableArea(content = content) }
+                        )
+                    }
+
+                    // 小窗模式
+                    if (playerManager.isPipMode) {
+                        PipPlayerWindow(
+                            onClose = {
+                                player.stopPlayback()
+                                playerManager.hidePlayer()
+                                playerManager.isPipMode = false
+                            },
+                            onExitPip = {
+                                playerManager.isPipMode = false
+                            }
                         )
                     }
                 }
