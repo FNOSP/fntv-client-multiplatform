@@ -172,7 +172,7 @@ fun PlayerSettingsMenu(
 
         if (showPopup) {
             Popup(
-                offset = IntOffset(-140, -70), // Adjust based on position (similar to QualityControlFlyout)
+                offset = IntOffset(0, -70), // Adjust based on position (similar to QualityControlFlyout)
                 alignment = Alignment.BottomCenter,
                 properties = PopupProperties(
                     clippingEnabled = false,

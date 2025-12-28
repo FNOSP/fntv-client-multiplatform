@@ -49,6 +49,13 @@ import org.openani.mediamp.PlaybackState
 import org.openani.mediamp.compose.MediampPlayerSurface
 import java.awt.MouseInfo
 import java.awt.Point
+import fntv_client_multiplatform.composeapp.generated.resources.Res
+import fntv_client_multiplatform.composeapp.generated.resources.icon
+import org.jetbrains.compose.resources.painterResource
+import org.koin.compose.viewmodel.koinViewModel
+import com.jankinwu.fntv.client.viewmodel.PlayerViewModel
+import com.jankinwu.fntv.client.utils.calculateOptimalPlayerWindowSize
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalComposeUiApi::class, kotlinx.coroutines.FlowPreview::class)
 @Composable
@@ -58,6 +65,8 @@ fun PipPlayerWindow(
 ) {
     val mediaPlayer = LocalMediaPlayer.current
     val playbackState by mediaPlayer.playbackState.collectAsState()
+    val playerViewModel: PlayerViewModel = koinViewModel()
+    val playingInfoCache by playerViewModel.playingInfoCache.collectAsState()
     val savedData = remember { PlayingSettingsStore.getPipWindowData() }
 
     val windowState = rememberWindowState(
@@ -65,6 +74,32 @@ fun PipPlayerWindow(
         width = if (savedData != null) savedData.width.dp else 320.dp,
         height = if (savedData != null) savedData.height.dp else 180.dp
     )
+
+    // Dynamic Resize based on Video
+    LaunchedEffect(playingInfoCache?.currentVideoStream) {
+        // 延迟一点时间确保窗口状态已稳定
+        delay(100)
+        val videoStream = playingInfoCache?.currentVideoStream
+        if (videoStream != null) {
+            val currentWidth = windowState.size.width.value
+            val currentHeight = windowState.size.height.value
+
+            // 确保有有效值
+            val baseWidth = if (!currentWidth.isNaN() && currentWidth > 0f) currentWidth else 320f
+            val baseHeight = if (!currentHeight.isNaN() && currentHeight > 0f) currentHeight else 180f
+
+            val optimalSize = calculateOptimalPlayerWindowSize(
+                videoStream,
+                baseWidth,
+                baseHeight,
+                "AUTO"
+            )
+
+            if (optimalSize != null) {
+                windowState.size = optimalSize
+            }
+        }
+    }
 
     // Auto-save position
     LaunchedEffect(windowState) {
@@ -89,7 +124,8 @@ fun PipPlayerWindow(
         alwaysOnTop = true,
         resizable = true,
         transparent = false,
-        title = "PiP Player"
+        title = "PiP Player",
+        icon = painterResource(Res.drawable.icon)
     ) {
         var isHovered by remember { mutableStateOf(false) }
         val density = LocalDensity.current
@@ -97,6 +133,40 @@ fun PipPlayerWindow(
 
         LaunchedEffect(Unit) {
             window.background = java.awt.Color(0, 0, 0)
+        }
+
+        val dragModifier = Modifier.pointerInput(Unit) {
+            detectDragGestures(
+                onDragStart = {
+                    val mouse = MouseInfo.getPointerInfo()?.location
+                    if (mouse != null) {
+                        val location = window.location
+                        dragOffset = Point(mouse.x - location.x, mouse.y - location.y)
+                    }
+                },
+                onDragEnd = {
+                    dragOffset = null
+                    val location = window.location
+                    windowState.position = with(density) {
+                        WindowPosition(location.x.toDp(), location.y.toDp())
+                    }
+                },
+                onDragCancel = {
+                    dragOffset = null
+                },
+                onDrag = { change, _ ->
+                    change.consume()
+                    val offset = dragOffset ?: return@detectDragGestures
+                    val mouse = MouseInfo.getPointerInfo()?.location ?: return@detectDragGestures
+                    window.setLocation(mouse.x - offset.x, mouse.y - offset.y)
+                    if (windowState.position !is WindowPosition.Absolute) {
+                        val location = window.location
+                        windowState.position = with(density) {
+                            WindowPosition(location.x.toDp(), location.y.toDp())
+                        }
+                    }
+                }
+            )
         }
 
         Box(
@@ -123,39 +193,7 @@ fun PipPlayerWindow(
                             }
                         )
                     }
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = {
-                                val mouse = MouseInfo.getPointerInfo()?.location
-                                if (mouse != null) {
-                                    val location = window.location
-                                    dragOffset = Point(mouse.x - location.x, mouse.y - location.y)
-                                }
-                            },
-                            onDragEnd = {
-                                dragOffset = null
-                                val location = window.location
-                                windowState.position = with(density) {
-                                    WindowPosition(location.x.toDp(), location.y.toDp())
-                                }
-                            },
-                            onDragCancel = {
-                                dragOffset = null
-                            },
-                            onDrag = { change, _ ->
-                                change.consume()
-                                val offset = dragOffset ?: return@detectDragGestures
-                                val mouse = MouseInfo.getPointerInfo()?.location ?: return@detectDragGestures
-                                window.setLocation(mouse.x - offset.x, mouse.y - offset.y)
-                                if (windowState.position !is WindowPosition.Absolute) {
-                                    val location = window.location
-                                    windowState.position = with(density) {
-                                        WindowPosition(location.x.toDp(), location.y.toDp())
-                                    }
-                                }
-                            }
-                        )
-                    }
+                    .then(dragModifier)
             )
 
             // Play Button when paused
@@ -163,7 +201,9 @@ fun PipPlayerWindow(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .pointerHoverIcon(PointerIcon.Hand)
                         .background(Color.Black.copy(alpha = 0.3f))
+                        .then(dragModifier)
                         .clickable { mediaPlayer.resume() },
                     contentAlignment = Alignment.Center
                 ) {
@@ -183,7 +223,7 @@ fun PipPlayerWindow(
                     modifier = Modifier
                         .pointerHoverIcon(PointerIcon.Hand)
                         .align(Alignment.TopEnd)
-                        .offset(x = 6.dp, y = (-6).dp)
+                        .offset(x = 7.dp, y = (-7).dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
@@ -203,9 +243,10 @@ fun PipPlayerWindow(
                     iterations = 1,
                     isPlaying = isPlaying
                 )
+                var isExitBtnHovered by remember { mutableStateOf(false) }
 
-                LaunchedEffect(isHovered) {
-                    if (isHovered) {
+                LaunchedEffect(isExitBtnHovered) {
+                    if (isExitBtnHovered) {
                         isPlaying = true
                     }
                 }
@@ -223,6 +264,8 @@ fun PipPlayerWindow(
                             .padding(8.dp)
                             .size(26.dp)
                             .pointerHoverIcon(PointerIcon.Hand)
+                            .onPointerEvent(PointerEventType.Enter) { isExitBtnHovered = true }
+                            .onPointerEvent(PointerEventType.Exit) { isExitBtnHovered = false }
                             .clickable { onExitPip() }
                     ) {
                         Image(
