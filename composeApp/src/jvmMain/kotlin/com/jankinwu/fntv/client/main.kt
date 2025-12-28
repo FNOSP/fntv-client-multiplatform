@@ -68,6 +68,7 @@ import org.koin.compose.KoinApplication
 import org.koin.compose.viewmodel.koinViewModel
 import org.openani.mediamp.compose.rememberMediampPlayer
 import java.awt.Dimension
+import java.awt.Frame
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -230,12 +231,6 @@ fun main() {
                         )
                     }
 
-                    LaunchedEffect(playerManager.playerState.isVisible, playerManager.isPipMode) {
-                        window.invalidate()
-                        window.validate()
-                        window.repaint()
-                    }
-
                     // 显示播放器覆盖层
                     if (playerManager.playerState.isVisible && !playerManager.isPipMode) {
                         PlayerOverlay(
@@ -263,9 +258,17 @@ fun main() {
                                 player.stopPlayback()
                                 playerManager.hidePlayer()
                                 playerManager.isPipMode = false
+                                // 退出小窗时恢复并置顶主窗口
+                                window.extendedState = Frame.NORMAL
+                                window.toFront()
+                                window.requestFocus()
                             },
                             onExitPip = {
                                 playerManager.isPipMode = false
+                                // 退出小窗时恢复并置顶主窗口
+                                window.extendedState = Frame.NORMAL
+                                window.toFront()
+                                window.requestFocus()
                             }
                         )
                     }

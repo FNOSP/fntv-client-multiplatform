@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.Icon
@@ -33,7 +34,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.runtime.collectAsState
 import com.jankinwu.fntv.client.data.store.PlayingSettingsStore
+import com.jankinwu.fntv.client.icons.PlayCircle
 import com.jankinwu.fntv.client.manager.PlayerResourceManager
 import com.jankinwu.fntv.client.ui.providable.LocalMediaPlayer
 import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
@@ -52,6 +55,7 @@ fun PipPlayerWindow(
     onExitPip: () -> Unit
 ) {
     val mediaPlayer = LocalMediaPlayer.current
+    val playbackState by mediaPlayer.playbackState.collectAsState()
     val savedData = remember { PlayingSettingsStore.getPipWindowData() }
 
     val windowState = rememberWindowState(
@@ -151,11 +155,31 @@ fun PipPlayerWindow(
                     }
             )
 
+            // Play Button when paused
+            if (playbackState == PlaybackState.PAUSED) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f))
+                        .clickable { mediaPlayer.resume() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = PlayCircle,
+                        contentDescription = "Play",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+            }
+
             // Top Right: Close Button
             if (isHovered) {
                 IconButton(
                     onClick = onClose,
-                    modifier = Modifier.align(Alignment.TopEnd)
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 6.dp, y = (-6).dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
