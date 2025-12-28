@@ -6,8 +6,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 val osName = System.getProperty("os.name").lowercase()
 val osArch = System.getProperty("os.arch").lowercase()
 
-val appVersion = "1.3.3"
-val appVersionSuffix = ""
+val appVersion = "1.4.0"
+val appVersionSuffix = "Beta"
 
 val platformStr = when {
     osName.contains("win") -> {
