@@ -1,6 +1,7 @@
 package com.jankinwu.fntv.client.ui.window
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -23,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
@@ -34,21 +36,21 @@ import androidx.compose.ui.window.rememberWindowState
 import com.jankinwu.fntv.client.data.store.PlayingSettingsStore
 import com.jankinwu.fntv.client.manager.PlayerResourceManager
 import com.jankinwu.fntv.client.ui.providable.LocalMediaPlayer
-import com.jankinwu.fntv.client.ui.providable.LocalPlayerManager
 import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
 import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import io.github.alexzhirkevich.compottie.rememberLottiePainter
 import kotlinx.coroutines.flow.debounce
 import org.openani.mediamp.PlaybackState
 import org.openani.mediamp.compose.MediampPlayerSurface
+import java.awt.MouseInfo
+import java.awt.Point
 
-@OptIn(ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalComposeUiApi::class, kotlinx.coroutines.FlowPreview::class)
 @Composable
 fun PipPlayerWindow(
     onClose: () -> Unit,
     onExitPip: () -> Unit
 ) {
-    val playerManager = LocalPlayerManager.current
     val mediaPlayer = LocalMediaPlayer.current
     val savedData = remember { PlayingSettingsStore.getPipWindowData() }
 
@@ -85,10 +87,16 @@ fun PipPlayerWindow(
     ) {
         var isHovered by remember { mutableStateOf(false) }
         val density = LocalDensity.current
+        var dragOffset by remember { mutableStateOf<Point?>(null) }
+
+        LaunchedEffect(Unit) {
+            window.background = java.awt.Color(0, 0, 0)
+        }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color.Black)
                 .onPointerEvent(PointerEventType.Enter) { isHovered = true }
                 .onPointerEvent(PointerEventType.Exit) { isHovered = false }
         ) {
@@ -109,26 +117,45 @@ fun PipPlayerWindow(
                         )
                     }
                     .pointerInput(Unit) {
-                        detectDragGestures { change, dragAmount ->
-                            change.consume()
-                            val pos = windowState.position
-                            if (pos is WindowPosition.Absolute) {
-                                with(density) {
-                                    windowState.position = WindowPosition(
-                                        pos.x + dragAmount.x.toDp(),
-                                        pos.y + dragAmount.y.toDp()
-                                    )
+                        detectDragGestures(
+                            onDragStart = {
+                                val mouse = MouseInfo.getPointerInfo()?.location
+                                if (mouse != null) {
+                                    val location = window.location
+                                    dragOffset = Point(mouse.x - location.x, mouse.y - location.y)
+                                }
+                            },
+                            onDragEnd = {
+                                dragOffset = null
+                                val location = window.location
+                                windowState.position = with(density) {
+                                    WindowPosition(location.x.toDp(), location.y.toDp())
+                                }
+                            },
+                            onDragCancel = {
+                                dragOffset = null
+                            },
+                            onDrag = { change, _ ->
+                                change.consume()
+                                val offset = dragOffset ?: return@detectDragGestures
+                                val mouse = MouseInfo.getPointerInfo()?.location ?: return@detectDragGestures
+                                window.setLocation(mouse.x - offset.x, mouse.y - offset.y)
+                                if (windowState.position !is WindowPosition.Absolute) {
+                                    val location = window.location
+                                    windowState.position = with(density) {
+                                        WindowPosition(location.x.toDp(), location.y.toDp())
+                                    }
                                 }
                             }
-                        }
+                        )
                     }
             )
 
+            // Top Right: Close Button
             if (isHovered) {
-                // Top Right: Close Button
                 IconButton(
                     onClick = onClose,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                    modifier = Modifier.align(Alignment.TopEnd)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
@@ -136,28 +163,44 @@ fun PipPlayerWindow(
                         tint = Color.White
                     )
                 }
+            }
 
-                // Bottom Right: Exit PiP Button
-                val pipSpec = PlayerResourceManager.quitPipSpec
-                if (pipSpec != null) {
-                    val composition by rememberLottieComposition { pipSpec }
-                    val progress by animateLottieCompositionAsState(
-                        composition = composition,
-                        iterations = 1,
+            // Bottom Right: Exit PiP Button
+            val pipSpec = PlayerResourceManager.quitPipSpec
+            if (pipSpec != null) {
+                val composition by rememberLottieComposition { pipSpec }
+                var isPlaying by remember { mutableStateOf(false) }
+                val progress by animateLottieCompositionAsState(
+                    composition = composition,
+                    iterations = 1,
+                    isPlaying = isPlaying
+                )
+
+                LaunchedEffect(isHovered) {
+                    if (isHovered) {
                         isPlaying = true
-                    )
+                    }
+                }
 
+                LaunchedEffect(progress) {
+                    if (progress == 1f) {
+                        isPlaying = false
+                    }
+                }
+
+                if (isHovered || (progress > 0f && progress < 1f)) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(8.dp)
-                            .size(32.dp)
+                            .size(26.dp)
                             .clickable { onExitPip() }
                     ) {
                         Image(
                             painter = rememberLottiePainter(composition, progress = { progress }),
                             contentDescription = "Exit PiP",
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize(),
+                            colorFilter = ColorFilter.tint(Color.White)
                         )
                     }
                 }

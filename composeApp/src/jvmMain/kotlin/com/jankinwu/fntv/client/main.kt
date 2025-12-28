@@ -229,6 +229,13 @@ fun main() {
                             icon = icon
                         )
                     }
+
+                    LaunchedEffect(playerManager.playerState.isVisible, playerManager.isPipMode) {
+                        window.invalidate()
+                        window.validate()
+                        window.repaint()
+                    }
+
                     // 显示播放器覆盖层
                     if (playerManager.playerState.isVisible && !playerManager.isPipMode) {
                         PlayerOverlay(
