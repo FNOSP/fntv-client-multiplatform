@@ -24,6 +24,7 @@ import androidx.compose.ui.window.rememberWindowState
 import co.touchlab.kermit.Logger
 import com.jankinwu.fntv.client.data.network.apiModule
 import com.jankinwu.fntv.client.data.store.AppSettingsStore
+import com.jankinwu.fntv.client.data.store.PlayingSettingsStore
 import com.jankinwu.fntv.client.manager.LoginStateManager
 import com.jankinwu.fntv.client.manager.PreferencesManager
 import com.jankinwu.fntv.client.manager.ProxyManager
@@ -103,7 +104,7 @@ fun main() {
             }
         }
 
-        // 加载登录信息到缓存
+        // 加载登录信息到缓�?
         PreferencesManager.getInstance().loadAllLoginInfo()
 
         KoinApplication(application = {
@@ -136,7 +137,7 @@ fun main() {
                 size = DpSize(AppSettingsStore.playerWindowWidth.dp, AppSettingsStore.playerWindowHeight.dp)
             )
 
-            // 监听窗口位置变化并自动保存 (主窗口)
+            // 监听窗口位置变化并自动保�?(主窗�?
             LaunchedEffect(mainState, playerManager.playerState.isVisible) {
                 snapshotFlow { mainState.position to mainState.size }
                     .debounce(500)
@@ -167,7 +168,7 @@ fun main() {
                 DesktopContext(playerState, dataDir, cacheDir, logDir, ExtraWindowProperties())
             }
 
-            // 主窗口
+            // 主窗�?
             Window(
                 onCloseRequest = ::exitApplication,
                 state = mainState,
@@ -202,7 +203,7 @@ fun main() {
                         backButtonClick = { navigator.navigateUp() },
                         backButtonVisible = false
                     ) { windowInset, contentInset ->
-                        // 使用LoginStateManagement来管理登录状态
+                        // 使用LoginStateManagement来管理登录状�?
                         LaunchedEffect(isLoggedIn) {
                             if (isLoggedIn) {
                                 userInfoViewModel.refresh()
@@ -215,7 +216,7 @@ fun main() {
                             }
                         }
 
-                        // 只有在未登录状态下才显示登录界面
+                        // 只有在未登录状态下才显示登录界�?
                         if (!isLoggedIn) {
                             LoginScreen(
                                 navigator = navigator,
@@ -236,13 +237,13 @@ fun main() {
                 }
             }
 
-            // 播放器窗口
+            // 播放器窗�?
             if (playerManager.playerState.isVisible && !playerManager.isPipMode) {
                 Window(
                     onCloseRequest = {
-                        if (AppSettingsStore.playerIsFullscreen) {
+                        if (PlayingSettingsStore.playerIsFullscreen) {
                             playerState.placement = WindowPlacement.Floating
-                            AppSettingsStore.playerIsFullscreen = false
+                            PlayingSettingsStore.playerIsFullscreen = false
                         }
                         playerManager.hidePlayer()
                         player.stopPlayback()
@@ -272,9 +273,9 @@ fun main() {
                     ) {
                         WindowFrame(
                             onCloseRequest = {
-                                if (AppSettingsStore.playerIsFullscreen) {
+                                if (PlayingSettingsStore.playerIsFullscreen) {
                                     playerState.placement = WindowPlacement.Floating
-                                    AppSettingsStore.playerIsFullscreen = false
+                                    PlayingSettingsStore.playerIsFullscreen = false
                                 }
                                 playerManager.hidePlayer()
                                 player.stopPlayback()
@@ -285,9 +286,9 @@ fun main() {
                             backButtonVisible = false,
                             backButtonEnabled = false,
                             backButtonClick = {
-                                if (AppSettingsStore.playerIsFullscreen) {
+                                if (PlayingSettingsStore.playerIsFullscreen) {
                                     playerState.placement = WindowPlacement.Floating
-                                    AppSettingsStore.playerIsFullscreen = false
+                                    PlayingSettingsStore.playerIsFullscreen = false
                                 }
                                 playerManager.hidePlayer()
                                 player.stopPlayback()
@@ -298,9 +299,9 @@ fun main() {
                                 subhead = playerManager.playerState.subhead,
                                 isEpisode = playerManager.playerState.isEpisode,
                                 onBack = {
-                                    if (AppSettingsStore.playerIsFullscreen) {
+                                    if (PlayingSettingsStore.playerIsFullscreen) {
                                         playerState.placement = WindowPlacement.Floating
-                                        AppSettingsStore.playerIsFullscreen = false
+                                        PlayingSettingsStore.playerIsFullscreen = false
                                     }
                                     playerManager.hidePlayer()
                                     // 停止播放
@@ -316,11 +317,11 @@ fun main() {
 
             // 小窗模式
             if (playerManager.isPipMode) {
-                // 如果处于全屏模式，退出全屏
-                if (AppSettingsStore.playerIsFullscreen) {
+                // 如果处于全屏模式，退出全�?
+                if (PlayingSettingsStore.playerIsFullscreen) {
                     LaunchedEffect(Unit) {
                         playerState.placement = WindowPlacement.Floating
-                        AppSettingsStore.playerIsFullscreen = false
+                        PlayingSettingsStore.playerIsFullscreen = false
                     }
                 }
 
@@ -480,8 +481,8 @@ private fun kcefCacheDir(): File {
 }
 
 /**
- * 初始化日志目录
- * 根据应用程序运行模式（开发模式或打包模式）确定日志目录位置
+ * 初始化日志目�?
+ * 根据应用程序运行模式（开发模式或打包模式）确定日志目录位�?
  */
 private fun initializeLoggingDirectory(): File {
     val userDirStr = System.getProperty("user.dir")

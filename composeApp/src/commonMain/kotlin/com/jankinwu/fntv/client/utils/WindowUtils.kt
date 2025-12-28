@@ -3,7 +3,7 @@ package com.jankinwu.fntv.client.utils
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.jankinwu.fntv.client.data.model.response.VideoStream
-import com.jankinwu.fntv.client.data.store.AppSettingsStore
+import com.jankinwu.fntv.client.data.store.PlayingSettingsStore
 
 fun calculateOptimalPlayerWindowSize(
     videoStream: VideoStream,
@@ -31,7 +31,7 @@ fun calculateOptimalPlayerWindowSize(
 
     // Compensation only applies in AUTO mode
     val compensation =
-        if (aspectRatioSetting == "AUTO") AppSettingsStore.playerWindowWidthCompensation else 0f
+        if (aspectRatioSetting == "AUTO") PlayingSettingsStore.playerWindowWidthCompensation else 0f
 
     // Logic to expand window rather than shrink content
     // 为了防止基于当前窗口大小计算导致无限膨胀，我们采用"保持宽度"的策略，除非必须变宽

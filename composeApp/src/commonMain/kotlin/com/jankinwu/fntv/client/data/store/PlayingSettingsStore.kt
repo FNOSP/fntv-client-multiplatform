@@ -52,4 +52,20 @@ object PlayingSettingsStore {
     fun getVolume(): Float {
         return settings.getFloat(scopedKey("player_volume"), 1.0f)
     }
+
+    var autoPlay: Boolean
+        get() = settings.getBoolean(scopedKey("auto_play"), true)
+        set(value) = settings.set(scopedKey("auto_play"), value)
+
+    var playerIsFullscreen: Boolean
+        get() = settings.getBoolean(scopedKey("player_is_fullscreen"), false)
+        set(value) = settings.set(scopedKey("player_is_fullscreen"), value)
+
+    var playerWindowAspectRatio: String
+        get() = settings.getString(scopedKey("player_window_aspect_ratio"), "AUTO")
+        set(value) = settings.set(scopedKey("player_window_aspect_ratio"), value)
+
+    var playerWindowWidthCompensation: Float
+        get() = settings.getFloat(scopedKey("player_window_width_compensation"), -40f)
+        set(value) = settings.set(scopedKey("player_window_width_compensation"), value)
 }

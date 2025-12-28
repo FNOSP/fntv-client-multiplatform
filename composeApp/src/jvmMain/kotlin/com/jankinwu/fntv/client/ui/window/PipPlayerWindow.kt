@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,35 +29,43 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
-import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
+import com.jankinwu.fntv.client.data.model.SubtitleSettings
+import com.jankinwu.fntv.client.data.network.fnOfficialClient
 import com.jankinwu.fntv.client.data.store.PlayingSettingsStore
 import com.jankinwu.fntv.client.icons.PlayCircle
 import com.jankinwu.fntv.client.manager.PlayerResourceManager
+import com.jankinwu.fntv.client.ui.component.player.SubtitleOverlay
 import com.jankinwu.fntv.client.ui.providable.LocalMediaPlayer
+import com.jankinwu.fntv.client.utils.ExternalSubtitleUtil
+import com.jankinwu.fntv.client.utils.HlsSubtitleUtil
+import com.jankinwu.fntv.client.utils.SubtitleCue
+import com.jankinwu.fntv.client.utils.calculateOptimalPlayerWindowSize
+import com.jankinwu.fntv.client.utils.rememberSmoothVideoTime
+import com.jankinwu.fntv.client.viewmodel.PlayerViewModel
+import fntv_client_multiplatform.composeapp.generated.resources.Res
+import fntv_client_multiplatform.composeapp.generated.resources.icon
 import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
 import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import io.github.alexzhirkevich.compottie.rememberLottiePainter
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
+import org.koin.compose.viewmodel.koinViewModel
 import org.openani.mediamp.PlaybackState
 import org.openani.mediamp.compose.MediampPlayerSurface
 import java.awt.MouseInfo
 import java.awt.Point
-import fntv_client_multiplatform.composeapp.generated.resources.Res
-import fntv_client_multiplatform.composeapp.generated.resources.icon
-import org.jetbrains.compose.resources.painterResource
-import org.koin.compose.viewmodel.koinViewModel
-import com.jankinwu.fntv.client.viewmodel.PlayerViewModel
-import com.jankinwu.fntv.client.utils.calculateOptimalPlayerWindowSize
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalComposeUiApi::class, kotlinx.coroutines.FlowPreview::class)
 @Composable
@@ -67,7 +77,79 @@ fun PipPlayerWindow(
     val playbackState by mediaPlayer.playbackState.collectAsState()
     val playerViewModel: PlayerViewModel = koinViewModel()
     val playingInfoCache by playerViewModel.playingInfoCache.collectAsState()
+    val subtitleSettings by playerViewModel.subtitleSettings.collectAsState()
     val savedData = remember { PlayingSettingsStore.getPipWindowData() }
+
+    val hlsSubtitleUtil = remember(playingInfoCache) {
+        val playLink = playingInfoCache?.playLink
+        val subtitle = playingInfoCache?.currentSubtitleStream
+        if (!playLink.isNullOrBlank() && playLink.contains(".m3u8") && subtitle != null && subtitle.isExternal == 0) {
+            HlsSubtitleUtil(fnOfficialClient, playLink, subtitle)
+        } else {
+            null
+        }
+    }
+
+    val externalSubtitleUtil = remember(playingInfoCache) {
+        val subtitle = playingInfoCache?.currentSubtitleStream
+        if (subtitle != null && subtitle.isExternal == 1 && subtitle.format in listOf(
+                "srt",
+                "ass",
+                "vtt"
+            )
+        ) {
+            ExternalSubtitleUtil(fnOfficialClient, subtitle)
+        } else {
+            null
+        }
+    }
+
+    LaunchedEffect(hlsSubtitleUtil, externalSubtitleUtil) {
+        hlsSubtitleUtil?.initialize(mediaPlayer.getCurrentPositionMillis())
+        externalSubtitleUtil?.initialize()
+    }
+
+    var subtitleCues by remember { mutableStateOf<List<SubtitleCue>>(emptyList()) }
+    val currentRenderTime by rememberSmoothVideoTime(mediaPlayer)
+
+    LaunchedEffect(hlsSubtitleUtil, externalSubtitleUtil, mediaPlayer, subtitleSettings) {
+        if (hlsSubtitleUtil != null) {
+            // Loop 1: Fetch loop
+            launch(kotlinx.coroutines.Dispatchers.IO) {
+                while (isActive) {
+                    val currentPos = mediaPlayer.getCurrentPositionMillis()
+                    hlsSubtitleUtil.update(currentPos)
+                    delay(2000)
+                }
+            }
+            // Loop 2: List update loop
+            launch {
+                while (isActive) {
+                    val currentPos = mediaPlayer.getCurrentPositionMillis()
+                    val adjustedPos = currentPos - (subtitleSettings.offsetSeconds * 1000).toLong()
+                    val newCues = hlsSubtitleUtil.getCurrentSubtitle(adjustedPos)
+                    if (subtitleCues != newCues) {
+                        subtitleCues = newCues
+                    }
+                    delay(16)
+                }
+            }
+        } else if (externalSubtitleUtil != null) {
+            launch {
+                while (isActive) {
+                    val currentPos = mediaPlayer.getCurrentPositionMillis()
+                    val adjustedPos = currentPos - (subtitleSettings.offsetSeconds * 1000).toLong()
+                    val newCues = externalSubtitleUtil.getCurrentSubtitle(adjustedPos)
+                    if (subtitleCues != newCues) {
+                        subtitleCues = newCues
+                    }
+                    delay(16)
+                }
+            }
+        } else {
+            subtitleCues = emptyList()
+        }
+    }
 
     val windowState = rememberWindowState(
         position = if (savedData != null) WindowPosition(savedData.x.dp, savedData.y.dp) else WindowPosition.Aligned(Alignment.BottomEnd),
@@ -195,6 +277,22 @@ fun PipPlayerWindow(
                     }
                     .then(dragModifier)
             )
+
+            // Subtitles
+            if (subtitleCues.isNotEmpty()) {
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    SubtitleOverlay(
+                        subtitleCues = subtitleCues,
+                        currentRenderTime = currentRenderTime - (subtitleSettings.offsetSeconds * 1000).toLong(),
+                        maxWidth = maxWidth,
+                        maxHeight = maxHeight,
+                        currentPosition = mediaPlayer.getCurrentPositionMillis() - (subtitleSettings.offsetSeconds * 1000).toLong(),
+                        settings = subtitleSettings
+                    )
+                }
+            }
 
             // Play Button when paused
             if (playbackState == PlaybackState.PAUSED) {

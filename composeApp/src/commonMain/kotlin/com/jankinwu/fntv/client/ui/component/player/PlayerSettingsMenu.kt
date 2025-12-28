@@ -56,7 +56,7 @@ import co.touchlab.kermit.Logger
 import com.jankinwu.fntv.client.data.convertor.FnDataConvertor
 import com.jankinwu.fntv.client.data.model.PlayingInfoCache
 import com.jankinwu.fntv.client.data.model.response.AudioStream
-import com.jankinwu.fntv.client.data.store.AppSettingsStore
+import com.jankinwu.fntv.client.data.store.PlayingSettingsStore
 import com.jankinwu.fntv.client.manager.PlayerResourceManager
 import com.jankinwu.fntv.client.ui.component.common.AnimatedScrollbarLazyColumn
 import com.jankinwu.fntv.client.ui.providable.IsoTagData
@@ -376,7 +376,7 @@ fun MainSettingsScreen(
             }
         }
 
-        val currentWindowAspectRatio = AppSettingsStore.playerWindowAspectRatio
+        val currentWindowAspectRatio = PlayingSettingsStore.playerWindowAspectRatio
         val currentWindowAspectRatioText = when (currentWindowAspectRatio) {
             "AUTO" -> "自动"
             else -> currentWindowAspectRatio
@@ -441,7 +441,7 @@ fun WindowAspectRatioSettingsScreen(
     onBack: () -> Unit,
     onAspectRatioSelected: (String) -> Unit
 ) {
-    val currentRatio = AppSettingsStore.playerWindowAspectRatio
+    val currentRatio = PlayingSettingsStore.playerWindowAspectRatio
     val options = listOf("AUTO", "4:3", "16:9", "21:9")
     val optionLabels = mapOf(
         "AUTO" to "自动",
