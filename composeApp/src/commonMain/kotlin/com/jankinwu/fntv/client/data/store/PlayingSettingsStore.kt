@@ -68,4 +68,17 @@ object PlayingSettingsStore {
     var playerWindowWidthCompensation: Float
         get() = settings.getFloat(scopedKey("player_window_width_compensation"), -40f)
         set(value) = settings.set(scopedKey("player_window_width_compensation"), value)
+
+    data class PlayerScreenSize(val width: Float, val height: Float)
+
+    fun saveLastPlayerScreenSize(width: Float, height: Float) {
+        settings[scopedKey("last_player_screen_width")] = width
+        settings[scopedKey("last_player_screen_height")] = height
+    }
+
+    fun getLastPlayerScreenSize(): PlayerScreenSize? {
+        val width = settings.getFloatOrNull(scopedKey("last_player_screen_width")) ?: return null
+        val height = settings.getFloatOrNull(scopedKey("last_player_screen_height")) ?: return null
+        return PlayerScreenSize(width, height)
+    }
 }

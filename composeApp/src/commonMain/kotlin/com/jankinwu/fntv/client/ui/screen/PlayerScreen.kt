@@ -317,7 +317,7 @@ fun PlayerOverlay(
     // Window Aspect Ratio State
     var windowAspectRatio by remember { mutableStateOf(PlayingSettingsStore.playerWindowAspectRatio) }
 
-    val playerViewModel: PlayerViewModel = koinInject()
+    val playerViewModel: PlayerViewModel = koinViewModel()
     val subtitleSettingsFromVm by playerViewModel.subtitleSettings.collectAsState()
 
     var subtitleSettings by remember {
@@ -363,7 +363,6 @@ fun PlayerOverlay(
 //    val scope = rememberCoroutineScope()
     val mediaPViewModel: MediaPViewModel = koinViewModel()
     val tagViewModel: TagViewModel = koinViewModel()
-//    val playerViewModel: PlayerViewModel = koinViewModel()
     val playPlayViewModel: PlayPlayViewModel = koinViewModel()
     val episodeListViewModel: EpisodeListViewModel = koinViewModel()
     val episodeListState by episodeListViewModel.uiState.collectAsState()
@@ -388,15 +387,6 @@ fun PlayerOverlay(
         isSettingsMenuHovered = false
         isSubtitleControlHovered = false
         playerManager.requestKeyFocus()
-
-        // Reset subtitle settings when episode changes
-        val settings = SubtitleSettings(
-            fontScale = 1.0f,
-            verticalPosition = 0.1f,
-            offsetSeconds = 0.0f
-        )
-        subtitleSettings = settings
-        playerViewModel.updateSubtitleSettings(settings)
     }
 
     LaunchedEffect(playingInfoCache?.parentGuid) {
@@ -1095,6 +1085,9 @@ fun PlayerOverlay(
                     true
                 )
         ) {
+            LaunchedEffect(maxWidth, maxHeight) {
+                PlayingSettingsStore.saveLastPlayerScreenSize(maxWidth.value, maxHeight.value)
+            }
             // 视频层 - 从标题栏下方开始显示
             key(surfaceRecreateKey) {
                 MediampPlayerSurface(

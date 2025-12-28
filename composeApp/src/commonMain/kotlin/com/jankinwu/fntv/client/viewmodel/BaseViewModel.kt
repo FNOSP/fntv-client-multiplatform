@@ -2,6 +2,7 @@ package com.jankinwu.fntv.client.viewmodel
 
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
@@ -75,5 +76,5 @@ val viewModelModule = module {
     viewModelOf (::ProxySettingViewModel)
     viewModelOf (::UpdateViewModel)
     viewModelOf (::MediaPViewModel)
-    viewModelOf (::PlayerViewModel)
+    singleOf (::PlayerViewModel)
 }

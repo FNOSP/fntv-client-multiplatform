@@ -283,13 +283,21 @@ fun PipPlayerWindow(
                 BoxWithConstraints(
                     modifier = Modifier.fillMaxSize()
                 ) {
+                    val playerScreenSize = remember { PlayingSettingsStore.getLastPlayerScreenSize() }
+                    val fontScaleRatio = if (playerScreenSize != null && playerScreenSize.width > 0) {
+                        maxWidth.value / playerScreenSize.width
+                    } else {
+                        maxWidth.value / 1280f
+                    }
+
                     SubtitleOverlay(
                         subtitleCues = subtitleCues,
                         currentRenderTime = currentRenderTime - (subtitleSettings.offsetSeconds * 1000).toLong(),
                         maxWidth = maxWidth,
                         maxHeight = maxHeight,
                         currentPosition = mediaPlayer.getCurrentPositionMillis() - (subtitleSettings.offsetSeconds * 1000).toLong(),
-                        settings = subtitleSettings
+                        settings = subtitleSettings,
+                        fontScaleRatio = fontScaleRatio
                     )
                 }
             }

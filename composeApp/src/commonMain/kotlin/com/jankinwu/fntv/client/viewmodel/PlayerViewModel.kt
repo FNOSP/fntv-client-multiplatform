@@ -22,6 +22,10 @@ class PlayerViewModel : ViewModel() {
     }
 
     fun updatePlayingInfo(info: PlayingInfoCache?) {
+        // 当切换视频（guid不同）或清除播放信息时，重置字幕设置
+        if (info?.itemGuid != _playingInfoCache.value?.itemGuid) {
+            _subtitleSettings.value = SubtitleSettings()
+        }
         _playingInfoCache.value = info
     }
 
