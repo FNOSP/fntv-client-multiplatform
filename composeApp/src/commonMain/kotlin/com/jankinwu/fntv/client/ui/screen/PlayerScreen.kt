@@ -137,6 +137,7 @@ import com.jankinwu.fntv.client.utils.HiddenPointerIcon
 import com.jankinwu.fntv.client.utils.HlsSubtitleUtil
 import com.jankinwu.fntv.client.utils.Mp4Parser
 import com.jankinwu.fntv.client.utils.SubtitleCue
+import com.jankinwu.fntv.client.utils.callPlayRecord
 import com.jankinwu.fntv.client.utils.calculateOptimalPlayerWindowSize
 import com.jankinwu.fntv.client.utils.chooseFile
 import com.jankinwu.fntv.client.utils.rememberSmoothVideoTime
@@ -251,48 +252,6 @@ object PlayerScreen {
         // 不序列化null值
         disable(SerializationFeature.WRITE_NULL_MAP_VALUES)
 //            setSerializationInclusion(JsonInclude.Include.NON_NULL)
-    }
-}
-
-private fun createPlayRecordRequest(
-    ts: Int,
-    cache: PlayingInfoCache
-): PlayRecordRequest {
-    return PlayRecordRequest(
-        itemGuid = cache.itemGuid,
-        mediaGuid = cache.currentFileStream.guid,
-        videoGuid = cache.currentVideoStream.guid,
-        audioGuid = cache.currentAudioStream?.guid ?: "",
-        subtitleGuid = cache.currentSubtitleStream?.guid,
-        resolution = cache.currentQuality?.resolution ?: cache.currentVideoStream.resolutionType,
-        bitrate = cache.currentQuality?.bitrate ?: cache.currentVideoStream.bps,
-        ts = ts,
-        duration = cache.currentVideoStream.duration,
-        playLink = cache.playLink
-    )
-}
-
-/**
- * 保存播放进度
- *
- * @param ts 当前播放时间戳(秒)
- * @param playRecordViewModel PlayRecordViewModel实例
- * @param onSuccess 成功回调
- * @param onError 错误回调
- */
-private fun callPlayRecord(
-    ts: Int,
-    playingInfoCache: PlayingInfoCache?,
-    playRecordViewModel: PlayRecordViewModel,
-    onSuccess: (() -> Unit)? = null,
-    onError: (() -> Unit)? = null
-) {
-    playingInfoCache?.let { cache ->
-        val playRecordRequest = createPlayRecordRequest(ts, cache)
-        playRecordViewModel.loadData(playRecordRequest)
-        onSuccess?.invoke()
-    } ?: run {
-        onError?.invoke()
     }
 }
 
@@ -765,7 +724,7 @@ fun PlayerOverlay(
     // 上一次播放状�?
     var lastPlayState by remember { mutableStateOf<PlaybackState?>(null) }
 
-    // 当播放状态变为暂停时，确保UI可见并调用playRecord接口
+    // 当播放状态变为暂停或播放时，调用playRecord接口
     LaunchedEffect(playState) {
         if (playState == PlaybackState.PAUSED && lastPlayState == PlaybackState.PLAYING) {
             uiVisible = true
@@ -782,6 +741,19 @@ fun PlayerOverlay(
                 },
                 onError = {
                     logger.i("暂停时调用playRecord失败：缓存为空")
+                },
+            )
+        } else if (playState == PlaybackState.PLAYING && lastPlayState == PlaybackState.PAUSED) {
+            // 从暂停切换到播放时也调用playRecord接口
+            callPlayRecord(
+                ts = (mediaPlayer.currentPositionMillis.value / 1000).toInt(),
+                playingInfoCache = playingInfoCache,
+                playRecordViewModel = playRecordViewModel,
+                onSuccess = {
+                    logger.i("恢复播放时调用playRecord成功")
+                },
+                onError = {
+                    logger.i("恢复播放时调用playRecord失败：缓存为空")
                 },
             )
         }
