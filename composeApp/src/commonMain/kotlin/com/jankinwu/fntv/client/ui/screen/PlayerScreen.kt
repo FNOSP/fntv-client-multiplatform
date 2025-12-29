@@ -723,8 +723,26 @@ fun PlayerOverlay(
     // 上一次播放状�?
     var lastPlayState by remember { mutableStateOf<PlaybackState?>(null) }
 
+    var isSeeking by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isSeeking) {
+        if (isSeeking) {
+            delay(2000)
+            if (isSeeking) {
+                playerManager.setLoading(false)
+                isSeeking = false
+            }
+        }
+    }
+
     // 当播放状态变为暂停或播放时，调用playRecord接口
     LaunchedEffect(playState) {
+        if (playState == PlaybackState.PLAYING || playState == PlaybackState.PAUSED) {
+            if (playerManager.playerState.isLoading) {
+                playerManager.setLoading(false)
+            }
+            isSeeking = false
+        }
         if (playState == PlaybackState.PAUSED && lastPlayState == PlaybackState.PLAYING) {
             uiVisible = true
             isCursorVisible = true
@@ -1084,6 +1102,8 @@ fun PlayerOverlay(
                     onProgressBarHoverChanged = { isProgressBarHovered = it },
                     onResetMouseMoveTimer = { lastMouseMoveTime = System.currentTimeMillis() },
                     onSeek = { newProgress ->
+                        playerManager.setLoading(true)
+                        isSeeking = true
                         val seekPosition = (newProgress * totalDuration).toLong()
                         mediaPlayer.seekTo(seekPosition)
                         logger.i("Seek to: ${newProgress * 100}%")

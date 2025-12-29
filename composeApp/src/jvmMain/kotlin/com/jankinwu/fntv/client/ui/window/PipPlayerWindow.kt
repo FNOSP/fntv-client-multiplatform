@@ -57,6 +57,7 @@ import com.jankinwu.fntv.client.icons.PlayCircle
 import com.jankinwu.fntv.client.manager.PlayerResourceManager
 import com.jankinwu.fntv.client.ui.component.player.SubtitleOverlay
 import com.jankinwu.fntv.client.ui.component.player.VolumeControl
+import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.providable.LocalMediaPlayer
 import com.jankinwu.fntv.client.utils.ExternalSubtitleUtil
 import com.jankinwu.fntv.client.utils.HlsSubtitleUtil
@@ -106,6 +107,23 @@ fun PipPlayerWindow(
 
     // 上一次播放状态
     var lastPlayState by remember { mutableStateOf<PlaybackState?>(null) }
+
+    var isLoading by remember { mutableStateOf(false) }
+
+    LaunchedEffect(playbackState) {
+        if (playbackState == PlaybackState.PLAYING || playbackState == PlaybackState.PAUSED) {
+            isLoading = false
+        }
+    }
+
+    LaunchedEffect(isLoading) {
+        if (isLoading) {
+            delay(2000)
+            if (isLoading) {
+                isLoading = false
+            }
+        }
+    }
 
     // 当播放状态变为暂停或播放时，调用playRecord接口
     LaunchedEffect(playbackState) {
@@ -399,6 +417,15 @@ fun PipPlayerWindow(
                 }
             }
 
+            if (playbackState == PlaybackState.READY || playbackState == PlaybackState.PAUSED_BUFFERING || isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ImgLoadingProgressRing(modifier = Modifier.size(32.dp))
+                }
+            }
+
             // Play Button when paused
             if (playbackState == PlaybackState.PAUSED) {
                 Box(
@@ -492,6 +519,7 @@ fun PipPlayerWindow(
                     player = mediaPlayer,
                     totalDuration = totalDuration,
                     onSeek = { ratio ->
+                        isLoading = true
                         mediaPlayer.seekTo((ratio * totalDuration).toLong())
                     },
                     modifier = Modifier
