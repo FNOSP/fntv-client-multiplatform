@@ -310,7 +310,7 @@ fun LoginScreen(
                     // 1. Logo
                     Image(
                         painterResource(Res.drawable.fnarwhal_login),
-                        contentDescription = "飞鲸logo",
+                        contentDescription = "飞鲸 logo",
                         modifier = Modifier
                             .width(174.dp)
 //                            .graphicsLayer {
@@ -322,7 +322,7 @@ fun LoginScreen(
                         contentScale = ContentScale.FillWidth,
 //                        filterQuality = FilterQuality.Medium
                     )
-                    Text("FN_Media", color = HintColor, fontSize = 16.sp)
+                    Text("Fly Narwhal", color = HintColor, fontSize = 16.sp)
                     var isHistoryHovered by remember { mutableStateOf(false) }
                     if (isNasLogin) {
                         OutlinedTextField(
