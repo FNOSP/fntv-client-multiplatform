@@ -69,8 +69,8 @@ import com.jankinwu.fntv.client.utils.rememberSmoothVideoTime
 import com.jankinwu.fntv.client.viewmodel.PlayRecordViewModel
 import com.jankinwu.fntv.client.viewmodel.PlayerViewModel
 import com.jankinwu.fntv.client.window.findSkiaLayer
-import fntv_client_multiplatform.composeapp.generated.resources.Res
-import fntv_client_multiplatform.composeapp.generated.resources.icon
+import flynarwhal.composeapp.generated.resources.Res
+import flynarwhal.composeapp.generated.resources.icon
 import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
 import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import io.github.alexzhirkevich.compottie.rememberLottiePainter

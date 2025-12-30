@@ -101,9 +101,9 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.FluentMaterials
 import dev.chrisbanes.haze.rememberHazeState
-import fntv_client_multiplatform.composeapp.generated.resources.fnarwhal_login
-import fntv_client_multiplatform.composeapp.generated.resources.Res
-import fntv_client_multiplatform.composeapp.generated.resources.login_background
+import flynarwhal.composeapp.generated.resources.Res
+import flynarwhal.composeapp.generated.resources.fnarwhal_login
+import flynarwhal.composeapp.generated.resources.login_background
 import io.github.composefluent.FluentTheme
 import io.github.composefluent.component.CheckBox
 import io.github.composefluent.component.CheckBoxDefaults

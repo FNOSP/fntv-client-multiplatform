@@ -64,8 +64,8 @@ import com.jankinwu.fntv.client.ui.providable.LocalStore
 import com.jankinwu.fntv.client.utils.LocalLogExporter
 import com.jankinwu.fntv.client.viewmodel.LogoutViewModel
 import com.jankinwu.fntv.client.viewmodel.UpdateViewModel
-import fntv_client_multiplatform.composeapp.generated.resources.Res
-import fntv_client_multiplatform.composeapp.generated.resources.github_logo
+import flynarwhal.composeapp.generated.resources.Res
+import flynarwhal.composeapp.generated.resources.github_logo
 import io.github.composefluent.FluentTheme
 import io.github.composefluent.component.Button
 import io.github.composefluent.component.CardExpanderItem

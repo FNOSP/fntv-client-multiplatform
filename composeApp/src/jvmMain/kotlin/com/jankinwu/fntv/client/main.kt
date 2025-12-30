@@ -61,8 +61,8 @@ import com.jankinwu.fntv.client.viewmodel.viewModelModule
 import com.jankinwu.fntv.client.window.WindowFrame
 import com.sun.jna.platform.win32.Kernel32
 import dev.datlag.kcef.KCEF
-import fntv_client_multiplatform.composeapp.generated.resources.Res
-import fntv_client_multiplatform.composeapp.generated.resources.icon
+import flynarwhal.composeapp.generated.resources.Res
+import flynarwhal.composeapp.generated.resources.icon
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -78,8 +78,8 @@ import org.koin.compose.KoinApplication
 import org.koin.compose.viewmodel.koinViewModel
 import org.openani.mediamp.PlaybackState
 import org.openani.mediamp.compose.rememberMediampPlayer
-import java.awt.EventQueue
 import java.awt.Dimension
+import java.awt.EventQueue
 import java.io.File
 import java.io.RandomAccessFile
 import java.util.concurrent.atomic.AtomicBoolean

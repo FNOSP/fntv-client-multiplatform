@@ -4,7 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import co.touchlab.kermit.Logger
-import fntv_client_multiplatform.composeapp.generated.resources.Res
+import flynarwhal.composeapp.generated.resources.Res
 import io.github.alexzhirkevich.compottie.LottieCompositionSpec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

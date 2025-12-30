@@ -37,6 +37,7 @@ import com.jankinwu.fntv.client.ui.providable.LocalWebViewRestartRequired
 import com.jankinwu.fntv.client.utils.CaptureLoginInfoHandler
 import com.jankinwu.fntv.client.utils.NetworkLogHandler
 import com.jankinwu.fntv.client.utils.getJsInjectionScript
+import com.jankinwu.fntv.client.viewmodel.NasAuthViewModel
 import com.multiplatform.webview.jsbridge.rememberWebViewJsBridge
 import com.multiplatform.webview.web.LoadingState
 import com.multiplatform.webview.web.rememberWebViewNavigator
@@ -46,12 +47,11 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.FluentMaterials
 import dev.chrisbanes.haze.rememberHazeState
-import fntv_client_multiplatform.composeapp.generated.resources.Res
-import fntv_client_multiplatform.composeapp.generated.resources.login_background
+import flynarwhal.composeapp.generated.resources.Res
+import flynarwhal.composeapp.generated.resources.login_background
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import org.jetbrains.compose.resources.painterResource
-import com.jankinwu.fntv.client.viewmodel.NasAuthViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 private val logger = Logger.withTag("FnConnectWebViewScreen")
