@@ -34,7 +34,7 @@ fun KcefInitErrorDialog(
             }
         },
         content = {
-            Text("KCEF 组件加载失败，部分功能（Fn ID、NAS 登录）将不可用。\n错误信息：${error?.message}")
+            Text("浏览器组件加载失败，部分功能（Fn ID、NAS 登录）将不可用。\n错误信息：${error?.message}")
         }
     )
 }

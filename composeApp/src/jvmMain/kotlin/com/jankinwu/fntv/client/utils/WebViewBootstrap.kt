@@ -16,6 +16,17 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.CoroutineContext
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
+import io.ktor.http.ContentType
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 
 object WebViewBootstrap {
     private val started = AtomicBoolean(false)
@@ -45,6 +56,32 @@ object WebViewBootstrap {
 
         if (!started.compareAndSet(false, true)) return
 
+        // Create a custom HttpClient with Trust-All SSL configuration for KCEF download
+        val kcefClient = HttpClient(OkHttp) {
+            engine {
+                config {
+                    val trustAllCerts = arrayOf<TrustManager>(@Suppress("CustomX509TrustManager")
+                    object : X509TrustManager {
+                        override fun getAcceptedIssuers(): Array<X509Certificate>? = null
+                        @Suppress("TrustAllX509TrustManager")
+                        override fun checkClientTrusted(certs: Array<X509Certificate>, authType: String) {}
+                        @Suppress("TrustAllX509TrustManager")
+                        override fun checkServerTrusted(certs: Array<X509Certificate>, authType: String) {}
+                    })
+                    val sslContext = SSLContext.getInstance("SSL")
+                    sslContext.init(null, trustAllCerts, SecureRandom())
+                    
+                    sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+                    hostnameVerifier { _, _ -> true }
+                }
+            }
+            install(ContentNegotiation) {
+                val jsonConfig = Json { ignoreUnknownKeys = true }
+                json(jsonConfig)
+                json(jsonConfig, ContentType("application", "vnd.github+json"))
+            }
+        }
+
         // Clean up legacy kcef.log in logDir if it exists
         File(cacheDir, "kcef.log").delete()
 
@@ -71,12 +108,15 @@ object WebViewBootstrap {
                             settings {
                                 cachePath = cacheDir.absolutePath
                                 logFile = kcefLog.absolutePath
-                                // logSeverity = KCEFBuilder.Settings.LogSeverity.INFO
                             }
                             progress {
                                 onInitialized {
                                     initialized.value = true
                                 }
+                            }
+                            download {
+                                github()
+                                client(kcefClient)
                             }
                         },
                         onError = { throwable ->
