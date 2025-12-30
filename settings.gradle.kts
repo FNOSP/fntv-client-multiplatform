@@ -1,4 +1,4 @@
-rootProject.name = "fntv-client-multiplatform"
+rootProject.name = "FlyNarwhal"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {

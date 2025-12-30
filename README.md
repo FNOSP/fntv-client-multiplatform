@@ -54,7 +54,7 @@
 
 - 克隆项目到本地：
   ```bash
-  git clone https://github.com/FNOSP/fntv-client-multiplatform.git
+  git clone https://github.com/FNOSP/FlyNarwhal.git
   ```
 - 打开项目：
   - 使用 Android Studio 或 IntelliJ IDEA 打开项目
