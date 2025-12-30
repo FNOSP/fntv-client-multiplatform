@@ -575,8 +575,8 @@ fun SettingsScreen(navigator: ComponentNavigator) {
                 )
 
                 CardExpanderItem(
-                    heading = { Text("导出错误日志") },
-                    caption = { Text("支持导出近三天的错误日志") },
+                    heading = { Text("导出报错日志") },
+                    caption = { Text("支持导出近三天的报错日志，方便开发者排查问题") },
                     icon = { Icon(Download, null, modifier = Modifier.size(18.dp)) },
                     trailing = {
                         Row(verticalAlignment = Alignment.CenterVertically) {

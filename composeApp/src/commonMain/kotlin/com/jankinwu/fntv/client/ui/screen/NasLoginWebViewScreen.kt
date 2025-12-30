@@ -143,7 +143,7 @@ fun NasLoginWebViewScreen(
                 if (url.contains("/login")) {
                     baseUrl = url.substringBefore("/login")
                     AccountDataCache.updateFnOfficialBaseUrlFromUrl(baseUrl)
-                    logger.i("Base url: $baseUrl")
+//                    logger.i("Base url: $baseUrl")
                     if (onBaseUrlDetected != null) {
                         onBaseUrlDetected(baseUrl)
                         return@LaunchedEffect
