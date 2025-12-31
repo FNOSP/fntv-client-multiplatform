@@ -108,13 +108,18 @@ fun main() {
 
     // Cleanup old KCEF directories
     val baseDir = kcefBaseDir()
+    val installDir = File(baseDir, "kcef-bundle-${BuildConfig.VERSION_NAME}")
+    val cacheDir = File(baseDir, "kcef-cache-${BuildConfig.VERSION_NAME}")
     cleanupOldKcefDirs(baseDir)
+    Logger.withTag("main").i { "KCEF base directory: ${baseDir.absolutePath}" }
+    Logger.withTag("main").i { "KCEF install directory: ${installDir.absolutePath}" }
+    Logger.withTag("main").i { "KCEF cache directory: ${cacheDir.absolutePath}" }
 
     application {
         LaunchedEffect(Unit) {
             WebViewBootstrap.start(
-                installDir = kcefInstallDir(),
-                cacheDir = kcefCacheDir(),
+                installDir = installDir,
+                cacheDir = cacheDir,
                 logDir = logDir
             )
         }
@@ -535,14 +540,8 @@ private fun kcefBaseDir(): File {
         )
 
         is Platform.Windows -> {
-            val localAppData = System.getenv("LOCALAPPDATA")?.takeIf { it.isNotBlank() }
-            val defaultBase = File(localAppData ?: System.getProperty("user.home"), "FlyNarwhal")
-            if (defaultBase.absolutePath.any { it.code > 127 }) {
-                val programData = System.getenv("PROGRAMDATA")?.takeIf { it.isNotBlank() } ?: "C:\\ProgramData"
-                File(programData, "FlyNarwhal")
-            } else {
-                defaultBase
-            }
+            val exeDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
+            File(exeDir, "app/resources")
         }
     }
 }

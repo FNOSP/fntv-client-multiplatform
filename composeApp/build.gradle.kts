@@ -30,6 +30,27 @@ val proxyResourcesDir = layout.buildDirectory.dir("compose/proxy-resources")
 
 val kcefPreparedDir = layout.buildDirectory.dir("kcef/prepared")
 
+val kcefDownloaderClasspath by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
+dependencies {
+    add(
+        kcefDownloaderClasspath.name,
+        if (System.getProperty("os.name").lowercase().contains("win")) {
+            "dev.datlag:kcef:2024.04.20.4"
+        } else {
+            libs.kcef.get().toString()
+        }
+    )
+    add(kcefDownloaderClasspath.name, libs.ktor.client.core.get().toString())
+    add(kcefDownloaderClasspath.name, libs.ktor.client.okhttp.get().toString())
+    add(kcefDownloaderClasspath.name, libs.ktor.client.content.negotiation.get().toString())
+    add(kcefDownloaderClasspath.name, libs.ktor.serialization.kotlinx.json.get().toString())
+    add(kcefDownloaderClasspath.name, libs.ktor.http.get().toString())
+}
+
 val downloadKcefBundle by tasks.registering(JavaExec::class) {
     val compileKotlinJvmTask = tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileKotlinJvm")
     dependsOn(compileKotlinJvmTask)
@@ -43,7 +64,7 @@ val downloadKcefBundle by tasks.registering(JavaExec::class) {
     val installDirFile = installDir.get().asFile
 
     val classesDir = compileKotlinJvmTask.flatMap { it.destinationDirectory }
-    classpath = files(classesDir, configurations.getByName("jvmRuntimeClasspath"))
+    classpath = files(classesDir, kcefDownloaderClasspath)
 
     onlyIf {
         !installDirFile.exists() || installDirFile.listFiles()?.isEmpty() != false
@@ -141,6 +162,11 @@ afterEvaluate {
         "processResources",
         "prepareAppResources",
         "createDistributable",
+        "createReleaseDistributable",
+        "createDebugDistributable",
+        "runDistributable",
+        "runReleaseDistributable",
+        "runDebugDistributable",
         "packageRelease",
         "packageDebug",
         "package"
@@ -285,11 +311,12 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
             implementation(libs.androidx.runtime.desktop)
-            if (System.getProperty("os.name").lowercase().contains("win")) {
-                implementation("dev.datlag:kcef:2024.04.20.4")
-            } else {
-                implementation(libs.kcef)
-            }
+//            if (System.getProperty("os.name").lowercase().contains("win")) {
+//                implementation("dev.datlag:kcef:2024.04.20.4")
+//            } else {
+//                implementation(libs.kcef)
+//            }
+            implementation(libs.kcef)
 //            implementation(libs.vlcj)
             implementation(libs.oshi.core)
             implementation(libs.versioncompare)

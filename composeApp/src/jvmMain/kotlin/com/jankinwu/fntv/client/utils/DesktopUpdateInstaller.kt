@@ -94,14 +94,8 @@ interface DesktopUpdateInstaller : UpdateInstaller {
                     is Platform.Linux -> File(System.getProperty("user.home"), ".local/share/fly-narwhal")
                     is Platform.MacOS -> File(System.getProperty("user.home"), "Library/Application Support/fly-narwhal")
                     is Platform.Windows -> {
-                        val localAppData = System.getenv("LOCALAPPDATA")?.takeIf { it.isNotBlank() }
-                        val defaultBase = File(localAppData ?: System.getProperty("user.home"), "FlyNarwhal")
-                        if (defaultBase.absolutePath.any { it.code > 127 }) {
-                            val programData = System.getenv("PROGRAMDATA")?.takeIf { it.isNotBlank() } ?: "C:\\ProgramData"
-                            File(programData, "FlyNarwhal")
-                        } else {
-                            defaultBase
-                        }
+                        val exeDir = ExecutableDirectoryDetector.INSTANCE.getExecutableDirectory()
+                        File(exeDir, "app/resources")
                     }
                 }
 

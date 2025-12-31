@@ -71,6 +71,19 @@ object WebViewBootstrap {
 
         if (!started.compareAndSet(false, true)) return
 
+        runCatching {
+            installDir.parentFile?.mkdirs()
+            if (!installDir.exists()) installDir.mkdirs()
+            if (!cacheDir.exists()) cacheDir.mkdirs()
+        }.onFailure { t ->
+            logger.w(t) { "Failed to create KCEF directories: installDir=${installDir.absolutePath}, cacheDir=${cacheDir.absolutePath}" }
+        }
+
+        logger.i {
+            val resourcesDir = System.getProperty("compose.application.resources.dir") ?: "(null)"
+            "KCEF bootstrap starting. version=${BuildConfig.VERSION_NAME}, installDir=${installDir.absolutePath}, cacheDir=${cacheDir.absolutePath}, resourcesDir=$resourcesDir"
+        }
+
         val currentVersion = BuildConfig.VERSION_NAME
 
         var isKcefInitialized = AppSettingsStore.kcefInitialized &&
@@ -183,6 +196,13 @@ object WebViewBootstrap {
                 initError.value = preflightError
                 return
             }
+            logger.i("2.KCEF install directory is complete: ${installDir.absolutePath}")
+
+            val os = System.getProperty("os.name").lowercase()
+            if (os.contains("win")) {
+                val files = installDir.listFiles()?.map { it.name } ?: emptyList()
+                logger.i("KCEF install directory files: $files")
+            }
 
             val initFailure = runCatching {
                 withContext(awtDispatcher) {
@@ -192,6 +212,8 @@ object WebViewBootstrap {
                             settings {
                                 cachePath = cacheDir.absolutePath
                                 logFile = kcefLog.absolutePath
+                                resourcesDirPath = installDir.absolutePath
+                                localesDirPath = File(installDir, "locales").absolutePath
                             }
                             progress {
                                 onInitialized {
@@ -233,10 +255,26 @@ object WebViewBootstrap {
         start(lastInstallDir!!, lastCacheDir!!, lastLogDir!!)
     }
 
+    private fun addLibraryDir(libraryPath: String) {
+        try {
+            val field = ClassLoader::class.java.getDeclaredField("usr_paths")
+            field.isAccessible = true
+            val paths = field.get(null) as Array<String>
+            if (paths.contains(libraryPath)) return
+            val newPaths = paths.copyOf(paths.size + 1)
+            newPaths[paths.size] = libraryPath
+            field.set(null, newPaths)
+            logger.i { "Added to java.library.path: $libraryPath" }
+        } catch (t: Throwable) {
+            logger.w(t) { "Failed to add library path: $libraryPath" }
+        }
+    }
+
     private fun extractBundledKcef(targetInstallDir: File) {
         if (!targetInstallDir.exists()) targetInstallDir.mkdirs()
 
         if (extractBundledKcefFromResourcesDir(targetInstallDir)) return
+        if (extractBundledKcefFromClasspathDirs(targetInstallDir)) return
         if (extractBundledKcefFromClasspathJar(targetInstallDir)) return
 
         logger.w { "Bundled KCEF directory not found in resources dir or classpath, skipping extraction" }
@@ -248,7 +286,35 @@ object WebViewBootstrap {
         val bundledDir = File(resourcesDir, "kcef-bundle")
         if (!bundledDir.exists() || !bundledDir.isDirectory) return false
 
-        logger.i { "Extracting bundled KCEF from resources dir: ${bundledDir.absolutePath} -> ${targetInstallDir.absolutePath}" }
+        return copyBundledDir(
+            bundledDir = bundledDir,
+            targetInstallDir = targetInstallDir,
+            sourceLabel = "resources dir"
+        )
+    }
+
+    private fun extractBundledKcefFromClasspathDirs(targetInstallDir: File): Boolean {
+        val classPath = System.getProperty("java.class.path")?.takeIf { it.isNotBlank() } ?: return false
+        val entries = classPath.split(File.pathSeparatorChar).map { it.trim() }.filter { it.isNotBlank() }
+
+        for (entry in entries) {
+            val dir = File(entry)
+            if (!dir.isDirectory) continue
+
+            val bundledDir = File(dir, "kcef-bundle")
+            if (!bundledDir.isDirectory) continue
+
+            return copyBundledDir(
+                bundledDir = bundledDir,
+                targetInstallDir = targetInstallDir,
+                sourceLabel = "classpath dir"
+            )
+        }
+        return false
+    }
+
+    private fun copyBundledDir(bundledDir: File, targetInstallDir: File, sourceLabel: String): Boolean {
+        logger.i { "Extracting bundled KCEF from $sourceLabel: ${bundledDir.absolutePath} -> ${targetInstallDir.absolutePath}" }
 
         val supportsPosix = FileSystems.getDefault().supportedFileAttributeViews().contains("posix")
         var fileCount = 0
@@ -318,6 +384,16 @@ object WebViewBootstrap {
         val localesDir = File(installDir, "locales")
         val hasLocales = localesDir.isDirectory && localesDir.listFiles()?.any { it.isFile && it.name.endsWith(".pak") } == true
         val hasIcu = File(installDir, "icudtl.dat").isFile
+        
+        // Check for critical binaries on Windows
+        val os = System.getProperty("os.name").lowercase()
+        if (os.contains("win")) {
+            val hasLibCef = File(installDir, "libcef.dll").isFile
+            val hasJcef = File(installDir, "jcef.dll").isFile
+            val hasHelper = File(installDir, "jcef_helper.exe").isFile
+            return hasLocales && hasIcu && hasLibCef && hasJcef && hasHelper
+        }
+        
         return hasLocales && hasIcu
     }
 
