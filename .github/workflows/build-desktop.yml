@@ -282,7 +282,7 @@ jobs:
         shell: bash
         run: |
           # Define common release notes
-          NOTES="1.优化 Webview 组件的初始化逻辑  
+          NOTES="1.集成 Webview 组件到安装包中  
           　  
           此项目已更名为飞鲸影视，可执行程序名称也相应做了更改，从更名前的旧版本升级到新版过程中出现报错提示“Failed to launch application **”属于正常现象，安装成功后把旧的快捷方式从桌面或开始菜单删除即可。  
           　  
