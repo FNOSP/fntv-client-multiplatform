@@ -311,12 +311,12 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
             implementation(libs.androidx.runtime.desktop)
-//            if (System.getProperty("os.name").lowercase().contains("win")) {
-//                implementation("dev.datlag:kcef:2024.04.20.4")
-//            } else {
-//                implementation(libs.kcef)
-//            }
-            implementation(libs.kcef)
+            if (System.getProperty("os.name").lowercase().contains("win")) {
+                implementation("dev.datlag:kcef:2024.04.20.4")
+            } else {
+                implementation(libs.kcef)
+            }
+//            implementation(libs.kcef)
 //            implementation(libs.vlcj)
             implementation(libs.oshi.core)
             implementation(libs.versioncompare)
