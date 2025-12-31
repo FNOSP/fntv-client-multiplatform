@@ -72,6 +72,19 @@ val mergeResources by tasks.registering(Copy::class) {
     into(layout.buildDirectory.dir("mergedResources"))
 }
 
+val stopFntvProxyBeforePackaging by tasks.registering(Exec::class) {
+    enabled = osName.contains("win")
+    isIgnoreExitValue = true
+    commandLine(
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "\$ErrorActionPreference='SilentlyContinue'; Get-Process fntv-proxy | Stop-Process -Force; exit 0"
+    )
+}
+
 // Tasks will be configured after project evaluation to ensure task existence
 afterEvaluate {
     // Ensure resources are prepared before processing
@@ -90,7 +103,10 @@ afterEvaluate {
     
     tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>().configureEach {
         dependsOn(mergeResources)
+        dependsOn(stopFntvProxyBeforePackaging)
     }
+
+    tasks.findByName("createDistributable")?.dependsOn(stopFntvProxyBeforePackaging)
     
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         dependsOn(generateBuildConfig)
