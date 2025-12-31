@@ -79,7 +79,7 @@ object WebViewBootstrap {
                 config {
                     val trustAllCerts = arrayOf<TrustManager>(@Suppress("CustomX509TrustManager")
                     object : X509TrustManager {
-                        override fun getAcceptedIssuers(): Array<X509Certificate>? = null
+                        override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
                         @Suppress("TrustAllX509TrustManager")
                         override fun checkClientTrusted(certs: Array<X509Certificate>, authType: String) {}
                         @Suppress("TrustAllX509TrustManager")
