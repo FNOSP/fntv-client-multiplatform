@@ -240,15 +240,18 @@ fun LoginScreen(
             }
 
             is UiState.Error -> {
-                // 登录失败，可以显示错误信息
+                // 登录失败，显示错误信息
+                if (state.message.contains("not verified")) {
+                    toastManager.showToast("证书校验失败，暂时不支持自签证书，请使用 HTTP 端口访问", ToastType.Failed)
+                }
                 toastManager.showToast("登录失败，${state.message}", ToastType.Failed)
                 logger.e("登录失败: ${state.message}")
 
                 // 检查是否是证书错误
-                if (state.message.contains("PKIX path building failed") || state.message.contains("unable to find valid certification path")) {
-                    // Todo 这里应该显示一个对话框询问用户是否信任证书
-                    logger.w("检测到SSL证书错误，需要用户确认是否信任证书")
-                }
+//                if (state.message.contains("PKIX path building failed") || state.message.contains("unable to find valid certification path")) {
+//                    // Todo 这里应该显示一个对话框询问用户是否信任证书
+//                    logger.w("检测到SSL证书错误，需要用户确认是否信任证书")
+//                }
             }
 
             else -> {
