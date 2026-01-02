@@ -20,7 +20,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -111,7 +116,6 @@ import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.ui.component.common.dialog.AddNasSubtitleDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.CustomContentDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.SubtitleSearchDialog
-import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.component.player.EpisodeSelectionFlyout
 import com.jankinwu.fntv.client.ui.component.player.FullScreenControl
 import com.jankinwu.fntv.client.ui.component.player.NextEpisodePreviewFlyout
@@ -196,14 +200,15 @@ data class PlayerState(
     val isVisible: Boolean = false,
     val isUiVisible: Boolean = true,
     val isLoading: Boolean = false,
-    val itemGuid: String = "",
+    var itemGuid: String = "",
     val mediaTitle: String = "",
     val subhead: String = "",
-    val duration: Long = 0L,
+    var duration: Long = 0L,
     val isEpisode: Boolean = false
 )
 
 class PlayerManager {
+    val toastManager: ToastManager = ToastManager()
     var playerState: PlayerState by mutableStateOf(PlayerState())
     var keyFocusRequestSerial: Int by mutableIntStateOf(0)
     var isPipMode: Boolean by mutableStateOf(false)
@@ -273,6 +278,7 @@ fun PlayerOverlay(
     // 控制UI可见性的状态
     var uiVisible by remember { mutableStateOf(true) }
     val playerManager = LocalPlayerManager.current
+    val toastManager = playerManager.toastManager
     LaunchedEffect(uiVisible) {
         playerManager.setUiVisible(uiVisible)
     }
@@ -377,10 +383,11 @@ fun PlayerOverlay(
         playRecordViewModel,
         playerViewModel,
         playerManager,
-        mp4Parser
+        mp4Parser,
+        toastManager
     ) {
         { episodeGuid: String ->
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
                 // 1. Quit current media if needed
                 if (playingInfoCache?.isUseDirectLink == false) {
                     mediaPViewModel.quit(
@@ -404,6 +411,7 @@ fun PlayerOverlay(
                         playRecordViewModel = playRecordViewModel,
                         playerViewModel = playerViewModel,
                         playerManager = playerManager,
+                        toastManager = toastManager,
                         mediaGuid = null,
                         currentAudioGuid = null,
                         currentSubtitleGuid = null,
@@ -425,6 +433,80 @@ fun PlayerOverlay(
             episodeList[currentEpisodeIndex + 1]
         } else {
             null
+        }
+    }
+
+    // Skip Outro State
+    var showSkipOutroPrompt by remember { mutableStateOf(false) }
+    var skipOutroCancelled by remember { mutableStateOf(false) }
+    var skipOutroCountdown by remember { mutableIntStateOf(5) }
+    var showEndScreen by remember { mutableStateOf(false) }
+
+    LaunchedEffect(playingInfoCache?.itemGuid) {
+        showSkipOutroPrompt = false
+        skipOutroCancelled = false
+        skipOutroCountdown = 5
+        showEndScreen = false
+    }
+
+    val totalDuration = remember(playerManager.playerState.itemGuid) {
+        playerManager.playerState.duration
+    }
+    val playConfig = playingInfoCache?.playConfig
+    val skipEnding = playConfig?.skipEnding ?: 0
+
+    // Intro Skip
+//    LaunchedEffect(playingInfoCache?.itemGuid, playConfig) {
+//        val skipOpening = playConfig?.skipOpening ?: 0
+//        if (skipOpening > 0) {
+//            delay(500)
+//            val currentPos = mediaPlayer.currentPositionMillis.value
+//            if (currentPos < skipOpening * 1000) {
+//                mediaPlayer.seekTo(skipOpening * 1000L)
+//                toastManager.showToast("已为您自动跳过片头", ToastType.Info)
+//            }
+//        }
+//    }
+
+    // Outro Skip Monitor
+    LaunchedEffect(currentPosition, playConfig, skipOutroCancelled, totalDuration) {
+        if (skipEnding > 0 && totalDuration > 0) {
+            val skipPoint = totalDuration - skipEnding * 1000L
+            if (currentPosition >= skipPoint) {
+                if (!showSkipOutroPrompt && !showEndScreen && !skipOutroCancelled) {
+                    showSkipOutroPrompt = true
+                    skipOutroCountdown = 5
+                }
+            } else {
+                if (showSkipOutroPrompt) {
+                    showSkipOutroPrompt = false
+                }
+                if (showEndScreen) {
+                    showEndScreen = false
+                }
+                if (skipOutroCancelled) {
+                    skipOutroCancelled = false
+                }
+            }
+        }
+    }
+
+    // Countdown
+    LaunchedEffect(showSkipOutroPrompt) {
+        if (showSkipOutroPrompt) {
+            while (skipOutroCountdown > 0) {
+                delay(1000)
+                skipOutroCountdown--
+            }
+            if (showSkipOutroPrompt && !skipOutroCancelled) {
+                showSkipOutroPrompt = false
+                if (nextEpisode != null) {
+                    playEpisode(nextEpisode.guid)
+                } else {
+                    showEndScreen = true
+                    mediaPlayer.pause()
+                }
+            }
         }
     }
 
@@ -531,7 +613,7 @@ fun PlayerOverlay(
     val iso6391State by tagViewModel.iso6391State.collectAsState()
     val iso6392State by tagViewModel.iso6392State.collectAsState()
     val iso3166State by tagViewModel.iso3166State.collectAsState()
-    val toastManager = rememberToastManager()
+//    val toastManager = rememberToastManager()
     var isoTagData by remember {
         mutableStateOf(
             IsoTagData(
@@ -630,7 +712,7 @@ fun PlayerOverlay(
             { targetTrimId: String? ->
                 val cache = playerViewModel.playingInfoCache.value
                 if (cache != null) {
-                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
                         try {
                             val userInfoState = userInfoViewModel.uiState.value
                             val userInfo = when (userInfoState) {
@@ -801,7 +883,7 @@ fun PlayerOverlay(
         }
     }
 
-    val totalDuration = playerManager.playerState.duration
+    // val totalDuration = playerManager.playerState.duration
     val videoProgress = if (totalDuration > 0) {
         (currentPosition.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
     } else {
@@ -922,7 +1004,7 @@ fun PlayerOverlay(
     var surfaceRecreateKey by remember { mutableIntStateOf(0) }
     var lastMinimized by remember { mutableStateOf(isMinimized) }
     var lastWindowFocused by remember { mutableStateOf(isWindowFocused) }
-    val focusRequester = remember { FocusRequester() }
+    val playerFocusRequester = remember { FocusRequester() }
     val keyFocusRequestSerial = playerManager.keyFocusRequestSerial
 
     LaunchedEffect(isMinimized, isWindowFocused) {
@@ -931,9 +1013,9 @@ fun PlayerOverlay(
         if (restoredFromMinimize || regainedFocus) {
             surfaceRecreateKey++
             if (isWindowFocused) {
-                focusRequester.requestFocus()
+                playerFocusRequester.requestFocus()
                 delay(50)
-                focusRequester.requestFocus()
+                playerFocusRequester.requestFocus()
             }
         }
         lastMinimized = isMinimized
@@ -941,9 +1023,9 @@ fun PlayerOverlay(
     }
 
     LaunchedEffect(keyFocusRequestSerial) {
-        focusRequester.requestFocus()
+        playerFocusRequester.requestFocus()
         delay(50)
-        focusRequester.requestFocus()
+        playerFocusRequester.requestFocus()
     }
 
     // region Window Resize Logic
@@ -1061,7 +1143,7 @@ fun PlayerOverlay(
     // endregion
     LaunchedEffect(windowState.placement, isWindowFocused) {
         if (isWindowFocused) {
-            focusRequester.requestFocus()
+            playerFocusRequester.requestFocus()
         }
     }
 
@@ -1093,7 +1175,7 @@ fun PlayerOverlay(
                         { lastVolume = it }
                     )
                 }
-                .focusRequester(focusRequester)
+                .focusRequester(playerFocusRequester)
                 .focusable()
                 .pointerHoverIcon(
                     if (isCursorVisible) PointerIcon.Hand else HiddenPointerIcon,
@@ -1147,6 +1229,38 @@ fun PlayerOverlay(
                 }
             }
 
+            if (showSkipOutroPrompt) {
+                SkipOutroPrompt(
+                    countdown = skipOutroCountdown,
+                    onCancel = {
+                        skipOutroCancelled = true
+                        showSkipOutroPrompt = false
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(bottom = 120.dp, start = 32.dp)
+                )
+            }
+
+            if (showEndScreen) {
+                EndScreen(
+                    playingInfoCache = playingInfoCache,
+                    mediaPlayer = mediaPlayer,
+                    onBack = onBack,
+                    onReplay = {
+                        showEndScreen = false
+                        val skipOpening = playingInfoCache?.playConfig?.skipOpening ?: 0
+                        if (skipOpening > 0) {
+                            mediaPlayer.seekTo(skipOpening * 1000L)
+                            toastManager.showToast("已为您自动跳过片头", ToastType.Info)
+                        } else {
+                            mediaPlayer.seekTo(0)
+                        }
+                        mediaPlayer.resume()
+                    }
+                )
+            }
+
             if (windowState.placement != WindowPlacement.Fullscreen) {
                 // 添加标题栏占位区域，允许窗口拖动
                 draggableArea {
@@ -1196,7 +1310,17 @@ fun PlayerOverlay(
                         isSeeking = true
                         val seekPosition = (newProgress * totalDuration).toLong()
                         mediaPlayer.seekTo(seekPosition)
-                        logger.i("Seek to: ${newProgress * 100}%")
+                        logger.i(
+                            "Seek to: ${newProgress * 100}%，seekPosition: ${
+                                FnDataConvertor.formatDurationToDateTime(
+                                    seekPosition
+                                )
+                            }, totalDuration: ${
+                                FnDataConvertor.formatDurationToDateTime(
+                                    totalDuration
+                                )
+                            }"
+                        )
 
                         // Force update subtitle on seek
                         if (hlsSubtitleUtil != null) {
@@ -1348,7 +1472,8 @@ fun PlayerOverlay(
                     },
                     isNextEpisodeHovered = isNextEpisodeHovered,
                     onNextEpisodeHoverChanged = { isNextEpisodeHovered = it },
-                    playRecordViewModel = playRecordViewModel
+                    playRecordViewModel = playRecordViewModel,
+                    onSkipConfigChanged = { o, e -> playerViewModel.updateSkipConfig(o, e) }
                 )
             }
 
@@ -1414,6 +1539,108 @@ fun buildEpisodeTitle(mediaTitle: String, subhead: String): AnnotatedString {
         }
     }
     return annotatedString
+}
+
+@Composable
+private fun SkipOutroPrompt(
+    countdown: Int,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+    ) {
+        androidx.compose.material3.Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = Color(0xFF2B2B2B).copy(alpha = 0.9f),
+            contentColor = Color.White
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${countdown}s 后将自动跳过片尾并播放下集",
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "取消跳过",
+                    color = Color(0xFF3B82F6),
+                    fontSize = 14.sp,
+                    modifier = Modifier.clickable {
+                        onCancel()
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EndScreen(
+    playingInfoCache: PlayingInfoCache?,
+    mediaPlayer: MediampPlayer,
+    onBack: () -> Unit,
+    onReplay: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.95f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "${
+                    playingInfoCache?.item?.episodeNumber?.toString()?.padStart(2, '0')
+                }. ${playingInfoCache?.item?.title ?: ""}",
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Text(
+                text = "${playingInfoCache?.item?.runtime} 分钟",
+                color = Color.Gray,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            Row {
+                androidx.compose.material3.Button(
+                    onClick = onReplay,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(
+                            alpha = 0.1f
+                        )
+                    )
+                ) {
+                    Icon(Icons.Default.Refresh, null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("重新播放", color = Color.White)
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                androidx.compose.material3.Button(
+                    onClick = onBack,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(
+                            alpha = 0.1f
+                        )
+                    )
+                ) {
+                    Icon(Icons.Default.Home, null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("回到首页", color = Color.White)
+                }
+            }
+        }
+    }
 }
 
 fun buildMacOsEpisodeTitle(mediaTitle: String, subhead: String): AnnotatedString {
@@ -1488,8 +1715,10 @@ fun PlayerControlRow(
     onPlayNextEpisode: (() -> Unit)? = null,
     isNextEpisodeHovered: Boolean = false,
     onNextEpisodeHoverChanged: ((Boolean) -> Unit)? = null,
-    playRecordViewModel: PlayRecordViewModel
+    playRecordViewModel: PlayRecordViewModel,
+    onSkipConfigChanged: ((Int, Int) -> Unit)? = null
 ) {
+    val currentPositionMillis by mediaPlayer.currentPositionMillis.collectAsState()
     val interactionSource = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1666,12 +1895,20 @@ fun PlayerControlRow(
             PlayerSettingsMenu(
                 playingInfoCache = playingInfoCache,
                 isoTagData = isoTagData,
+                currentPositionMillis = currentPositionMillis,
+                totalDurationMillis = totalDuration,
                 onAudioSelected = { audio ->
                     onAudioSelected?.invoke(audio)
                 },
                 onWindowAspectRatioChanged = onWindowAspectRatioChanged,
+                onSkipConfigChanged = { opening, ending ->
+                    onSkipConfigChanged?.invoke(
+                        opening,
+                        ending
+                    )
+                },
                 modifier = Modifier.padding(start = 12.dp),
-                onHoverStateChanged = onSettingsMenuHoverChanged
+                onHoverStateChanged = { onSettingsMenuHoverChanged?.invoke(it) }
             )
             val audioLevelController =
                 remember(mediaPlayer) { mediaPlayer.features[AudioLevelController] }
@@ -1779,6 +2016,7 @@ fun rememberPlayMediaFunction(
     val playerViewModel: PlayerViewModel = koinViewModel()
     val mp4Parser: Mp4Parser = koinInject()
     val playerManager = LocalPlayerManager.current
+    val toastManager = LocalToastManager.current
     return remember(
         streamViewModel,
         playPlayViewModel,
@@ -1786,13 +2024,14 @@ fun rememberPlayMediaFunction(
         guid,
         player,
         playerManager,
+        toastManager,
         mediaGuid,
         currentAudioGuid,
         currentSubtitleGuid,
         mp4Parser
     ) {
         {
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
                 try {
                     playerManager.setLoading(true)
                     playMedia(
@@ -1805,6 +2044,75 @@ fun rememberPlayMediaFunction(
                         playRecordViewModel = playRecordViewModel,
                         playerViewModel = playerViewModel,
                         playerManager = playerManager,
+                        toastManager = toastManager,
+                        mediaGuid = mediaGuid,
+                        currentAudioGuid = currentAudioGuid,
+                        currentSubtitleGuid = currentSubtitleGuid,
+                        mp4Parser = mp4Parser
+                    )
+                } finally {
+                    playerManager.setLoading(false)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun rememberPlayMediaByGuidFunction(
+    player: MediampPlayer,
+    mediaGuid: String? = null,
+    currentAudioGuid: String? = null,
+    currentSubtitleGuid: String? = null
+): (String) -> Unit {
+    val streamViewModel: StreamViewModel = koinViewModel()
+    val playPlayViewModel: PlayPlayViewModel = koinViewModel()
+    val playInfoViewModel: PlayInfoViewModel = koinViewModel()
+    val userInfoViewModel: UserInfoViewModel = koinViewModel()
+    val playRecordViewModel: PlayRecordViewModel = koinViewModel()
+    val playerViewModel: PlayerViewModel = koinViewModel()
+    val mediaPViewModel: MediaPViewModel = koinViewModel()
+    val playingInfoCache by playerViewModel.playingInfoCache.collectAsState()
+    val mp4Parser: Mp4Parser = koinInject()
+    val playerManager = LocalPlayerManager.current
+    val toastManager = playerManager.toastManager
+    return remember(
+        streamViewModel,
+        playPlayViewModel,
+        playerViewModel,
+        mediaPViewModel,
+        playingInfoCache,
+        player,
+        playerManager,
+        mediaGuid,
+        currentAudioGuid,
+        currentSubtitleGuid,
+        mp4Parser
+    ) {
+        { guid: String ->
+            kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                if (playingInfoCache?.isUseDirectLink == false) {
+                    mediaPViewModel.quit(
+                        MediaPRequest(
+                            playLink = playingInfoCache?.playLink ?: ""
+                        ),
+                        updateState = false
+                    )
+                }
+
+                try {
+                    playerManager.setLoading(true)
+                    playMedia(
+                        guid = guid,
+                        player = player,
+                        playInfoViewModel = playInfoViewModel,
+                        userInfoViewModel = userInfoViewModel,
+                        streamViewModel = streamViewModel,
+                        playPlayViewModel = playPlayViewModel,
+                        playRecordViewModel = playRecordViewModel,
+                        playerViewModel = playerViewModel,
+                        playerManager = playerManager,
+                        toastManager = toastManager,
                         mediaGuid = mediaGuid,
                         currentAudioGuid = currentAudioGuid,
                         currentSubtitleGuid = currentSubtitleGuid,
@@ -1828,6 +2136,7 @@ private suspend fun playMedia(
     playRecordViewModel: PlayRecordViewModel,
     playerViewModel: PlayerViewModel,
     playerManager: PlayerManager,
+    toastManager: ToastManager,
     mediaGuid: String?,
     currentAudioGuid: String?,
     currentSubtitleGuid: String?,
@@ -1835,14 +2144,20 @@ private suspend fun playMedia(
 ) {
     try {
         // 1. Fetch Basic Info (IO)
-        val (playInfoResponse, userInfo, streamInfo) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val (playInfoResponse, userInfo, streamInfo) = withContext(Dispatchers.IO) {
             val p = playInfoViewModel.loadDataAndWait(guid, mediaGuid)
             val u = getUserInfo(userInfoViewModel)
             val s = fetchStreamInfo(p, u, streamViewModel)
             Triple(p, u, s)
         }
 
-        val startPosition: Long = playInfoResponse.ts.toLong() * 1000
+        var startPosition: Long = playInfoResponse.ts.toLong() * 1000
+        var isSkippedIntro = false
+        val skipOpening = playInfoResponse.playConfig?.skipOpening ?: 0
+        if (skipOpening > 0 && startPosition < skipOpening * 1000L) {
+            startPosition = skipOpening * 1000L
+            isSkippedIntro = true
+        }
         val videoStream = streamInfo.videoStream
         val audioStream =
             streamInfo.audioStreams?.firstOrNull { audioStream -> audioStream.guid == playInfoResponse.audioGuid }
@@ -1865,6 +2180,9 @@ private suspend fun playMedia(
         )
         playerViewModel.updatePlayingInfo(cache)
 
+        // 切换分集时需要更新总时长
+        playerManager.playerState.duration = playInfoResponse.item.duration.toLong()
+        playerManager.playerState.itemGuid = playInfoResponse.item.guid
         // 显示播放器
         showPlayerUI(playInfoResponse, videoStream, playerManager, guid)
 
@@ -1876,7 +2194,7 @@ private suspend fun playMedia(
             createPlayRequest(videoStream, fileStream, audioGuid, subtitleGuid, forcedSdr)
 
         // 获取播放链接
-        val playLinkResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val playLinkResult = withContext(Dispatchers.IO) {
             resolvePlayLink(
                 playRequest,
                 cache,
@@ -1932,6 +2250,9 @@ private suspend fun playMedia(
             extraFiles,
             isM3u8
         )
+        if (isSkippedIntro) {
+            playerManager.toastManager.showToast("已为您自动跳过片头", ToastType.Info)
+        }
         // 调用playRecord接口
         callPlayRecord(
 //            itemGuid = guid,
@@ -2162,7 +2483,9 @@ private fun createPlayingInfoCache(
         currentQuality = currentQuality,
         currentAudioStreamList = streamInfo.audioStreams,
         currentSubtitleStreamList = streamInfo.subtitleStreams,
-        isEpisode = playInfoResponse.type == FnTvMediaType.EPISODE.value
+        isEpisode = playInfoResponse.type == FnTvMediaType.EPISODE.value,
+        playConfig = playInfoResponse.playConfig,
+        item = playInfoResponse.item
     )
 }
 
@@ -2742,7 +3065,8 @@ fun PlayerBottomBar(
     onNextEpisode: (() -> Unit)? = null,
     isNextEpisodeHovered: Boolean = false,
     onNextEpisodeHoverChanged: ((Boolean) -> Unit)? = null,
-    playRecordViewModel: PlayRecordViewModel
+    playRecordViewModel: PlayRecordViewModel,
+    onSkipConfigChanged: ((Int, Int) -> Unit)? = null
 ) {
     Column(
         modifier = Modifier
@@ -2766,7 +3090,9 @@ fun PlayerBottomBar(
                 player = mediaPlayer,
                 totalDuration = playerManager.playerState.duration,
                 onSeek = onSeek,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                skipOpening = playingInfoCache?.playConfig?.skipOpening ?: 0,
+                skipEnding = playingInfoCache?.playConfig?.skipEnding ?: 0
             )
             // 播放器控制行
             PlayerControlRow(
@@ -2803,7 +3129,8 @@ fun PlayerBottomBar(
                 onPlayNextEpisode = onNextEpisode,
                 isNextEpisodeHovered = isNextEpisodeHovered,
                 onNextEpisodeHoverChanged = onNextEpisodeHoverChanged,
-                playRecordViewModel = playRecordViewModel
+                playRecordViewModel = playRecordViewModel,
+                onSkipConfigChanged = onSkipConfigChanged
             )
         }
     }

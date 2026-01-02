@@ -1,16 +1,24 @@
 package com.jankinwu.fntv.client.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.jankinwu.fntv.client.data.model.PlayingInfoCache
 import com.jankinwu.fntv.client.data.model.SubtitleSettings
+import com.jankinwu.fntv.client.data.model.request.SetConfigByItemRequest
+import com.jankinwu.fntv.client.data.model.response.PlayConfig
 import com.jankinwu.fntv.client.data.model.response.StreamResponse
 import com.jankinwu.fntv.client.data.model.response.SubtitleStream
+import com.jankinwu.fntv.client.data.network.impl.FnOfficialApiImpl
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import org.koin.java.KoinJavaComponent.inject
 
 class PlayerViewModel : ViewModel() {
+    private val fnOfficialApi: FnOfficialApiImpl by inject(FnOfficialApiImpl::class.java)
+
     private val _playingInfoCache = MutableStateFlow<PlayingInfoCache?>(null)
     val playingInfoCache: StateFlow<PlayingInfoCache?> = _playingInfoCache.asStateFlow()
 
@@ -35,6 +43,34 @@ class PlayerViewModel : ViewModel() {
                 currentSubtitleStreamList = subtitleStreams,
                 streamInfo = streamInfo
             )
+        }
+    }
+
+    fun updateSkipConfig(skipOpening: Int, skipEnding: Int) {
+        val currentInfo = _playingInfoCache.value ?: return
+        val guid = currentInfo.playConfig?.guid ?: currentInfo.parentGuid ?: return
+
+        val newConfig = currentInfo.playConfig?.copy(
+            skipOpening = skipOpening,
+            skipEnding = skipEnding
+        ) ?: PlayConfig(guid = guid, skipOpening = skipOpening, skipEnding = skipEnding)
+
+        _playingInfoCache.update { current ->
+            current?.copy(playConfig = newConfig)
+        }
+
+        viewModelScope.launch {
+            try {
+                fnOfficialApi.setConfigByItem(
+                    SetConfigByItemRequest(
+                        guid = guid,
+                        skipOpening = skipOpening,
+                        skipEnding = skipEnding
+                    )
+                )
+            } catch (e: Exception) {
+                // Ignore error for now
+            }
         }
     }
 }

@@ -79,10 +79,24 @@ class FileLogWriter(private val logDir: File) : LogWriter() {
         var masked = message
         // Mask password in JSON and toString()
         masked = masked.replace(Regex("(\"password\"\\s*:\\s*\")[^\"]+(\")"), "$1******$2")
-        masked = masked.replace(Regex("(?i)(password\\s*=\\s*)[^,\\s)]+"), "$1******")
+        masked = masked.replace(Regex("(?i)(password\\s*[=:]\\s*)[^,\\s)]+"), "$1******")
         // Mask username in JSON and toString()
         masked = masked.replace(Regex("(\"username\"\\s*:\\s*\")[^\"]+(\")"), "$1******$2")
-        masked = masked.replace(Regex("(?i)(username\\s*=\\s*)[^,\\s)]+"), "$1******")
+        masked = masked.replace(Regex("(?i)(username\\s*[=:]\\s*)[^,\\s)]+"), "$1******")
+        // Mask source_name in JSON and toString()
+        masked = masked.replace(Regex("(\"source_name\"\\s*:\\s*\")[^\"]+(\")"), "$1******$2")
+        masked = masked.replace(Regex("(?i)(source_name\\s*[=:]\\s*)[^,\\s)]+"), "$1******")
+        // Mask token in JSON and toString()
+        masked = masked.replace(Regex("(\"token\"\\s*:\\s*\")[^\"]+(\")"), "$1******$2")
+        masked = masked.replace(Regex("(?i)(token\\s*[=:]\\s*)[^,\\s)\"]+"), "$1******")
+        // Mask cookie in headers and strings
+        masked = masked.replace(Regex("(?i)(cookie\\s*[=:]\\s*)[^;\\s,)]+"), "$1******")
+        // Mask subdomain for .5ddd.com URLs (special rule)
+        masked = masked.replace(Regex("(https?://)[^./]+\\.5ddd\\.com"), "$1***.5ddd.com")
+        // Mask domain or IP in other URLs
+        masked = masked.replace(Regex("(https?://)(?![^/\\s]+\\.5ddd\\.com)[^/\\s]+"), "$1***")
+        // Mask user folder in file paths (Windows, macOS, Linux)
+        masked = masked.replace(Regex("(?i)([a-z]:\\\\Users\\\\|/Users/|/home/)([^\\\\/\\s]+)"), "$1***")
         return masked
     }
     

@@ -47,7 +47,9 @@ fun VideoPlayerProgressBar(
     player: MediampPlayer,
     totalDuration: Long,
     onSeek: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    skipOpening: Int = 0,
+    skipEnding: Int = 0
 ) {
     // 获取当前播放位置
     val currentPosition by player.currentPositionMillis.collectAsState()
@@ -63,6 +65,22 @@ fun VideoPlayerProgressBar(
             }
         }
     }
+    
+    val skipOpeningRatio = remember(skipOpening, totalDuration) {
+        if (totalDuration > 0 && skipOpening > 0) {
+            (skipOpening * 1000f) / totalDuration
+        } else {
+            0f
+        }
+    }
+
+    val skipEndingRatio = remember(skipEnding, totalDuration) {
+        if (totalDuration > 0 && skipEnding > 0) {
+            ((totalDuration - skipEnding * 1000f) / totalDuration).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+    }
 
     // 其余部分保持不变，只是将 progress 参数替换为 displayPositionRatio
     VideoPlayerProgressBarImpl(
@@ -70,7 +88,9 @@ fun VideoPlayerProgressBar(
         buffered = 0f, // 如果需要缓冲进度，可以类似处理
         totalDuration = totalDuration,
         onSeek = onSeek,
-        modifier = modifier
+        modifier = modifier,
+        skipOpeningRatio = skipOpeningRatio,
+        skipEndingRatio = skipEndingRatio
     )
 }
 
@@ -90,7 +110,9 @@ fun VideoPlayerProgressBarImpl(
     buffered: Float,
     totalDuration: Long,
     onSeek: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    skipOpeningRatio: Float = 0f,
+    skipEndingRatio: Float = 0f
 ) {
     var isHovered by remember { mutableStateOf(false) }
     var isDragging by remember { mutableStateOf(false) }
@@ -180,6 +202,31 @@ fun VideoPlayerProgressBarImpl(
                             strokeWidth = trackStrokeWidth,
                             cap = StrokeCap.Round
                         )
+                    }
+
+                    // Draw markers for skip intro/outro
+                    val markerXList = listOfNotNull(
+                        if (skipOpeningRatio > 0f && skipOpeningRatio < 1f) skipOpeningRatio * size.width else null,
+                        if (skipEndingRatio > 0f && skipEndingRatio < 1f) skipEndingRatio * size.width else null
+                    )
+
+                    markerXList.forEach { x ->
+                        if (showDetails) {
+                            // When expanded, draw a vertical line
+                            drawLine(
+                                color = Color.White,
+                                start = Offset(x, 0f),
+                                end = Offset(x, size.height),
+                                strokeWidth = 2.dp.toPx()
+                            )
+                        } else {
+                            // When collapsed, draw a small dot
+                            drawCircle(
+                                color = Color.White,
+                                radius = 1.dp.toPx(),
+                                center = Offset(x, trackYCenter)
+                            )
+                        }
                     }
 
                     // 4. 白色的圆形滑块 (仅在悬停或拖动时显示)

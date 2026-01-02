@@ -8,6 +8,7 @@ import com.jankinwu.fntv.client.data.model.request.PlayPlayRequest
 import com.jankinwu.fntv.client.data.model.request.PlayRecordRequest
 import com.jankinwu.fntv.client.data.model.request.ScrapRescrapRequest
 import com.jankinwu.fntv.client.data.model.request.ScrapSearchRequest
+import com.jankinwu.fntv.client.data.model.request.SetConfigByItemRequest
 import com.jankinwu.fntv.client.data.model.request.StreamRequest
 import com.jankinwu.fntv.client.data.model.request.SubtitleDownloadRequest
 import com.jankinwu.fntv.client.data.model.request.SubtitleMarkRequest
@@ -99,6 +100,8 @@ interface FnOfficialApi {
 
     suspend fun getFilesByServerPath(path: String): List<ServerPathResponse>
 
+    suspend fun setConfigByItem(request: SetConfigByItemRequest): Boolean
+    
     suspend fun subtitleMark(request: SubtitleMarkRequest): List<SubtitleMarkResponse>
 
     suspend fun subtitleSearch(request: SubtitleSearchRequest): SubtitleSearchResponse

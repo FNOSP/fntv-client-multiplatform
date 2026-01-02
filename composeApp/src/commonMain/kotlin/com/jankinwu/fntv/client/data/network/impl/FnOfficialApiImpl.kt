@@ -15,6 +15,7 @@ import com.jankinwu.fntv.client.data.model.request.PlayPlayRequest
 import com.jankinwu.fntv.client.data.model.request.PlayRecordRequest
 import com.jankinwu.fntv.client.data.model.request.ScrapRescrapRequest
 import com.jankinwu.fntv.client.data.model.request.ScrapSearchRequest
+import com.jankinwu.fntv.client.data.model.request.SetConfigByItemRequest
 import com.jankinwu.fntv.client.data.model.request.StreamRequest
 import com.jankinwu.fntv.client.data.model.request.SubtitleDownloadRequest
 import com.jankinwu.fntv.client.data.model.request.SubtitleMarkRequest
@@ -265,6 +266,10 @@ class FnOfficialApiImpl() : FnOfficialApi {
 
     override suspend fun seasonList(guid: String): List<SeasonListResponse> {
         return get("/v/api/v1/season/list/$guid")
+    }
+
+    override suspend fun setConfigByItem(request: SetConfigByItemRequest): Boolean {
+        return post("/v/api/v1/play/setConfigByItem", request)
     }
 
     private suspend inline fun <reified T> get(

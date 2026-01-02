@@ -90,14 +90,29 @@ object KcefBundleDownloader {
     }
 
     private suspend fun installKcef(builder: KCEFBuilder): KCEFBuilder {
-        val method = KCEFBuilder::class.java.getDeclaredMethod("install\$kcef", Continuation::class.java)
-        method.isAccessible = true
-
         @Suppress("UNCHECKED_CAST")
         return suspendCoroutine { cont ->
-            runCatching {
-                method.invoke(builder, cont)
-            }.onSuccess { result ->
+            val run = runCatching {
+                val builderClass = KCEFBuilder::class.java
+                val candidates = listOf("install\$kcef", "install")
+                val builderMethod = candidates.firstNotNullOfOrNull { name ->
+                    runCatching { builderClass.getDeclaredMethod(name, Continuation::class.java) }.getOrNull()
+                }
+                if (builderMethod != null) {
+                    builderMethod.isAccessible = true
+                    return@runCatching builderMethod.invoke(builder, cont)
+                }
+
+                val cClass = Class.forName("dev.datlag.kcef.c")
+                val staticMethod = candidates.firstNotNullOfOrNull { name ->
+                    runCatching { cClass.getDeclaredMethod(name, KCEFBuilder::class.java, Continuation::class.java) }.getOrNull()
+                } ?: error("No compatible KCEF install method found")
+
+                staticMethod.isAccessible = true
+                staticMethod.invoke(null, builder, cont)
+            }
+
+            run.onSuccess { result ->
                 if (result != COROUTINE_SUSPENDED) {
                     cont.resume(result as KCEFBuilder)
                 }

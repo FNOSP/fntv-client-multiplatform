@@ -322,6 +322,7 @@ fun main() {
                                     error = webViewInitError,
                                     onDismiss = { errorDialogDismissed = true }
                                 )
+                                logger.e("KCEF init error", webViewInitError)
                             }
 
                             WindowFrame(
@@ -534,6 +535,7 @@ fun main() {
                                         error = webViewInitError,
                                         onDismiss = { errorDialogDismissed = true }
                                     )
+                                    logger.e("KCEF init error", webViewInitError)
                                 }
 
                                 WindowFrame(

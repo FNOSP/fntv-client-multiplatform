@@ -15,7 +15,7 @@ data class PlayInfoResponse(
     val parentGuid: String,
 
     @param:JsonProperty("play_config")
-    val playConfig: Any?,
+    val playConfig: PlayConfig?,
 
     @param:JsonProperty("ts")
     val ts: Int,
@@ -40,6 +40,18 @@ data class PlayInfoResponse(
 
     @param:JsonProperty("direct_link_audio_index")
     val directLinkAudioIndex: Int
+)
+
+@Immutable
+data class PlayConfig(
+    @param:JsonProperty("guid")
+    val guid: String,
+
+    @param:JsonProperty("skip_opening")
+    val skipOpening: Int,
+
+    @param:JsonProperty("skip_ending")
+    val skipEnding: Int
 )
 
 @Immutable

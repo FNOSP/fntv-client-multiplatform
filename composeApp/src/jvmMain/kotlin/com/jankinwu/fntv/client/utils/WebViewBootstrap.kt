@@ -1,12 +1,15 @@
 package com.jankinwu.fntv.client.utils
 
 import co.touchlab.kermit.Logger
+import co.touchlab.kermit.Severity
 import com.jankinwu.fntv.client.BuildConfig
 import com.jankinwu.fntv.client.data.store.AppSettingsStore
-
-import co.touchlab.kermit.Severity
 import dev.datlag.kcef.KCEF
-import dev.datlag.kcef.KCEFBuilder
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.ContentType
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,32 +18,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import java.awt.EventQueue
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import java.util.jar.JarFile
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.serialization.kotlinx.json.json
-import kotlinx.serialization.json.Json
-import io.ktor.http.ContentType
+import java.util.jar.JarFile
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
+import kotlin.coroutines.CoroutineContext
 
 object WebViewBootstrap {
     private val logger = Logger.withTag("WebViewBootstrap")
@@ -169,25 +161,8 @@ object WebViewBootstrap {
                     }
 
                     if (!isKcefInstallComplete(installDir)) {
+                        logger.w { "Bundled KCEF is missing or incomplete, will download during KCEF.init: ${installDir.absolutePath}" }
                         installDir.deleteRecursively()
-                        val builder = KCEFBuilder()
-                            .installDir(installDir)
-                            .settings {
-                                cachePath = cacheDir.absolutePath
-                                logFile = kcefLog.absolutePath
-                            }
-                            .download {
-                                github()
-                                client(kcefClient)
-                            }
-
-                        withTimeout(30L * 60L * 1000L) {
-                            installKcef(builder)
-                        }
-                    }
-
-                    if (!isKcefInstallComplete(installDir)) {
-                        error("KCEF install directory is incomplete: ${installDir.absolutePath}")
                     }
                 }.exceptionOrNull()
             }
@@ -370,7 +345,6 @@ object WebViewBootstrap {
         val hasLocales = localesDir.isDirectory && localesDir.listFiles()?.any { it.isFile && it.name.endsWith(".pak") } == true
         val hasIcu = File(installDir, "icudtl.dat").isFile
         
-        // Check for critical binaries on Windows
         val os = System.getProperty("os.name").lowercase()
         if (os.contains("win")) {
             val hasLibCef = File(installDir, "libcef.dll").isFile
@@ -378,26 +352,24 @@ object WebViewBootstrap {
             val hasHelper = File(installDir, "jcef_helper.exe").isFile
             return hasLocales && hasIcu && hasLibCef && hasJcef && hasHelper
         }
+
+        if (os.contains("mac")) {
+            val frameworkDir = File(installDir, "Chromium Embedded Framework.framework")
+            val hasFramework = frameworkDir.isDirectory &&
+                File(frameworkDir, "Chromium Embedded Framework").isFile
+            val hasJcefApp = File(installDir, "jcef_app.app").isDirectory
+            val hasJcefDylib = File(installDir, "libjcef.dylib").isFile
+            return hasLocales && hasIcu && hasFramework && hasJcefApp && hasJcefDylib
+        }
+
+        if (os.contains("nix") || os.contains("nux")) {
+            val entries = installDir.listFiles().orEmpty().map { it.name }
+            val hasLibCef = entries.any { it == "libcef.so" || it.startsWith("libcef.so.") }
+            val hasLibJcef = entries.any { it == "libjcef.so" || it.startsWith("libjcef.so.") }
+            return hasLocales && hasIcu && hasLibCef && hasLibJcef
+        }
         
         return hasLocales && hasIcu
-    }
-
-    private suspend fun installKcef(builder: KCEFBuilder): KCEFBuilder {
-        val method = KCEFBuilder::class.java.getDeclaredMethod("install\$kcef", Continuation::class.java)
-        method.isAccessible = true
-
-        @Suppress("UNCHECKED_CAST")
-        return suspendCoroutine { cont ->
-            runCatching { method.invoke(builder, cont) }
-                .onSuccess { result ->
-                    if (result != COROUTINE_SUSPENDED) {
-                        cont.resume(result as KCEFBuilder)
-                    }
-                }
-                .onFailure { e ->
-                    cont.resumeWithException(e)
-                }
-        }
     }
 
     private suspend fun tailKcefLog(file: File) {
