@@ -205,20 +205,28 @@ fun VideoPlayerProgressBarImpl(
                     }
 
                     // Draw markers for skip intro/outro
-                    val markerRadius = if (showDetails) 3.dp.toPx() else 1.dp.toPx()// White dot radius
-                    if (skipOpeningRatio > 0f && skipOpeningRatio < 1f) {
-                         drawCircle(
-                            color = Color.White,
-                            radius = markerRadius,
-                            center = Offset(skipOpeningRatio * size.width, trackYCenter)
-                        )
-                    }
-                    if (skipEndingRatio > 0f && skipEndingRatio < 1f) {
-                         drawCircle(
-                            color = Color.White,
-                            radius = markerRadius,
-                            center = Offset(skipEndingRatio * size.width, trackYCenter)
-                        )
+                    val markerXList = listOfNotNull(
+                        if (skipOpeningRatio > 0f && skipOpeningRatio < 1f) skipOpeningRatio * size.width else null,
+                        if (skipEndingRatio > 0f && skipEndingRatio < 1f) skipEndingRatio * size.width else null
+                    )
+
+                    markerXList.forEach { x ->
+                        if (showDetails) {
+                            // When expanded, draw a vertical line
+                            drawLine(
+                                color = Color.White,
+                                start = Offset(x, 0f),
+                                end = Offset(x, size.height),
+                                strokeWidth = 2.dp.toPx()
+                            )
+                        } else {
+                            // When collapsed, draw a small dot
+                            drawCircle(
+                                color = Color.White,
+                                radius = 1.dp.toPx(),
+                                center = Offset(x, trackYCenter)
+                            )
+                        }
                     }
 
                     // 4. 白色的圆形滑块 (仅在悬停或拖动时显示)
