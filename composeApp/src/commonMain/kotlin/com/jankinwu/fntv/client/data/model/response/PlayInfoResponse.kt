@@ -45,13 +45,13 @@ data class PlayInfoResponse(
 @Immutable
 data class PlayConfig(
     @param:JsonProperty("guid")
-    val guid: String,
+    val guid: String?,
 
     @param:JsonProperty("skip_opening")
-    val skipOpening: Int,
+    val skipOpening: Int?,
 
     @param:JsonProperty("skip_ending")
-    val skipEnding: Int
+    val skipEnding: Int?
 )
 
 @Immutable

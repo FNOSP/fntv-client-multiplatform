@@ -282,14 +282,12 @@ jobs:
         shell: bash
         run: |
           # Define common release notes
-          NOTES="1.实现跳过片头/片尾功能  
-          2.优化浏览器组件初始化逻辑  
-          3.修复最近播放记录列表不显示的问题  
+          NOTES="1.修复未设置片头/片尾的电视节目在详情页中无法播放的问题  
           　  
           此项目已更名为飞鲸影视，可执行程序名称也相应做了更改，从更名前的旧版本升级到新版过程中出现报错提示“Failed to launch application **”属于正常现象，安装成功后把旧的快捷方式从桌面或开始菜单删除即可。  
           　  
           感谢以下飞牛共建团成员反馈问题并协助排查：  
-          @[MR_XIAOBO](https://github.com/xiaobonet)  
+          @[玉尺书生](https://club.fnnas.com/home.php?mod=space&uid=6482)  
           　  
           > **当前应用中没有展示出来或者点击没有反应的就是还没做的功能，后面陆续都会实现，请仅对已实现的功能提出合理意见，感谢理解**  
           　  "
