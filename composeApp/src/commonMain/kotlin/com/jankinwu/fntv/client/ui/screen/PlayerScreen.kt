@@ -436,17 +436,21 @@ fun PlayerOverlay(
         }
     }
 
+    var isSeeking by remember { mutableStateOf(false) }
+
     // Skip Outro State
     var showSkipOutroPrompt by remember { mutableStateOf(false) }
     var skipOutroCancelled by remember { mutableStateOf(false) }
     var skipOutroCountdown by remember { mutableIntStateOf(5) }
     var showEndScreen by remember { mutableStateOf(false) }
+    var lastOutroMonitorPosition by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(playingInfoCache?.itemGuid) {
         showSkipOutroPrompt = false
         skipOutroCancelled = false
         skipOutroCountdown = 5
         showEndScreen = false
+        lastOutroMonitorPosition = 0L
     }
 
     val totalDuration = remember(playerManager.playerState.itemGuid) {
@@ -469,15 +473,12 @@ fun PlayerOverlay(
 //    }
 
     // Outro Skip Monitor
-    LaunchedEffect(currentPosition, playConfig, skipOutroCancelled, totalDuration) {
+    LaunchedEffect(currentPosition, playConfig, skipOutroCancelled, totalDuration, playState, isSeeking, nextEpisode) {
         if (skipEnding > 0 && totalDuration > 0) {
             val skipPoint = totalDuration - skipEnding * 1000L
-            if (currentPosition >= skipPoint) {
-                if (!showSkipOutroPrompt && !showEndScreen && !skipOutroCancelled) {
-                    showSkipOutroPrompt = true
-                    skipOutroCountdown = 5
-                }
-            } else {
+            val crossedIntoOutro = lastOutroMonitorPosition < skipPoint && currentPosition >= skipPoint
+
+            if (currentPosition < skipPoint) {
                 if (showSkipOutroPrompt) {
                     showSkipOutroPrompt = false
                 }
@@ -487,7 +488,14 @@ fun PlayerOverlay(
                 if (skipOutroCancelled) {
                     skipOutroCancelled = false
                 }
+            } else if (crossedIntoOutro && playState == PlaybackState.PLAYING && !isSeeking) {
+                if (!showSkipOutroPrompt && !showEndScreen && !skipOutroCancelled) {
+                    showSkipOutroPrompt = true
+                    skipOutroCountdown = 5
+                }
             }
+
+            lastOutroMonitorPosition = currentPosition
         }
     }
 
@@ -503,6 +511,9 @@ fun PlayerOverlay(
                 if (nextEpisode != null) {
                     playEpisode(nextEpisode.guid)
                 } else {
+                    if (totalDuration > 0) {
+                        mediaPlayer.seekTo(totalDuration)
+                    }
                     showEndScreen = true
                     mediaPlayer.pause()
                 }
@@ -895,8 +906,6 @@ fun PlayerOverlay(
     // 上一次播放状�?
     var lastPlayState by remember { mutableStateOf<PlaybackState?>(null) }
 
-    var isSeeking by remember { mutableStateOf(false) }
-
     LaunchedEffect(isSeeking) {
         if (isSeeking) {
             delay(2000)
@@ -909,6 +918,17 @@ fun PlayerOverlay(
 
     // 当播放状态变为暂停或播放时，调用playRecord接口
     LaunchedEffect(playState) {
+        if (playState == PlaybackState.FINISHED && nextEpisode == null) {
+            if (totalDuration > 0) {
+                mediaPlayer.seekTo(totalDuration)
+            }
+            showEndScreen = true
+        }
+        if (playState == PlaybackState.PLAYING) {
+            if (showEndScreen) {
+                showEndScreen = false
+            }
+        }
         if (playState == PlaybackState.PLAYING || playState == PlaybackState.PAUSED) {
             if (playerManager.playerState.isLoading) {
                 playerManager.setLoading(false)
