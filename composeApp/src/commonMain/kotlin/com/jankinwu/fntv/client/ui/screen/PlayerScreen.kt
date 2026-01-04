@@ -476,7 +476,7 @@ fun PlayerOverlay(
     LaunchedEffect(currentPosition, playConfig, skipOutroCancelled, totalDuration, playState, isSeeking, nextEpisode) {
         if (skipEnding > 0 && totalDuration > 0) {
             val skipPoint = totalDuration - skipEnding * 1000L
-            val crossedIntoOutro = lastOutroMonitorPosition < skipPoint && currentPosition >= skipPoint
+            val crossedIntoOutro = skipPoint in (lastOutroMonitorPosition + 1)..currentPosition
 
             if (currentPosition < skipPoint) {
                 if (showSkipOutroPrompt) {
