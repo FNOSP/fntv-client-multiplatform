@@ -53,10 +53,12 @@ import com.jankinwu.fntv.client.icons.Logout
 import com.jankinwu.fntv.client.icons.PreRelease
 import com.jankinwu.fntv.client.icons.Statement
 import com.jankinwu.fntv.client.icons.VersionInfo
+import com.jankinwu.fntv.client.icons.VideoSmartAnalysis
 import com.jankinwu.fntv.client.manager.LoginStateManager
 import com.jankinwu.fntv.client.ui.component.common.BackButton
 import com.jankinwu.fntv.client.ui.component.common.ComponentItem
 import com.jankinwu.fntv.client.ui.component.common.ComponentNavigator
+import com.jankinwu.fntv.client.ui.component.common.HoverTip
 import com.jankinwu.fntv.client.ui.component.common.dialog.AboutDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.CustomContentDialog
 import com.jankinwu.fntv.client.ui.component.common.dialog.UpdateDialog
@@ -89,7 +91,6 @@ import io.github.composefluent.icons.regular.Color
 import io.github.composefluent.icons.regular.Globe
 import io.github.composefluent.icons.regular.Navigation
 import io.github.composefluent.icons.regular.Person
-import io.github.composefluent.icons.regular.PlayCircle
 import io.github.composefluent.icons.regular.WeatherMoon
 import io.github.composefluent.icons.regular.WeatherSunny
 import org.jetbrains.compose.resources.painterResource
@@ -152,17 +153,17 @@ fun SettingsScreen(navigator: ComponentNavigator) {
         }
     }
 
-     if (exportError != null) {
-         CustomContentDialog(
-             title = "导出错误",
-             visible = true,
-             content = {
-                 Text(exportError ?: "未知错误")
-             },
-             onButtonClick = { _ -> exportError = null },
-             primaryButtonText = "确定"
-         )
-     }
+    if (exportError != null) {
+        CustomContentDialog(
+            title = "导出错误",
+            visible = true,
+            content = {
+                Text(exportError ?: "未知错误")
+            },
+            onButtonClick = { _ -> exportError = null },
+            primaryButtonText = "确定"
+        )
+    }
 
     UpdateDialog(
         status = updateStatus,
@@ -257,7 +258,11 @@ fun SettingsScreen(navigator: ComponentNavigator) {
                                 Row(
                                     modifier = Modifier
                                         .padding(start = 8.dp)
-                                        .border(1.dp, Colors.AccentColorDefault, RoundedCornerShape(50))
+                                        .border(
+                                            1.dp,
+                                            Colors.AccentColorDefault,
+                                            RoundedCornerShape(50)
+                                        )
                                         .padding(horizontal = 6.dp, vertical = 1.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -304,7 +309,11 @@ fun SettingsScreen(navigator: ComponentNavigator) {
                         Text("主题模式")
                     },
                     icon = {
-                        Icon(Icons.Regular.Color, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Regular.Color,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                     },
                     caption = {
                         Text("是否跟随系统主题")
@@ -331,7 +340,11 @@ fun SettingsScreen(navigator: ComponentNavigator) {
                             Text("颜色")
                         },
                         icon = {
-                            Icon(if (store.darkMode) Icons.Regular.WeatherMoon else Icons.Regular.WeatherSunny, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(
+                                if (store.darkMode) Icons.Regular.WeatherMoon else Icons.Regular.WeatherSunny,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                         },
                         caption = {
                             Text("请选择主题颜色")
@@ -570,9 +583,17 @@ fun SettingsScreen(navigator: ComponentNavigator) {
 
                 Header("播放")
                 CardExpanderItem(
-                    heading = { Text("智能检测片头/片尾") },
-                    caption = { Text("开启后可连接分析服务进行片头片尾检测") },
-                    icon = { Icon(Icons.Regular.PlayCircle, null, modifier = Modifier.size(18.dp)) },
+                    heading = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("智能检测片头/片尾")
+                            Spacer(Modifier.width(6.dp))
+                            HoverTip(
+                                tipText = "启用后将通过部署在飞牛 NAS 上的后端服务识别片头/片尾。\n请确保已在下方正确配置「后端服务地址」，并且客户端能访问该服务。后端项目地址：https://github.com/FNOSP/fly-narwhal-server",
+                            )
+                        }
+                    },
+                    caption = { Text("开启后可连接后端服务进行片头片尾检测") },
+                    icon = { Icon(VideoSmartAnalysis, null, modifier = Modifier.size(18.dp)) },
                     trailing = {
                         Switcher(
                             checked = smartAnalysisEnabled,
@@ -592,8 +613,8 @@ fun SettingsScreen(navigator: ComponentNavigator) {
                     exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
                 ) {
                     CardExpanderItem(
-                        heading = { Text("分析服务地址") },
-                        caption = { Text("Fly Narwhal 服务端 Base URL") },
+                        heading = { Text("后端服务地址") },
+                        caption = { Text("Fly Narwhal 后端 Base URL") },
                         icon = { Icon(Icons.Regular.Globe, null, modifier = Modifier.size(18.dp)) },
                         trailing = {
                             TextField(
@@ -604,7 +625,12 @@ fun SettingsScreen(navigator: ComponentNavigator) {
                                 },
                                 modifier = Modifier.width(200.dp),
                                 singleLine = true,
-                                placeholder = { Text("") },
+                                placeholder = {
+                                    Text(
+                                        "http://192.168.1.1:5365",
+                                        style = FluentTheme.typography.body.copy(FluentTheme.colors.text.text.tertiary)
+                                    )
+                                },
                             )
                         }
                     )
