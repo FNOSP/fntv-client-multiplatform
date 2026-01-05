@@ -588,11 +588,11 @@ fun SettingsScreen(navigator: ComponentNavigator) {
                             Text("智能检测片头/片尾")
                             Spacer(Modifier.width(6.dp))
                             HoverTip(
-                                tipText = "启用后将通过部署在飞牛 NAS 上的后端服务识别片头/片尾。\n请确保已在下方正确配置「后端服务地址」，并且客户端能访问该服务。后端项目地址：https://github.com/FNOSP/fly-narwhal-server",
+                                tipText = "启用后将通过部署在飞牛 NAS 上的飞鲸服务端服务识别片头/片尾。\n请确保已在下方正确配置「飞鲸服务端地址」，并且客户端能访问该服务。服务端项目地址：https://github.com/FNOSP/fly-narwhal-server",
                             )
                         }
                     },
-                    caption = { Text("开启后可连接后端服务进行片头片尾检测") },
+                    caption = { Text("开启后可连接飞鲸服务端进行片头片尾检测") },
                     icon = { Icon(VideoSmartAnalysis, null, modifier = Modifier.size(18.dp)) },
                     trailing = {
                         Switcher(
@@ -613,8 +613,8 @@ fun SettingsScreen(navigator: ComponentNavigator) {
                     exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
                 ) {
                     CardExpanderItem(
-                        heading = { Text("后端服务地址") },
-                        caption = { Text("Fly Narwhal 后端 Base URL") },
+                        heading = { Text("飞鲸服务端地址") },
+                        caption = { Text("请填写完整服务端的 URL") },
                         icon = { Icon(Icons.Regular.Globe, null, modifier = Modifier.size(18.dp)) },
                         trailing = {
                             TextField(
