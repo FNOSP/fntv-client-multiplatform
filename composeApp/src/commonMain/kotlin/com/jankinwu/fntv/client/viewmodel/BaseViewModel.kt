@@ -80,4 +80,5 @@ val viewModelModule = module {
     viewModelOf (::NasAuthViewModel)
     singleOf (::PlayerViewModel)
     viewModelOf (::SmartAnalysisViewModel)
+    viewModelOf (::SmartAnalysisStatusViewModel)
 }
