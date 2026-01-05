@@ -2,6 +2,7 @@ package com.jankinwu.fntv.client.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import co.touchlab.kermit.Logger
 import com.jankinwu.fntv.client.data.model.PlayingInfoCache
 import com.jankinwu.fntv.client.data.model.SubtitleSettings
 import com.jankinwu.fntv.client.data.model.request.SetConfigByItemRequest
@@ -26,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 class PlayerViewModel : ViewModel() {
+    private val logger = Logger.withTag("PlayerViewModel")
     private val fnOfficialApi: FnOfficialApiImpl by inject(FnOfficialApiImpl::class.java)
 
     private val _playingInfoCache = MutableStateFlow<PlayingInfoCache?>(null)
@@ -66,7 +68,7 @@ class PlayerViewModel : ViewModel() {
         PlayingSettingsStore.smartSkipEnabled = enabled
         _smartSkipEnabled.value = enabled
         if (enabled && AppSettingsStore.smartAnalysisEnabled) {
-            val guid = playingInfoCache.value?.itemGuid
+            val guid = playingInfoCache.value?.currentVideoStream?.mediaGuid
             if (guid != null) {
                 checkAnalysisStatus(guid)
             }
@@ -83,10 +85,14 @@ class PlayerViewModel : ViewModel() {
                     val statusResult = flyNarwhalApi.getStatus("EPISODE", guid)
                     if (statusResult.isSuccess()) {
                         val status = statusResult.data
+                        logger.i { "Analysis status: $status" }
                         if (status == AnalysisStatus.COMPLETED) {
+                            logger.i { "Analysis completed" }
                             val segmentsResult = flyNarwhalApi.getSegments(guid)
                             if (segmentsResult.isSuccess()) {
                                 _smartSegments.value = segmentsResult.data
+                            } else {
+                                logger.w { "Get segments failed: code=${segmentsResult.code}, msg=${segmentsResult.msg}" }
                             }
                             break
                         } else if (status == AnalysisStatus.FAILED) {
@@ -98,10 +104,11 @@ class PlayerViewModel : ViewModel() {
                             break
                         }
                     } else {
+                        logger.w { "Get status failed: code=${statusResult.code}, msg=${statusResult.msg}" }
                         break
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    logger.e(e) { "Check analysis status failed" }
                     break
                 }
             }
@@ -147,7 +154,7 @@ class PlayerViewModel : ViewModel() {
                         skipEnding = skipEnding
                     )
                 )
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Ignore error for now
             }
         }

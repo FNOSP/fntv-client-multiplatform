@@ -23,11 +23,11 @@ class SmartAnalysisViewModel : BaseViewModel() {
 
     private val logger = Logger.withTag("SmartAnalysisViewModel")
 
-    fun analyzeSeason(seasonGuid: String, seasonTitle: String, seasonNumber: Int) {
+    fun analyzeSeason(seasonGuid: String, mediaTitle: String, seasonNumber: Int) {
         viewModelScope.launch {
             _analyzeState.value = UiState.Loading
             try {
-                logger.i { "Starting analysis for season $seasonTitle (S$seasonNumber, guid: $seasonGuid)" }
+                logger.i { "Starting analysis for season $mediaTitle (S$seasonNumber, guid: $seasonGuid)" }
                 // 1. Get Episode List
                 val episodeList = executeWithLoadingAndReturn {
                      fnOfficialApi.episodeList(seasonGuid)
@@ -78,7 +78,7 @@ class SmartAnalysisViewModel : BaseViewModel() {
                     seasonGuid = seasonGuid,
                     seasonPath = seasonPath,
                     episodes = queuedEpisodes,
-                    tvTitle = seasonTitle,
+                    tvTitle = mediaTitle,
                     seasonNumber = seasonNumber
                 )
                 

@@ -466,72 +466,95 @@ fun PlayerOverlay(
 
     val useSmartSkip = isSmartAnalysisGloballyEnabled && smartSkipEnabled && smartSegments != null
 
-    val effectiveSkipOpening = if (useSmartSkip) {
-        smartSegments?.intro?.end?.let { if (it > 0) it.toInt() else null } ?: (playConfig?.skipOpening ?: 0)
-    } else {
-        playConfig?.skipOpening ?: 0
-    }
-
-    val effectiveSkipEnding = if (useSmartSkip) {
-        if (smartSegments?.credits?.start != null && totalDuration > 0) {
-            val creditsStart = smartSegments?.credits?.start ?: 0.0
-            // Calculate how many seconds from the end we should skip
-            val durationSec = totalDuration / 1000.0
-            if (creditsStart < durationSec) {
-                (durationSec - creditsStart).toInt()
-            } else {
-                playConfig?.skipEnding ?: 0
-            }
+    val smartIntroSegmentMillis: Pair<Long, Long>? = if (useSmartSkip) {
+        val intro = smartSegments?.intro
+        if (intro != null && intro.valid && intro.end > intro.start && intro.end > 0) {
+            val startMs = (intro.start * 1000.0).toLong()
+            val endMs = (intro.end * 1000.0).toLong()
+            if (endMs > startMs) startMs to endMs else null
         } else {
-            playConfig?.skipEnding ?: 0
+            null
         }
     } else {
-        playConfig?.skipEnding ?: 0
+        null
+    }
+
+    val resolvedIntroSegmentMillis: Pair<Long, Long>? = smartIntroSegmentMillis
+        ?: ((playConfig?.skipOpening ?: 0).coerceAtLeast(0) * 1000L)
+            .takeIf { it > 0 }
+            ?.let { 0L to it }
+
+    val smartCreditsSegmentMillis: Pair<Long, Long>? = if (useSmartSkip) {
+        val credits = smartSegments?.credits
+        if (credits != null && credits.valid && credits.end > credits.start && credits.end > 0) {
+            var startMs = (credits.start * 1000.0).toLong()
+            var endMs = (credits.end * 1000.0).toLong()
+            if (totalDuration > 0) {
+                startMs = startMs.coerceIn(0L, totalDuration)
+                endMs = endMs.coerceIn(0L, totalDuration)
+            }
+            if (endMs > startMs) startMs to endMs else null
+        } else {
+            null
+        }
+    } else {
+        null
+    }
+
+    val resolvedCreditsSegmentMillis: Pair<Long, Long>? = smartCreditsSegmentMillis ?: run {
+        val skipEndingSec = (playConfig?.skipEnding ?: 0).coerceAtLeast(0)
+        if (skipEndingSec > 0 && totalDuration > 0) {
+            val startMs = (totalDuration - skipEndingSec * 1000L).coerceAtLeast(0L)
+            startMs to totalDuration
+        } else {
+            null
+        }
     }
 
     // Intro Skip
-    LaunchedEffect(playingInfoCache?.itemGuid, effectiveSkipOpening) {
-        val skipOpening = effectiveSkipOpening
-        if (skipOpening > 0) {
-            delay(500)
-            val currentPos = mediaPlayer.currentPositionMillis.value
-            if (currentPos < skipOpening * 1000) {
-                mediaPlayer.seekTo(skipOpening * 1000L)
-                toastManager.showToast("已为您自动跳过片头", ToastType.Info)
-            }
+    var introAutoSkipped by remember(playingInfoCache?.itemGuid) { mutableStateOf(false) }
+    LaunchedEffect(currentPosition, resolvedIntroSegmentMillis, playState, isSeeking) {
+        val introSegment = resolvedIntroSegmentMillis ?: return@LaunchedEffect
+        if (introAutoSkipped) return@LaunchedEffect
+        if (playState != PlaybackState.PLAYING || isSeeking) return@LaunchedEffect
+
+        val startMs = introSegment.first
+        val endMs = introSegment.second
+        if (currentPosition in startMs until endMs) {
+            introAutoSkipped = true
+            mediaPlayer.seekTo(endMs)
+            toastManager.showToast("已为您自动跳过片头", ToastType.Info)
         }
     }
 
     // Outro Skip Monitor
-    LaunchedEffect(currentPosition, effectiveSkipEnding, skipOutroCancelled, totalDuration, playState, isSeeking, nextEpisode) {
-        val skipEnding = effectiveSkipEnding
-        if (skipEnding > 0 && totalDuration > 0) {
-            val skipPoint = totalDuration - skipEnding * 1000L
-            val crossedIntoOutro = skipPoint in (lastOutroMonitorPosition + 1)..currentPosition
+    LaunchedEffect(currentPosition, resolvedCreditsSegmentMillis, skipOutroCancelled, totalDuration, playState, isSeeking, nextEpisode) {
+        val creditsSegment = resolvedCreditsSegmentMillis ?: return@LaunchedEffect
 
-            if (currentPosition < skipPoint) {
-                if (showSkipOutroPrompt) {
-                    showSkipOutroPrompt = false
-                }
-                if (showEndScreen) {
-                    showEndScreen = false
-                }
-                if (skipOutroCancelled) {
-                    skipOutroCancelled = false
-                }
-            } else if (crossedIntoOutro && playState == PlaybackState.PLAYING && !isSeeking) {
+        val startMs = creditsSegment.first
+        val endMs = creditsSegment.second
+
+        if (currentPosition < startMs) {
+            if (showSkipOutroPrompt) showSkipOutroPrompt = false
+            if (showEndScreen) showEndScreen = false
+            if (skipOutroCancelled) skipOutroCancelled = false
+        } else if (currentPosition >= endMs) {
+            if (showSkipOutroPrompt) showSkipOutroPrompt = false
+        } else {
+            val crossedIntoOutro = lastOutroMonitorPosition < startMs && currentPosition >= startMs
+            if (crossedIntoOutro && playState == PlaybackState.PLAYING && !isSeeking) {
                 if (!showSkipOutroPrompt && !showEndScreen && !skipOutroCancelled) {
                     showSkipOutroPrompt = true
                     skipOutroCountdown = 5
                 }
             }
-
-            lastOutroMonitorPosition = currentPosition
         }
+
+        lastOutroMonitorPosition = currentPosition
     }
 
     // Countdown
-    LaunchedEffect(showSkipOutroPrompt) {
+    LaunchedEffect(showSkipOutroPrompt, resolvedCreditsSegmentMillis, totalDuration, nextEpisode) {
         if (showSkipOutroPrompt) {
             while (skipOutroCountdown > 0) {
                 delay(1000)
@@ -539,7 +562,11 @@ fun PlayerOverlay(
             }
             if (showSkipOutroPrompt && !skipOutroCancelled) {
                 showSkipOutroPrompt = false
-                if (nextEpisode != null) {
+                val creditsEndMs = resolvedCreditsSegmentMillis?.second ?: 0L
+                val canSeekPastCredits = creditsEndMs > 0L && (totalDuration <= 0L || creditsEndMs < totalDuration - 1000L)
+                if (canSeekPastCredits) {
+                    mediaPlayer.seekTo(creditsEndMs)
+                } else if (nextEpisode != null) {
                     playEpisode(nextEpisode.guid)
                 } else {
                     if (totalDuration > 0) {
@@ -1300,12 +1327,16 @@ fun PlayerOverlay(
                     onBack = onBack,
                     onReplay = {
                         showEndScreen = false
-                        val skipOpening = playingInfoCache?.playConfig?.skipOpening ?: 0
-                        if (skipOpening > 0) {
-                            mediaPlayer.seekTo(skipOpening * 1000L)
-                            toastManager.showToast("已为您自动跳过片头", ToastType.Info)
-                        } else {
+                        if (useSmartSkip) {
                             mediaPlayer.seekTo(0)
+                        } else {
+                            val skipOpening = playingInfoCache?.playConfig?.skipOpening ?: 0
+                            if (skipOpening > 0) {
+                                mediaPlayer.seekTo(skipOpening * 1000L)
+                                toastManager.showToast("已为您自动跳过片头", ToastType.Info)
+                            } else {
+                                mediaPlayer.seekTo(0)
+                            }
                         }
                         mediaPlayer.resume()
                     }

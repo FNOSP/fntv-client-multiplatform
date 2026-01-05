@@ -110,6 +110,7 @@ fun MoviePoster(
     navigator: ComponentNavigator,
     type: String?,
     seasonNumber: Int? = null,
+    mediaTitle: String? = null,
 ) {
     val store = LocalStore.current
     val smartAnalysisViewModel: SmartAnalysisViewModel = koinViewModel()
@@ -436,7 +437,8 @@ fun MoviePoster(
                     onSmartAnalysisClick = if (type == FnTvMediaType.SEASON.value && smartAnalysisEnabled) {
                         {
                             val number = seasonNumber ?: 0
-                            smartAnalysisViewModel.analyzeSeason(guid, title, number)
+                            val mediaTitle = mediaTitle ?: ""
+                            smartAnalysisViewModel.analyzeSeason(guid, mediaTitle, number)
                         }
                     } else null
                 ){ onClick ->

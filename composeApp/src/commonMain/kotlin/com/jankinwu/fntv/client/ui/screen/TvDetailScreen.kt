@@ -530,6 +530,7 @@ fun TvDetailBody(
                                                 )
                                             },
                                             seasonNumber = season.seasonNumber,
+                                            mediaTitle = itemData?.title
                                         )
                                     }
                                 }

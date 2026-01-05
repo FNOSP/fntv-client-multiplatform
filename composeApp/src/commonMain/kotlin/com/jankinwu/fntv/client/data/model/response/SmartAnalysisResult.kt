@@ -6,10 +6,11 @@ package com.jankinwu.fntv.client.data.model.response
 data class SmartAnalysisResult<T>(
     val code: Int,
     val msg: String,
-    val data: T?
+    val data: T?,
+    val success: Boolean? = null
 ) {
     /**
-     * Returns true if the request was successful (code 0).
+     * Returns true if the request was successful.
      */
-    fun isSuccess(): Boolean = code == 0
+    fun isSuccess(): Boolean = success == true || code == 0 || code in 200..299
 }
