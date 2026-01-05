@@ -445,7 +445,6 @@ fun PlayerOverlay(
     var showSkipIntroUndoPrompt by remember { mutableStateOf(false) }
     var skipIntroUndoCountdown by remember { mutableIntStateOf(5) }
     var lastAutoSkippedIntroSegmentMillis by remember(playingInfoCache?.itemGuid) { mutableStateOf<Pair<Long, Long>?>(null) }
-    var lastUserSeekTargetMs by remember(playingInfoCache?.itemGuid) { mutableStateOf<Long?>(null) }
     var pendingIntroSkipSegmentMillis by remember(playingInfoCache?.itemGuid) { mutableStateOf<Pair<Long, Long>?>(null) }
     var introSkipSuppressedUntilMs by remember(playingInfoCache?.itemGuid) { mutableStateOf<Long?>(null) }
     var lastIntroMonitorPosition by remember { mutableLongStateOf(0L) }
@@ -462,7 +461,6 @@ fun PlayerOverlay(
         showSkipIntroUndoPrompt = false
         skipIntroUndoCountdown = 5
         lastAutoSkippedIntroSegmentMillis = null
-        lastUserSeekTargetMs = null
         pendingIntroSkipSegmentMillis = null
         introSkipSuppressedUntilMs = null
         lastIntroMonitorPosition = 0L
@@ -584,22 +582,6 @@ fun PlayerOverlay(
         }
 
         lastIntroMonitorPosition = currentPosition
-    }
-
-    LaunchedEffect(isSeeking, currentPosition, resolvedIntroSegmentMillis, playState) {
-        if (isSeeking) return@LaunchedEffect
-        if (playState != PlaybackState.PLAYING) return@LaunchedEffect
-
-        val introSegment = resolvedIntroSegmentMillis ?: return@LaunchedEffect
-        val seekTarget = lastUserSeekTargetMs ?: return@LaunchedEffect
-
-        val startMs = introSegment.first
-        val endMs = introSegment.second
-        if (seekTarget < startMs && introSkipSuppressedUntilMs == null && currentPosition in startMs until endMs) {
-            lastUserSeekTargetMs = null
-            pendingIntroSkipSegmentMillis = introSegment
-            mediaPlayer.seekTo(endMs)
-        }
     }
 
     LaunchedEffect(currentPosition, pendingIntroSkipSegmentMillis, playState) {
@@ -1414,7 +1396,6 @@ fun PlayerOverlay(
                         if (segment != null) {
                             introSkipSuppressedUntilMs = segment.second
                             pendingIntroSkipSegmentMillis = null
-                            lastUserSeekTargetMs = null
                             mediaPlayer.seekTo(segment.first)
                         }
                         showSkipIntroUndoPrompt = false
@@ -1511,7 +1492,6 @@ fun PlayerOverlay(
                         playerManager.setLoading(true)
                         isSeeking = true
                         val seekPosition = (newProgress * totalDuration).toLong()
-                        lastUserSeekTargetMs = seekPosition
                         mediaPlayer.seekTo(seekPosition)
                         logger.i(
                             "Seek to: ${newProgress * 100}%，seekPosition: ${

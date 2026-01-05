@@ -235,7 +235,6 @@ fun PipPlayerWindow(
     var showSkipIntroUndoPrompt by remember { mutableStateOf(false) }
     var skipIntroUndoCountdown by remember { mutableIntStateOf(5) }
     var lastAutoSkippedIntroSegmentMillis by remember(playingInfoCache?.itemGuid) { mutableStateOf<Pair<Long, Long>?>(null) }
-    var lastUserSeekTargetMs by remember(playingInfoCache?.itemGuid) { mutableStateOf<Long?>(null) }
     var pendingIntroSkipSegmentMillis by remember(playingInfoCache?.itemGuid) { mutableStateOf<Pair<Long, Long>?>(null) }
     var introSkipSuppressedUntilMs by remember(playingInfoCache?.itemGuid) { mutableStateOf<Long?>(null) }
     var lastIntroMonitorPosition by remember { mutableStateOf(0L) }
@@ -251,7 +250,6 @@ fun PipPlayerWindow(
         showSkipIntroUndoPrompt = false
         skipIntroUndoCountdown = 5
         lastAutoSkippedIntroSegmentMillis = null
-        lastUserSeekTargetMs = null
         pendingIntroSkipSegmentMillis = null
         introSkipSuppressedUntilMs = null
         lastIntroMonitorPosition = 0L
@@ -373,22 +371,6 @@ fun PipPlayerWindow(
         }
 
         lastIntroMonitorPosition = currentPosition
-    }
-
-    LaunchedEffect(isLoading, currentPosition, resolvedIntroSegmentMillis, playbackState) {
-        if (isLoading) return@LaunchedEffect
-        if (playbackState != PlaybackState.PLAYING) return@LaunchedEffect
-
-        val introSegment = resolvedIntroSegmentMillis ?: return@LaunchedEffect
-        val seekTarget = lastUserSeekTargetMs ?: return@LaunchedEffect
-
-        val startMs = introSegment.first
-        val endMs = introSegment.second
-        if (seekTarget < startMs && introSkipSuppressedUntilMs == null && currentPosition in startMs until endMs) {
-            lastUserSeekTargetMs = null
-            pendingIntroSkipSegmentMillis = introSegment
-            mediaPlayer.seekTo(endMs)
-        }
     }
 
     LaunchedEffect(currentPosition, pendingIntroSkipSegmentMillis, playbackState) {
@@ -831,7 +813,6 @@ fun PipPlayerWindow(
                     onSeek = { ratio ->
                         isLoading = true
                         val seekPosition = (ratio * totalDuration).toLong()
-                        lastUserSeekTargetMs = seekPosition
                         mediaPlayer.seekTo(seekPosition)
                         logger.i(
                             "Seek to: ${ratio * 100}%，seekPosition: ${
@@ -888,7 +869,6 @@ fun PipPlayerWindow(
                         if (segment != null) {
                             introSkipSuppressedUntilMs = segment.second
                             pendingIntroSkipSegmentMillis = null
-                            lastUserSeekTargetMs = null
                             mediaPlayer.seekTo(segment.first)
                         }
                         showSkipIntroUndoPrompt = false
