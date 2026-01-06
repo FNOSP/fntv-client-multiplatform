@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.jankinwu.fntv.client.data.model.request.AnalyzeRequest
+import com.jankinwu.fntv.client.data.model.request.SetFnBaseUrlRequest
 import com.jankinwu.fntv.client.data.model.request.UpdateSeasonStatusRequest
 import com.jankinwu.fntv.client.data.model.response.AnalysisStatus
 import com.jankinwu.fntv.client.data.model.response.EpisodeSegmentsResponse
@@ -76,6 +77,10 @@ class FlyNarwhalApiImpl : FlyNarwhalApi {
 
     override suspend fun getSegments(episodeGuid: String): SmartAnalysisResult<EpisodeSegmentsResponse> {
         return get("/api/analysis/segments", mapOf("episodeGuid" to episodeGuid))
+    }
+
+    override suspend fun setFnBaseUrl(request: SetFnBaseUrlRequest): SmartAnalysisResult<String> {
+        return post("/api/config/fn-base-url", request)
     }
 
     private suspend inline fun <reified T> get(

@@ -174,7 +174,7 @@ class SmartAnalysisViewModel : BaseViewModel() {
                     val failedText = failedSeasonNumbers.sorted().joinToString(", ") { "S$it" }
                     _analyzeState.value = UiState.Error("部分季请求片头片尾分析失败：$failedText")
                 } else {
-                    _analyzeState.value = UiState.Success("已启动 ${seasons.size} 季智能检测")
+                    _analyzeState.value = UiState.Success("已将 ${seasons.size} 季剧集加入分析队列")
                 }
             } catch (e: Exception) {
                 logger.e(e) { "TV analysis failed" }
