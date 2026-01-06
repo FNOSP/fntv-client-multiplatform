@@ -164,6 +164,7 @@
 - [Koin](https://github.com/InsertKoinIO/koin) - 适用于 Kotlin Multiplatform 的实用轻量级依赖注入框架
 - [Ktor](https://github.com/ktorio/ktor) - 使用 Kotlin 编写的 web 服务异步框架
 - [Kermit](https://github.com/touchlab/Kermit) - 适用于 Kotlin Multiplatform 的日志记录工具
+- [FileKit](https://github.com/vinceglb/FileKit) -  一个功能强大的适用于 KMP 的文件操作库
 - [jSystemThemeDetector](https://github.com/open-ani/jSystemThemeDetector) - 用于检测（桌面）操作系统是否使用深色 UI 主题的 Java 库
 - [fntv-electron](https://github.com/QiaoKes/fntv-electron) - 飞牛影视PC版 electron 封装
 - [fnos-tv](https://github.com/thshu/fnos-tv) - 基于飞牛影视接口开发的网页端
