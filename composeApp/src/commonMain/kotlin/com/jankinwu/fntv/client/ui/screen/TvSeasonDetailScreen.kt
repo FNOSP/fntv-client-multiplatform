@@ -66,9 +66,9 @@ import com.jankinwu.fntv.client.ui.component.common.ImgLoadingError
 import com.jankinwu.fntv.client.ui.component.common.ImgLoadingProgressRing
 import com.jankinwu.fntv.client.ui.component.common.MediaMoreFlyout
 import com.jankinwu.fntv.client.ui.component.common.ToastHost
-import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.component.common.ToastType
 import com.jankinwu.fntv.client.ui.component.common.dialog.VersionManagementDialog
+import com.jankinwu.fntv.client.ui.component.common.rememberToastManager
 import com.jankinwu.fntv.client.ui.component.detail.DetailPlayButton
 import com.jankinwu.fntv.client.ui.component.detail.DetailTags
 import com.jankinwu.fntv.client.ui.component.detail.EpisodesScrollRow
@@ -357,15 +357,19 @@ fun TvEpisodeBody(
     val painter = rememberAsyncImagePainter(model = imageRequest)
     val painterState by painter.state.collectAsState()
 
+    LaunchedEffect(smartAnalysisEnabled, itemData?.type, guid) {
+        if (!smartAnalysisEnabled || itemData?.type != FnTvMediaType.SEASON.value) return@LaunchedEffect
+        smartAnalysisViewModel.seasonStatusPollingTrigger.collect { seasonGuid ->
+            if (seasonGuid == guid) {
+                smartAnalysisStatusViewModel.startPolling(type = "SEASON", guid = guid, force = true)
+            }
+        }
+    }
+
     LaunchedEffect(analyzeState) {
         when (val state = analyzeState) {
             is UiState.Success -> {
                 toastManager.showToast(state.data, ToastType.Success)
-                val shouldStartStatusPolling = smartAnalysisEnabled && itemData?.type == FnTvMediaType.SEASON.value
-                if (shouldStartStatusPolling) {
-                    delay(1000)
-                    smartAnalysisStatusViewModel.startPolling(type = "SEASON", guid = guid, force = true)
-                }
                 smartAnalysisViewModel.clearState()
             }
 

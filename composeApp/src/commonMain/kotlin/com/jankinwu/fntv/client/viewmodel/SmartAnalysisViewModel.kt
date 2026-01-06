@@ -9,9 +9,12 @@ import com.jankinwu.fntv.client.data.model.response.AnalysisStatus
 import com.jankinwu.fntv.client.data.network.impl.FlyNarwhalApiImpl
 import com.jankinwu.fntv.client.data.network.impl.FnOfficialApiImpl
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.koin.java.KoinJavaComponent.inject
 
@@ -24,6 +27,9 @@ class SmartAnalysisViewModel : BaseViewModel() {
 
     private val _analyzeState = MutableStateFlow<UiState<String>>(UiState.Initial)
     val analyzeState: StateFlow<UiState<String>> = _analyzeState.asStateFlow()
+
+    private val _seasonStatusPollingTrigger = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val seasonStatusPollingTrigger: SharedFlow<String> = _seasonStatusPollingTrigger.asSharedFlow()
 
     private val logger = Logger.withTag("SmartAnalysisViewModel")
 
@@ -95,6 +101,7 @@ class SmartAnalysisViewModel : BaseViewModel() {
             if (!updateStatusResult.isSuccess()) {
                 throw Exception(updateStatusResult.msg)
             }
+            _seasonStatusPollingTrigger.tryEmit(seasonGuid)
         }
         val request = buildAnalyzeRequest(
             seasonGuid = seasonGuid,
@@ -112,8 +119,8 @@ class SmartAnalysisViewModel : BaseViewModel() {
         viewModelScope.launch {
             _analyzeState.value = UiState.Loading
             try {
+                _analyzeState.value = UiState.Success("已加入到分析队列")
                 startSeasonAnalysis(seasonGuid, mediaTitle, seasonNumber)
-                _analyzeState.value = UiState.Success("已开始分析")
             } catch (e: Exception) {
                 logger.e(e) { "Analysis failed" }
                 _analyzeState.value = UiState.Error(e.message ?: "Unknown error")
@@ -141,6 +148,7 @@ class SmartAnalysisViewModel : BaseViewModel() {
                 if (!updateStatusResult.isSuccess()) {
                     throw Exception(updateStatusResult.msg)
                 }
+                seasons.forEach { _seasonStatusPollingTrigger.tryEmit(it.guid) }
 
                 val normalizedTitle = tvTitle.ifBlank {
                     seasons.firstOrNull()?.parentTitle ?: seasons.firstOrNull()?.tvTitle ?: ""
