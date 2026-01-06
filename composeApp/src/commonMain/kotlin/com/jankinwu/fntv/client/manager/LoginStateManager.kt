@@ -165,8 +165,8 @@ object LoginStateManager {
             }
 
             // 如果使用 FN ID 或 FN 域名
-            val normalizedHost = if (host.contains('.')) host else "$host.5ddd.com"
-            if (normalizedHost.contains("5ddd.com")) {
+            val normalizedHost = if (host.contains('.')) host else "5ddd.com/$host"
+            if (normalizedHost.contains("5ddd.com")  || normalizedHost.contains("fnos.net")) {
                 if (onProbeRequired != null) {
                     onProbeRequired("https://$normalizedHost")
                     return
@@ -179,7 +179,7 @@ object LoginStateManager {
             }
             AccountDataCache.host = normalizedHost
         } else {
-            if (AccountDataCache.host.contains("ddd.com")) {
+            if (AccountDataCache.host.contains("5ddd.com") || AccountDataCache.host.contains("fnos.net")) {
                 AccountDataCache.isHttps = true
                 AccountDataCache.insertCookie("mode" to "relay")
                 AccountDataCache.port = 0
