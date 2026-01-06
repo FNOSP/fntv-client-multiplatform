@@ -15,6 +15,8 @@
 
 基于 Compose Multiplatform 框架开发的适用于飞牛影视的跨平台客户端
 
+服务端项目：https://github.com/FNOSP/fly-narwhal-server
+
 </div>
 
 ---
