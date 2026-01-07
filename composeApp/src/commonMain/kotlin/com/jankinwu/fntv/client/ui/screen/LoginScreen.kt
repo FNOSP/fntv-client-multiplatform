@@ -85,6 +85,7 @@ import com.jankinwu.fntv.client.manager.LoginStateManager
 import com.jankinwu.fntv.client.manager.LoginStateManager.handleLogin
 import com.jankinwu.fntv.client.manager.PreferencesManager
 import com.jankinwu.fntv.client.isDesktop
+import com.jankinwu.fntv.client.isLinux
 import com.jankinwu.fntv.client.isWindows
 import com.jankinwu.fntv.client.ui.component.common.ComponentNavigator
 import com.jankinwu.fntv.client.ui.component.common.NumberInput
@@ -162,6 +163,9 @@ fun LoginScreen(
     val toastManager = rememberToastManager()
     val isWebViewInitialized = LocalWebViewInitialized.current
     val webViewInitError = LocalWebViewInitError.current
+    val isLinuxPlatform = remember {
+        runCatching { currentPlatform() }.getOrNull()?.isLinux() == true
+    }
     val shouldBlockWebViewDependency = remember {
         val platform = runCatching { currentPlatform() }.getOrNull()
         platform?.let { it.isDesktop() && !it.isWindows() } ?: true
@@ -191,6 +195,11 @@ fun LoginScreen(
         // 加载历史记录
         val preferencesManager = PreferencesManager.getInstance()
         loginHistoryList = preferencesManager.loadLoginHistory()
+
+        if (isLinuxPlatform) {
+            isNasLogin = false
+            AccountDataCache.isNasLogin = false
+        }
     }
 
     // 自动聚焦 host 输入框
@@ -552,45 +561,29 @@ fun LoginScreen(
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            "使用 NAS 登录",
-                            color = Colors.TextSecondaryColor,
-                            fontSize = 16.sp
-                        )
-                        Switcher(
-                            isNasLogin,
-                            {
-                                isNasLogin = !isNasLogin
-//                                if (it) {
-//                                    if (!shouldBlockWebViewDependency || isWebViewInitialized) {
-//                                        isNasLogin = true
-//                                        if (!isWebViewInitialized) {
-//                                            val msg =
-//                                                if (webViewInitError != null) "组件加载失败，NAS 登录页面可能无法打开，可在弹窗中重试初始化"
-//                                                else "组件正在初始化，NAS 登录页面会在初始化完成后显示"
-//                                            toastManager.showToast(msg, ToastType.Info)
-//                                        }
-//                                    } else {
-//                                        val msg =
-//                                            if (webViewInitError != null) "组件加载失败，无法使用 NAS 登录"
-//                                            else "组件正在初始化，请稍后..."
-//                                        toastManager.showToast(msg, ToastType.Failed)
-//                                    }
-//                                } else {
-//                                    isNasLogin = false
-//                                }
-                            },
-                            styles = if (isNasLogin) {
-                                selectedSwitcherStyle()
-                            } else {
-                                SwitcherDefaults.defaultSwitcherStyle()
-                            },
-                        )
+                    if (!isLinuxPlatform) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "使用 NAS 登录",
+                                color = Colors.TextSecondaryColor,
+                                fontSize = 16.sp
+                            )
+                            Switcher(
+                                isNasLogin,
+                                {
+                                    isNasLogin = !isNasLogin
+                                },
+                                styles = if (isNasLogin) {
+                                    selectedSwitcherStyle()
+                                } else {
+                                    SwitcherDefaults.defaultSwitcherStyle()
+                                },
+                            )
+                        }
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -745,6 +738,10 @@ fun LoginScreen(
                     },
                     onSelect = onSelect@{ history ->
                         if (history.isNasLogin) {
+                            if (isLinuxPlatform) {
+                                toastManager.showToast("Linux 暂不支持 NAS 登录", ToastType.Failed)
+                                return@onSelect
+                            }
                             if (!isWebViewInitialized) {
                                 if (shouldBlockWebViewDependency) {
                                     val msg =

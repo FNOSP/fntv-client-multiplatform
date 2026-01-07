@@ -114,22 +114,31 @@ fun main() {
     val logger = Logger.withTag("main")
     logger.i { "Application started. Logs directory: ${logDir.absolutePath}" }
 
-    // Cleanup old KCEF directories
-    val baseDir = kcefBaseDir()
-    val installDir = File(baseDir, "kcef-bundle-${BuildConfig.VERSION_NAME}")
-    val cacheDir = File(baseDir, "kcef-cache-${BuildConfig.VERSION_NAME}")
-    cleanupOldKcefDirs(baseDir)
-    logger.i { "KCEF base directory: ${baseDir.absolutePath}" }
-    logger.i { "KCEF install directory: ${installDir.absolutePath}" }
-    logger.i { "KCEF cache directory: ${cacheDir.absolutePath}" }
+    val platform = currentPlatformDesktop()
+    val shouldInitKcef = platform !is Platform.Linux
+
+    val baseDir = if (shouldInitKcef) kcefBaseDir() else null
+    val installDir = baseDir?.let { File(it, "kcef-bundle-${BuildConfig.VERSION_NAME}") }
+    val cacheDir = baseDir?.let { File(it, "kcef-cache-${BuildConfig.VERSION_NAME}") }
+
+    if (shouldInitKcef && baseDir != null && installDir != null && cacheDir != null) {
+        cleanupOldKcefDirs(baseDir)
+        logger.i { "KCEF base directory: ${baseDir.absolutePath}" }
+        logger.i { "KCEF install directory: ${installDir.absolutePath}" }
+        logger.i { "KCEF cache directory: ${cacheDir.absolutePath}" }
+    } else {
+        logger.i { "KCEF bootstrap disabled for platform: ${platform::class.simpleName}" }
+    }
 
     application {
-        LaunchedEffect(Unit) {
-            WebViewBootstrap.start(
-                installDir = installDir,
-                cacheDir = cacheDir,
-                logDir = logDir
-            )
+        if (shouldInitKcef && installDir != null && cacheDir != null) {
+            LaunchedEffect(Unit) {
+                WebViewBootstrap.start(
+                    installDir = installDir,
+                    cacheDir = cacheDir,
+                    logDir = logDir
+                )
+            }
         }
 
         DisposableEffect(Unit) {
@@ -143,9 +152,11 @@ fun main() {
         val webViewRestartRequired by WebViewBootstrap.restartRequired.collectAsState()
         val webViewInitError by WebViewBootstrap.initError.collectAsState()
 
-        DisposableEffect(Unit) {
-            onDispose {
-                KCEF.disposeBlocking()
+        if (shouldInitKcef) {
+            DisposableEffect(Unit) {
+                onDispose {
+                    KCEF.disposeBlocking()
+                }
             }
         }
 
