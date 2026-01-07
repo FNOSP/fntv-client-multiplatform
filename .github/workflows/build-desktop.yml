@@ -79,85 +79,85 @@ jobs:
           path: composeApp/build/compose/binaries/**/*.dmg
           if-no-files-found: error
 
-  build-linux-deb-x64:
-    name: Build Linux Deb (x64)
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-        
-      - name: Install Linux Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fakeroot xvfb
-
-      - name: Build Linux Deb
-        # 执行 Compose Desktop 的打包任务
-        run: xvfb-run -a ./gradlew :composeApp:packageReleaseDeb
-        env:
-          REPORT_API_SECRET: ${{ secrets.REPORT_API_SECRET }}
-          REPORT_URL: ${{ secrets.REPORT_URL }}
-
-      - name: Upload Deb Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Linux-App-Deb-x64
-          # 上传生成的 Deb 文件
-          path: composeApp/build/compose/binaries/**/*.deb
-          if-no-files-found: error
-
-  build-linux-deb-arm64:
-    name: Build Linux Deb (ARM64)
-    runs-on: ubuntu-24.04-arm
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-        
-      - name: Install Linux Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fakeroot xvfb
-
-      - name: Build Linux Deb
-        # 执行 Compose Desktop 的打包任务
-        run: xvfb-run -a ./gradlew :composeApp:packageReleaseDeb
-        env:
-          REPORT_API_SECRET: ${{ secrets.REPORT_API_SECRET }}
-          REPORT_URL: ${{ secrets.REPORT_URL }}
-
-      - name: Upload Deb Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Linux-App-Deb-arm64
-          # 上传生成的 Deb 文件
-          path: composeApp/build/compose/binaries/**/*.deb
-          if-no-files-found: error
+#  build-linux-deb-x64:
+#    name: Build Linux Deb (x64)
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v4
+#
+#      - name: Set up JDK 17
+#        uses: actions/setup-java@v4
+#        with:
+#          java-version: '17'
+#          distribution: 'temurin'
+#
+#      - name: Setup Gradle
+#        uses: gradle/actions/setup-gradle@v3
+#
+#      - name: Grant execute permission for gradlew
+#        run: chmod +x gradlew
+#
+#      - name: Install Linux Dependencies
+#        run: |
+#          sudo apt-get update
+#          sudo apt-get install -y fakeroot xvfb
+#
+#      - name: Build Linux Deb
+#        # 执行 Compose Desktop 的打包任务
+#        run: xvfb-run -a ./gradlew :composeApp:packageReleaseDeb
+#        env:
+#          REPORT_API_SECRET: ${{ secrets.REPORT_API_SECRET }}
+#          REPORT_URL: ${{ secrets.REPORT_URL }}
+#
+#      - name: Upload Deb Artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: Linux-App-Deb-x64
+#          # 上传生成的 Deb 文件
+#          path: composeApp/build/compose/binaries/**/*.deb
+#          if-no-files-found: error
+#
+#  build-linux-deb-arm64:
+#    name: Build Linux Deb (ARM64)
+#    runs-on: ubuntu-24.04-arm
+#
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v4
+#
+#      - name: Set up JDK 17
+#        uses: actions/setup-java@v4
+#        with:
+#          java-version: '17'
+#          distribution: 'temurin'
+#
+#      - name: Setup Gradle
+#        uses: gradle/actions/setup-gradle@v3
+#
+#      - name: Grant execute permission for gradlew
+#        run: chmod +x gradlew
+#
+#      - name: Install Linux Dependencies
+#        run: |
+#          sudo apt-get update
+#          sudo apt-get install -y fakeroot xvfb
+#
+#      - name: Build Linux Deb
+#        # 执行 Compose Desktop 的打包任务
+#        run: xvfb-run -a ./gradlew :composeApp:packageReleaseDeb
+#        env:
+#          REPORT_API_SECRET: ${{ secrets.REPORT_API_SECRET }}
+#          REPORT_URL: ${{ secrets.REPORT_URL }}
+#
+#      - name: Upload Deb Artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: Linux-App-Deb-arm64
+#          # 上传生成的 Deb 文件
+#          path: composeApp/build/compose/binaries/**/*.deb
+#          if-no-files-found: error
 
   build-windows-x64:
     name: Build Windows (x64)
@@ -263,7 +263,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [build-macos-arm64, build-macos-x64, build-linux-deb-x64, build-linux-deb-arm64, build-windows-x64, build-windows-arm64]
+    needs: [build-macos-arm64, build-macos-x64, build-windows-x64, build-windows-arm64]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     
@@ -282,7 +282,7 @@ jobs:
         shell: bash
         run: |
           # Define common release notes
-          NOTES="1.修复若干序列化错误  
+          NOTES="1.解决 macOS 端应用启动报错的问题  
           　  
           此项目已更名为飞鲸影视，可执行程序名称也相应做了更改，从更名前的旧版本升级到新版过程中出现报错提示“Failed to launch application **”属于正常现象，安装成功后把旧的快捷方式从桌面或开始菜单删除即可。  
           　  
