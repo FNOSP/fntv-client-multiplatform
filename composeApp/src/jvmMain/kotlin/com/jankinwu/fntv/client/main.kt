@@ -115,7 +115,7 @@ fun main() {
     logger.i { "Application started. Logs directory: ${logDir.absolutePath}" }
 
     val platform = currentPlatformDesktop()
-    val shouldInitKcef = platform !is Platform.Linux
+    val shouldInitKcef = platform !is Platform.Linux && platform !is Platform.MacOS
 
     val baseDir = if (shouldInitKcef) kcefBaseDir() else null
     val installDir = baseDir?.let { File(it, "kcef-bundle-${BuildConfig.VERSION_NAME}") }
@@ -503,6 +503,12 @@ fun main() {
 
                     val request = fnConnectWindowRequest
                     if (request != null) {
+                        if (!shouldInitKcef) {
+                            LaunchedEffect(request) {
+                                logger.i { "FnConnect WebView is disabled for platform: ${platform::class.simpleName}" }
+                                fnConnectWindowRequest = null
+                            }
+                        } else {
                         val fnConnectWindowState = rememberWindowState(
                             size = DpSize(980.dp, 720.dp),
                             position = WindowPosition.Aligned(Alignment.Center)
@@ -582,6 +588,7 @@ fun main() {
                                     )
                                 }
                             }
+                        }
                         }
                     }
                 }

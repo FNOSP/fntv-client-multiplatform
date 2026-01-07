@@ -86,6 +86,7 @@ import com.jankinwu.fntv.client.manager.LoginStateManager.handleLogin
 import com.jankinwu.fntv.client.manager.PreferencesManager
 import com.jankinwu.fntv.client.isDesktop
 import com.jankinwu.fntv.client.isLinux
+import com.jankinwu.fntv.client.isMacOS
 import com.jankinwu.fntv.client.isWindows
 import com.jankinwu.fntv.client.ui.component.common.ComponentNavigator
 import com.jankinwu.fntv.client.ui.component.common.NumberInput
@@ -166,6 +167,10 @@ fun LoginScreen(
     val isLinuxPlatform = remember {
         runCatching { currentPlatform() }.getOrNull()?.isLinux() == true
     }
+    val isMacOSPlatform = remember {
+        runCatching { currentPlatform() }.getOrNull()?.isMacOS() == true
+    }
+    val isNasLoginDisabledPlatform = isLinuxPlatform || isMacOSPlatform
     val shouldBlockWebViewDependency = remember {
         val platform = runCatching { currentPlatform() }.getOrNull()
         platform?.let { it.isDesktop() && !it.isWindows() } ?: true
@@ -196,7 +201,7 @@ fun LoginScreen(
         val preferencesManager = PreferencesManager.getInstance()
         loginHistoryList = preferencesManager.loadLoginHistory()
 
-        if (isLinuxPlatform) {
+        if (isNasLoginDisabledPlatform) {
             isNasLogin = false
             AccountDataCache.isNasLogin = false
         }
@@ -561,7 +566,7 @@ fun LoginScreen(
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
-                    if (!isLinuxPlatform) {
+                    if (!isNasLoginDisabledPlatform) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -605,6 +610,10 @@ fun LoginScreen(
                     Button(
                         onClick = {
                             if (isNasLogin) {
+                                if (isNasLoginDisabledPlatform) {
+                                    toastManager.showToast("当前平台暂不支持 NAS 登录", ToastType.Failed)
+                                    return@Button
+                                }
                                 if (!isWebViewInitialized) {
                                     if (shouldBlockWebViewDependency) {
                                         val msg =
@@ -660,6 +669,10 @@ fun LoginScreen(
                                     loginViewModel = loginViewModel,
                                     rememberPassword = rememberPassword,
                                     onProbeRequired = { url ->
+                                        if (isNasLoginDisabledPlatform) {
+                                            toastManager.showToast("当前平台暂时不支持 FN ID 登录", ToastType.Failed)
+                                            return@handleLogin
+                                        }
                                         if (!isWebViewInitialized && shouldBlockWebViewDependency) {
                                             val msg =
                                                 if (webViewInitError != null) "组件加载失败，无法验证服务器"
@@ -738,8 +751,8 @@ fun LoginScreen(
                     },
                     onSelect = onSelect@{ history ->
                         if (history.isNasLogin) {
-                            if (isLinuxPlatform) {
-                                toastManager.showToast("Linux 暂不支持 NAS 登录", ToastType.Failed)
+                            if (isNasLoginDisabledPlatform) {
+                                toastManager.showToast("当前平台暂不支持 NAS 登录", ToastType.Failed)
                                 return@onSelect
                             }
                             if (!isWebViewInitialized) {
@@ -809,6 +822,10 @@ fun LoginScreen(
                                     loginViewModel = loginViewModel,
                                     rememberPassword = true,
                                     onProbeRequired = { url ->
+                                        if (isNasLoginDisabledPlatform) {
+                                            toastManager.showToast("当前平台暂不支持 NAS 登录", ToastType.Failed)
+                                            return@handleLogin
+                                        }
                                         if (!isWebViewInitialized && shouldBlockWebViewDependency) {
                                             val msg =
                                                 if (webViewInitError != null) "组件加载失败，无法验证服务器"
