@@ -18,8 +18,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
-import java.awt.EventQueue
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.file.FileSystems
@@ -32,21 +32,12 @@ import java.util.jar.JarFile
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
-import kotlin.coroutines.CoroutineContext
 
 object WebViewBootstrap {
     private val logger = Logger.withTag("WebViewBootstrap")
     private val started = AtomicBoolean(false)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val awtDispatcher = object : kotlinx.coroutines.CoroutineDispatcher() {
-        override fun dispatch(context: CoroutineContext, block: Runnable) {
-            if (EventQueue.isDispatchThread()) {
-                block.run()
-            } else {
-                EventQueue.invokeLater(block)
-            }
-        }
-    }
+    private const val INIT_TIMEOUT_MILLIS = 5 * 60 * 1000L
 
     val initialized = MutableStateFlow(false)
     val restartRequired = MutableStateFlow(false)
@@ -62,6 +53,18 @@ object WebViewBootstrap {
         lastLogDir = logDir
 
         if (!started.compareAndSet(false, true)) return
+
+        scope.launch {
+            withTimeoutOrNull(INIT_TIMEOUT_MILLIS) {
+                while (isActive && !initialized.value && initError.value == null) {
+                    delay(500)
+                }
+            } ?: run {
+                if (!initialized.value && initError.value == null) {
+                    initError.value = RuntimeException("KCEF initialization timed out.")
+                }
+            }
+        }
 
         runCatching {
             installDir.parentFile?.mkdirs()
@@ -180,7 +183,7 @@ object WebViewBootstrap {
             }
 
             val initFailure = runCatching {
-                withContext(awtDispatcher) {
+                withContext(Dispatchers.IO) {
                     KCEF.init(
                         builder = {
                             installDir(installDir)
@@ -192,6 +195,7 @@ object WebViewBootstrap {
                             }
                             progress {
                                 onInitialized {
+                                    initError.value = null
                                     initialized.value = true
                                     AppSettingsStore.kcefInitialized = true
                                     AppSettingsStore.kcefInitializedVersion = currentVersion

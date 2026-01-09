@@ -47,7 +47,6 @@ import com.jankinwu.fntv.client.ui.screen.PlayerManager
 import com.jankinwu.fntv.client.ui.screen.PlayerOverlay
 import com.jankinwu.fntv.client.ui.screen.updateLoginHistory
 import com.jankinwu.fntv.client.ui.window.PipPlayerWindow
-import com.jankinwu.fntv.client.ui.window.SplashScreen
 import com.jankinwu.fntv.client.utils.ComposeViewModelStoreOwner
 import com.jankinwu.fntv.client.utils.ConsoleLogWriter
 import com.jankinwu.fntv.client.utils.DesktopContext
@@ -115,7 +114,7 @@ fun main() {
     logger.i { "Application started. Logs directory: ${logDir.absolutePath}" }
 
     val platform = currentPlatformDesktop()
-    val shouldInitKcef = platform !is Platform.Linux && platform !is Platform.MacOS
+    val shouldInitKcef = platform.isWindows()
 
     val baseDir = if (shouldInitKcef) kcefBaseDir() else null
     val installDir = baseDir?.let { File(it, "kcef-bundle-${BuildConfig.VERSION_NAME}") }
@@ -237,37 +236,14 @@ fun main() {
                     DesktopContext(playerState, dataDir, cacheDir, logDir, ExtraWindowProperties())
                 }
 
-                val osName = System.getProperty("os.name").lowercase()
-                val isMacOS = osName.contains("mac")
-
-                if (isMacOS && !webViewInitialized && webViewInitError == null) {
-                    Window(
-                        onCloseRequest = ::exitApplication,
-                        title = title,
-                        state = rememberWindowState(
-                            width = 400.dp,
-                            height = 200.dp,
-                            position = WindowPosition(Alignment.Center)
-                        ),
-                        undecorated = true,
-                        transparent = true,
-                        icon = icon
-                    ) {
-                        SplashScreen(
-                            icon = icon,
-                            title = title,
-                            error = webViewInitError
-                        )
-                    }
-                } else {
-                    // 主窗口
-                    Window(
-                        onCloseRequest = ::exitApplication,
-                        state = mainState,
-                        title = title,
-                        icon = icon,
-                        visible = !playerManager.playerState.isVisible
-                    ) {
+                // 主窗口
+                Window(
+                    onCloseRequest = ::exitApplication,
+                    state = mainState,
+                    title = title,
+                    icon = icon,
+                    visible = !playerManager.playerState.isVisible
+                ) {
                         val shouldStartMaximized = remember { AppSettingsStore.isWindowMaximized }
                         DisposableEffect(shouldStartMaximized) {
                             if (!shouldStartMaximized) return@DisposableEffect onDispose {}
@@ -379,9 +355,9 @@ fun main() {
                         }
                     }
 
-                    // 播放器窗口
-                    if (playerManager.playerState.isVisible && !playerManager.isPipMode) {
-                        Window(
+                // 播放器窗口
+                if (playerManager.playerState.isVisible && !playerManager.isPipMode) {
+                    Window(
                             onCloseRequest = {
                                 if (PlayingSettingsStore.playerIsFullscreen) {
                                     playerState.placement = WindowPlacement.Floating
@@ -593,7 +569,6 @@ fun main() {
                     }
                 }
             }
-        }
     }
 }
 
