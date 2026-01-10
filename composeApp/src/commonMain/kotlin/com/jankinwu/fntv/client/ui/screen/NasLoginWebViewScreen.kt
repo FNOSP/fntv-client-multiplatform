@@ -369,7 +369,8 @@ private fun MacNasLoginWebViewContent(
             loadUrl = { url -> platformWebViewState.loadUrl(url) },
             onLoginSuccess = onLoginSuccess,
             fnId = fnId,
-            autoLoginUsername = autoLoginUsername
+            autoLoginUsername = autoLoginUsername,
+            preferWebViewSysConfig = true
         )
     }
 
@@ -416,7 +417,34 @@ private fun MacNasLoginWebViewContent(
             modifier = Modifier.fillMaxSize(),
             placeholderColor = Color.White,
             onUrlChanged = { url ->
-                if (url.startsWith("flynarwhal://bridge") || url.contains("#flynarwhal_bridge?")) return@PlatformWebView
+                val bridge = parseFnBridgeUrl(url)
+                if (bridge != null) {
+                    val (method, params) = bridge
+                    when (method) {
+                        "LogNetwork" -> {
+                            messageChannel.trySend(params)
+                        }
+
+                        "CaptureLoginInfo" -> {
+                            runCatching {
+                                val json = Json.parseToJsonElement(params).jsonObject
+                                val username = json["username"]?.jsonPrimitive?.contentOrNull ?: ""
+                                val password = json["password"]?.jsonPrimitive?.contentOrNull ?: ""
+                                val rememberPassword =
+                                    json["rememberPassword"]?.jsonPrimitive?.booleanOrNull ?: false
+                                setCapturedUsername(username)
+                                setCapturedPassword(password)
+                                setCapturedRememberPassword(rememberPassword)
+                            }
+                        }
+                    }
+                    cookieScope.launch {
+                        platformWebViewState.evaluateJavaScript(
+                            "try{history.replaceState(null,'',window.location.pathname+window.location.search)}catch(e){}"
+                        )
+                    }
+                    return@PlatformWebView
+                }
                 onAddressBarUrlChange(url)
                 if (url.contains("/login")) {
                     val baseUrl = url.substringBefore("/login")

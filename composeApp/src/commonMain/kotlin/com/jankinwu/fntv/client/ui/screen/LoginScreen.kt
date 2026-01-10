@@ -590,7 +590,7 @@ fun LoginScreen(
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
-                    if (!isNasLoginDisabledPlatform) {
+                    if (!isNasLoginDisabledPlatform || !isMacPlatform) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,

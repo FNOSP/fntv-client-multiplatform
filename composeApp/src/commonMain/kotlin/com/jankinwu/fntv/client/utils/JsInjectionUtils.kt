@@ -378,7 +378,7 @@ fun getJsInjectionScript(
                 }
                 
                 if (this._url && this._url.indexOf("/sac/rpcproxy/v1/new-user-guide/status") !== -1) {
-                    logToNative({ type: "XHR", url: this._url });
+                    logToNative({ type: "XHR", url: this._url, headers: (this._headers || {}) });
                 }
                 return originalSend.apply(this, arguments);
             };
@@ -408,6 +408,10 @@ fun getJsInjectionScript(
                     }
                 }
                 
+                if (url && url.indexOf("/sac/rpcproxy/v1/new-user-guide/status") !== -1) {
+                    logToNative({ type: "XHR", url: url, headers: headers });
+                }
+                
                 return originalFetch.apply(this, arguments).then(function(response) {
                     if (url && url.indexOf("/oauthapi/authorize") !== -1) {
                         var clone = response.clone();
@@ -428,6 +432,31 @@ fun getJsInjectionScript(
                     return response;
                 });
             };
+
+            function fetchSysConfigOnce() {
+                try {
+                    if (window.__flynarwhal_sys_config_requested) return;
+                    if (window.location.href.indexOf('/login') !== -1) return;
+                    window.__flynarwhal_sys_config_requested = true;
+                    fetch('/v/api/v1/sys/config', { credentials: 'include' })
+                        .then(function(r) { return r.text(); })
+                        .then(function(text) {
+                            logToNative({
+                                type: "SysConfig",
+                                url: "/v/api/v1/sys/config",
+                                body: text || "",
+                                pageUrl: String(window.location.href || "")
+                            });
+                        })
+                        .catch(function() {
+                            window.__flynarwhal_sys_config_requested = false;
+                        });
+                } catch (e) {
+                    window.__flynarwhal_sys_config_requested = false;
+                }
+            }
+
+            setTimeout(fetchSysConfigOnce, 800);
             console.log("Network Interceptor Injected Successfully.");
         })();
     """.trimIndent()
