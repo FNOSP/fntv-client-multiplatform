@@ -172,9 +172,6 @@ import io.github.alexzhirkevich.compottie.rememberLottiePainter
 import io.github.composefluent.FluentTheme
 import io.github.composefluent.component.ContentDialogButton
 import io.github.composefluent.component.DialogSize
-import io.github.composefluent.component.FontIconDefaults
-import io.github.composefluent.component.FontIconSize
-import io.github.composefluent.component.NavigationDefaults
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
@@ -3315,26 +3312,26 @@ fun PlayerTopBar(
                     .padding(top = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 80.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val interaction = remember { MutableInteractionSource() }
-                    NavigationDefaults.BackButton(
-                        onClick = {
-                            mediaPlayer.stopPlayback()
-                            playerViewModel.updatePlayingInfo(null)
-                            playerViewModel.updateSubtitleSettings(SubtitleSettings())
-                            onBack()
-                        },
-                        interaction = interaction,
-                        icon = {
-                            FontIconDefaults.BackIcon(interaction, size = FontIconSize(16f))
-                        }
-                    )
-                }
+//                Box(
+//                    modifier = Modifier
+//                        .align(Alignment.CenterStart)
+//                        .padding(start = 80.dp),
+//                    contentAlignment = Alignment.Center
+//                ) {
+//                    val interaction = remember { MutableInteractionSource() }
+//                    NavigationDefaults.BackButton(
+//                        onClick = {
+//                            mediaPlayer.stopPlayback()
+//                            playerViewModel.updatePlayingInfo(null)
+//                            playerViewModel.updateSubtitleSettings(SubtitleSettings())
+//                            onBack()
+//                        },
+//                        interaction = interaction,
+//                        icon = {
+//                            FontIconDefaults.BackIcon(interaction, size = FontIconSize(16f))
+//                        }
+//                    )
+//                }
                 Box(
                     modifier = Modifier.align(Alignment.Center),
                     contentAlignment = Alignment.Center
