@@ -488,9 +488,21 @@ fun PlayerOverlay(
     // Skip Intro Undo State
     var showSkipIntroUndoPrompt by remember { mutableStateOf(false) }
     var skipIntroUndoCountdown by remember { mutableIntStateOf(5) }
-    var lastAutoSkippedIntroSegmentMillis by remember(playingInfoCache?.itemGuid) { mutableStateOf<Pair<Long, Long>?>(null) }
-    var pendingIntroSkipSegmentMillis by remember(playingInfoCache?.itemGuid) { mutableStateOf<Pair<Long, Long>?>(null) }
-    var introSkipSuppressedUntilMs by remember(playingInfoCache?.itemGuid) { mutableStateOf<Long?>(null) }
+    var lastAutoSkippedIntroSegmentMillis by remember(playingInfoCache?.itemGuid) {
+        mutableStateOf<Pair<Long, Long>?>(
+            null
+        )
+    }
+    var pendingIntroSkipSegmentMillis by remember(playingInfoCache?.itemGuid) {
+        mutableStateOf<Pair<Long, Long>?>(
+            null
+        )
+    }
+    var introSkipSuppressedUntilMs by remember(playingInfoCache?.itemGuid) {
+        mutableStateOf<Long?>(
+            null
+        )
+    }
     var lastIntroMonitorPosition by remember { mutableLongStateOf(0L) }
     var introMonitorInitialized by remember(playingInfoCache?.itemGuid) { mutableStateOf(false) }
 
@@ -551,8 +563,10 @@ fun PlayerOverlay(
     val smartIntroSegmentMillis: Pair<Long, Long>? = if (useSmartSkip) {
         val intro = smartSegments?.intro
         if (intro != null && intro.valid && intro.end > intro.start && intro.end > BigDecimal.ZERO) {
-            val startMs = intro.start.multiply(BigDecimal(1000)).setScale(0, RoundingMode.HALF_UP).longValueExact()
-            val endMs = intro.end.multiply(BigDecimal(1000)).setScale(0, RoundingMode.HALF_UP).longValueExact()
+            val startMs = intro.start.multiply(BigDecimal(1000)).setScale(0, RoundingMode.HALF_UP)
+                .longValueExact()
+            val endMs = intro.end.multiply(BigDecimal(1000)).setScale(0, RoundingMode.HALF_UP)
+                .longValueExact()
             if (endMs > startMs) startMs to endMs else null
         } else {
             null
@@ -569,8 +583,10 @@ fun PlayerOverlay(
     val smartCreditsSegmentMillis: Pair<Long, Long>? = if (useSmartSkip) {
         val credits = smartSegments?.credits
         if (credits != null && credits.valid && credits.end > credits.start && credits.end > BigDecimal.ZERO) {
-            var startMs = credits.start.multiply(BigDecimal(1000)).setScale(0, RoundingMode.HALF_UP).longValueExact()
-            var endMs = credits.end.multiply(BigDecimal(1000)).setScale(0, RoundingMode.HALF_UP).longValueExact()
+            var startMs = credits.start.multiply(BigDecimal(1000)).setScale(0, RoundingMode.HALF_UP)
+                .longValueExact()
+            var endMs = credits.end.multiply(BigDecimal(1000)).setScale(0, RoundingMode.HALF_UP)
+                .longValueExact()
             if (totalDuration > 0) {
                 startMs = startMs.coerceIn(0L, totalDuration)
                 endMs = endMs.coerceIn(0L, totalDuration)
@@ -630,7 +646,8 @@ fun PlayerOverlay(
 
         val now = System.currentTimeMillis()
         val lastObservedPosition = playerManager.initialSeekLastObservedPositionMs
-        val largeBackwardJump = lastObservedPosition > 0L && (lastObservedPosition - currentPosition) > 1500L
+        val largeBackwardJump =
+            lastObservedPosition > 0L && (lastObservedPosition - currentPosition) > 1500L
         if (largeBackwardJump) {
             playerManager.initialSeekStableSinceWallTimeMs = 0L
         }
@@ -756,7 +773,15 @@ fun PlayerOverlay(
     }
 
     // Outro Skip Monitor
-    LaunchedEffect(currentPosition, resolvedCreditsSegmentMillis, skipOutroCancelled, totalDuration, playState, isSeeking, nextEpisode) {
+    LaunchedEffect(
+        currentPosition,
+        resolvedCreditsSegmentMillis,
+        skipOutroCancelled,
+        totalDuration,
+        playState,
+        isSeeking,
+        nextEpisode
+    ) {
         val creditsSegment = resolvedCreditsSegmentMillis ?: return@LaunchedEffect
 
         val startMs = creditsSegment.first
@@ -791,7 +816,8 @@ fun PlayerOverlay(
             if (showSkipOutroPrompt && !skipOutroCancelled) {
                 showSkipOutroPrompt = false
                 val creditsEndMs = resolvedCreditsSegmentMillis?.second ?: 0L
-                val canSeekPastCredits = creditsEndMs > 0L && (totalDuration <= 0L || creditsEndMs < totalDuration - 1000L)
+                val canSeekPastCredits =
+                    creditsEndMs > 0L && (totalDuration <= 0L || creditsEndMs < totalDuration - 1000L)
                 if (canSeekPastCredits) {
                     seekToWithDanmakuReset(creditsEndMs)
                 } else if (nextEpisode != null) {
@@ -1401,7 +1427,10 @@ fun PlayerOverlay(
                     val size = windowState.size
                     AppSettingsStore.playerWindowWidth = size.width.value
                     AppSettingsStore.playerWindowHeight = size.height.value
-                    PlayingSettingsStore.saveLastPlayerScreenSize(size.width.value, size.height.value)
+                    PlayingSettingsStore.saveLastPlayerScreenSize(
+                        size.width.value,
+                        size.height.value
+                    )
                 }
 
                 // Save position on exit
@@ -1466,7 +1495,10 @@ fun PlayerOverlay(
                     if (windowState.placement != WindowPlacement.Fullscreen && windowState.placement != WindowPlacement.Maximized) {
                         AppSettingsStore.playerWindowWidth = size.width.value
                         AppSettingsStore.playerWindowHeight = size.height.value
-                        PlayingSettingsStore.saveLastPlayerScreenSize(size.width.value, size.height.value)
+                        PlayingSettingsStore.saveLastPlayerScreenSize(
+                            size.width.value,
+                            size.height.value
+                        )
 
                         if (position is WindowPosition.Absolute) {
                             AppSettingsStore.playerWindowX = position.x.value
@@ -1560,6 +1592,8 @@ fun PlayerOverlay(
             val playbackSpeedValue = ((playbackSpeedFeature?.value) as? Number)?.toFloat() ?: 1f
 
             DanmakuOverlay(
+                modifier = Modifier
+                    .fillMaxSize(),
                 danmakuList = danmakuList,
                 currentTime = currentPosition,
                 isPlaying = playState == PlaybackState.PLAYING,
@@ -1873,7 +1907,11 @@ fun PlayerOverlay(
                     onDanmakuOpacityChange = { danmakuViewModel.updateOpacity(it) },
                     onDanmakuFontSizeChange = { danmakuViewModel.updateFontSize(it) },
                     onDanmakuSpeedChange = { danmakuViewModel.updateSpeed(it) },
-                    onDanmakuSyncPlaybackSpeedChanged = { danmakuViewModel.updateSyncPlaybackSpeed(it) },
+                    onDanmakuSyncPlaybackSpeedChanged = {
+                        danmakuViewModel.updateSyncPlaybackSpeed(
+                            it
+                        )
+                    },
                     onDanmakuDebugEnabledChange = { danmakuViewModel.updateDebugEnabled(it) },
                     onDanmakuSettingsHoverChanged = { isDanmakuSettingsHovered = it }
                 )
@@ -1942,7 +1980,6 @@ fun buildEpisodeTitle(mediaTitle: String, subhead: String): AnnotatedString {
     }
     return annotatedString
 }
-
 
 
 @Composable
@@ -2599,7 +2636,8 @@ private suspend fun playMedia(
             doubanId = playInfoResponse.item.doubanId ?: playInfoResponse.item.imdbId ?: "",
             episodeNumber = playInfoResponse.item.episodeNumber,
             episodeTitle = playInfoResponse.item.title ?: "",
-            title = if (playInfoResponse.type != FnTvMediaType.MOVIE.value) playInfoResponse.item.tvTitle else (playInfoResponse.item.title ?: ""),
+            title = if (playInfoResponse.type != FnTvMediaType.MOVIE.value) playInfoResponse.item.tvTitle else (playInfoResponse.item.title
+                ?: ""),
             seasonNumber = playInfoResponse.item.seasonNumber,
             season = playInfoResponse.type != FnTvMediaType.MOVIE.value,
             guid = playInfoResponse.item.guid,

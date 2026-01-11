@@ -123,7 +123,7 @@ fun SettingsScreen(navigator: ComponentNavigator) {
 
     var flyNarwhalServerEnabled by remember { mutableStateOf(AppSettingsStore.flyNarwhalServerEnabled) }
     var flyNarwhalServerBaseUrl by remember { mutableStateOf(AppSettingsStore.flyNarwhalServerBaseUrl) }
-    var wasSmartAnalysisBaseUrlFocused by remember { mutableStateOf(false) }
+//    var wasSmartAnalysisBaseUrlFocused by remember { mutableStateOf(false) }
 
     if (isExporting) {
         FluentDialog(
@@ -604,9 +604,9 @@ fun SettingsScreen(navigator: ComponentNavigator) {
                             onCheckStateChange = {
                                 flyNarwhalServerEnabled = it
                                 AppSettingsStore.flyNarwhalServerEnabled = it
-                                if (it) {
-                                    LoginStateManager.syncSmartAnalysisFnBaseUrlIfNeeded()
-                                }
+//                                if (it) {
+//                                    LoginStateManager.syncSmartAnalysisFnBaseUrlIfNeeded()
+//                                }
                             }
                         )
                     }
@@ -632,10 +632,10 @@ fun SettingsScreen(navigator: ComponentNavigator) {
                                     .width(200.dp)
                                     .onFocusChanged { focusState ->
                                         val isFocused = focusState.isFocused
-                                        if (wasSmartAnalysisBaseUrlFocused && !isFocused) {
-                                            LoginStateManager.syncSmartAnalysisFnBaseUrlIfNeeded()
-                                        }
-                                        wasSmartAnalysisBaseUrlFocused = isFocused
+//                                        if (wasSmartAnalysisBaseUrlFocused && !isFocused) {
+//                                            LoginStateManager.syncSmartAnalysisFnBaseUrlIfNeeded()
+//                                        }
+//                                        wasSmartAnalysisBaseUrlFocused = isFocused
                                     },
                                 singleLine = true,
                                 placeholder = {

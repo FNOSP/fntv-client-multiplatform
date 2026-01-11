@@ -100,11 +100,6 @@ class FlyNarwhalApiImpl : FlyNarwhalApi {
         guid: String,
         parentGuid: String
     ): Map<String, List<Danmaku>> {
-        val baseUrl = AppSettingsStore.flyNarwhalServerBaseUrl
-        if (baseUrl.isBlank()) {
-            throw IllegalArgumentException("飞鲸影视服务端 URL 未配置")
-        }
-
         val parameters = mapOf(
             "douban_id" to doubanId,
             "episode_number" to episodeNumber,
@@ -116,21 +111,8 @@ class FlyNarwhalApiImpl : FlyNarwhalApi {
             "parent_guid" to parentGuid
         )
 
-        val fullUrl = if (baseUrl.endsWith("/")) "$baseUrl${"/api/danmu/get".removePrefix("/")}" else "$baseUrl/api/danmu/get"
-
         return try {
-            logger.i { "GET SSE request: $fullUrl, params: $parameters" }
-            client.prepareGet(fullUrl) {
-                header(HttpHeaders.Accept, "text/event-stream")
-                parameters.forEach { (key, value) ->
-                    parameter(key, value)
-                }
-                timeout {
-                    requestTimeoutMillis = 240_000
-                    connectTimeoutMillis = 15_000
-                    socketTimeoutMillis = 240_000
-                }
-            }.execute { response ->
+            sseGet("/api/danmu/get", parameters) { response ->
                 readDanmakuFromSse(response)
             }
         } catch (e: Exception) {
@@ -193,11 +175,7 @@ class FlyNarwhalApiImpl : FlyNarwhalApi {
         parameters: Map<String, Any?>? = null,
         noinline block: (HttpRequestBuilder.() -> Unit)? = null
     ): T {
-        val baseUrl = AppSettingsStore.flyNarwhalServerBaseUrl
-        if (baseUrl.isBlank()) {
-            throw IllegalArgumentException("飞鲸影视服务端 URL 未配置")
-        }
-        val fullUrl = if (baseUrl.endsWith("/")) "$baseUrl${url.removePrefix("/")}" else "$baseUrl$url"
+        val fullUrl = buildFullUrl(url)
         logger.i { "GET request: $fullUrl, params: $parameters" }
         val authx = genAuthx(url, parameters)
 
@@ -220,17 +198,43 @@ class FlyNarwhalApiImpl : FlyNarwhalApi {
         }
     }
 
+    /**
+     * Executes a GET request for Server-Sent Events (SSE).
+     */
+    private suspend fun <T> sseGet(
+        url: String,
+        parameters: Map<String, Any?>? = null,
+        handleResponse: suspend (HttpResponse) -> T
+    ): T {
+        val fullUrl = buildFullUrl(url)
+        val authx = genAuthx(url, parameters)
+        logger.i { "GET SSE request: $fullUrl, params: $parameters" }
+
+        return client.prepareGet(fullUrl) {
+            header(HttpHeaders.Accept, "text/event-stream")
+            header("Authx", authx)
+            parameters?.forEach { (key, value) ->
+                if (value != null) {
+                    parameter(key, value)
+                }
+            }
+            timeout {
+                requestTimeoutMillis = 240_000
+                connectTimeoutMillis = 15_000
+                socketTimeoutMillis = 240_000
+            }
+        }.execute { response ->
+            handleResponse(response)
+        }
+    }
+
     private suspend inline fun <reified T> post(
         url: String,
         body: Any? = emptyMap<String, Any>(),
         noinline block: (HttpRequestBuilder.() -> Unit)? = null
     ): T {
-        val baseUrl = AppSettingsStore.flyNarwhalServerBaseUrl
-        if (baseUrl.isBlank()) {
-            throw IllegalArgumentException("飞鲸影视服务端 URL 未配置")
-        }
+        val fullUrl = buildFullUrl(url)
         val authx = genAuthx(url, data = body)
-        val fullUrl = if (baseUrl.endsWith("/")) "$baseUrl${url.removePrefix("/")}" else "$baseUrl$url"
         logger.i { "POST request: $fullUrl, body: $body" }
 
         try {
@@ -249,5 +253,16 @@ class FlyNarwhalApiImpl : FlyNarwhalApi {
             logger.e(e) { "POST request failed" }
             throw e
         }
+    }
+
+    /**
+     * Builds the full URL using the configured base URL.
+     */
+    private fun buildFullUrl(url: String): String {
+        val baseUrl = AppSettingsStore.flyNarwhalServerBaseUrl
+        if (baseUrl.isBlank()) {
+            throw IllegalArgumentException("飞鲸影视服务端 URL 未配置")
+        }
+        return if (baseUrl.endsWith("/")) "$baseUrl${url.removePrefix("/")}" else "$baseUrl$url"
     }
 }

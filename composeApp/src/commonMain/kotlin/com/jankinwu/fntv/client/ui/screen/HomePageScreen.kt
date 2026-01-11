@@ -33,7 +33,6 @@ import com.jankinwu.fntv.client.data.store.UserInfoMemoryCache
 import com.jankinwu.fntv.client.enums.FnTvMediaType
 import com.jankinwu.fntv.client.manager.HandleFavoriteResult
 import com.jankinwu.fntv.client.manager.HandleWatchedResult
-import com.jankinwu.fntv.client.manager.LoginStateManager
 import com.jankinwu.fntv.client.ui.component.common.ComponentNavigator
 import com.jankinwu.fntv.client.ui.component.common.MediaLibCardRow
 import com.jankinwu.fntv.client.ui.component.common.MediaLibGallery
@@ -120,15 +119,15 @@ fun HomePageScreen(navigator: ComponentNavigator) {
 //        }
     }
 
-    LaunchedEffect(userInfoUiState) {
-        when (userInfoUiState) {
-            is UiState.Success -> {
-                LoginStateManager.syncSmartAnalysisFnBaseUrlIfNeeded()
-            }
-
-            else -> {}
-        }
-    }
+//    LaunchedEffect(userInfoUiState) {
+//        when (userInfoUiState) {
+//            is UiState.Success -> {
+//                LoginStateManager.syncSmartAnalysisFnBaseUrlIfNeeded()
+//            }
+//
+//            else -> {}
+//        }
+//    }
 
     // 当从播放器返回首页时刷新最近播放列表
     LaunchedEffect(playerManager.playerState) {
