@@ -29,11 +29,11 @@ import com.jankinwu.fntv.client.data.model.response.Danmaku
 import kotlinx.coroutines.isActive
 import kotlin.math.max
 
-private const val BASE_DURATION_AT_1X_MILLIS = 16_000L
 private const val FIXED_DURATION_MILLIS = 5_000L
 private const val MIN_PLAYBACK_SPEED_FOR_OVERLAP = 0.5f
 private const val NEGATIVE_MEDIA_JITTER_TOLERANCE_MILLIS = 200L
 private const val DEBUG_MAX_LINES = 10
+private const val BASE_SCROLL_SPEED_DP_PER_SECOND = 120f
 
 private data class OverlayGeometry(
     val widthPx: Float,
@@ -148,7 +148,6 @@ fun DanmakuOverlay(
         val currentTimeState = rememberUpdatedState(currentTime)
         val speedState = rememberUpdatedState(speed)
         val gapPxState = rememberUpdatedState(geometry.gapPx)
-        val travelXState = rememberUpdatedState(geometry.travelX)
         val opacityState = rememberUpdatedState(opacity.coerceIn(0f, 1f))
         val trackHeightPxState = rememberUpdatedState(geometry.trackHeightPx)
         val fontSizeState = rememberUpdatedState(geometry.effectiveFontSize)
@@ -338,9 +337,9 @@ fun DanmakuOverlay(
                 }
                 val currentPlaybackSpeed = playbackSpeedState.value.coerceIn(0.1f, 16.0f)
 
-                val speedValue = speedState.value.coerceIn(0.1f, 10f)
-                val durationMillis = (BASE_DURATION_AT_1X_MILLIS / speedValue).toLong().coerceAtLeast(1L)
-                val speedPxPerMs = travelXState.value / durationMillis.toFloat()
+                val speedValue = speedState.value.coerceIn(0.5f, 2.0f)
+                val basePxPerMs = with(density) { (BASE_SCROLL_SPEED_DP_PER_SECOND / 1000f).dp.toPx() }
+                val speedPxPerMs = basePxPerMs * speedValue
                 val geometryNow = geometryState.value
 
                 val spawnState = spawnDueDanmakus(
