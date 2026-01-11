@@ -62,6 +62,7 @@ private data class SpawnState(
 
 @Composable
 fun DanmakuOverlay(
+    modifier: Modifier = Modifier,
     danmakuList: List<Danmaku>,
     currentTime: Long, // in millis
     isPlaying: Boolean,
@@ -77,15 +78,28 @@ fun DanmakuOverlay(
 ) {
     if (!isVisible) return
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize().clipToBounds()) {
+    BoxWithConstraints(
+        modifier = modifier
+            .clipToBounds()
+    ) {
         val density = LocalDensity.current
-        val geometry = computeOverlayGeometry(
-            density = density,
-            maxWidth = maxWidth,
-            maxHeight = maxHeight,
-            area = area,
-            fontSize = fontSize
-        )
+        val geometry = if (constraints.hasBoundedWidth && constraints.hasBoundedHeight) {
+            computeOverlayGeometryFromPx(
+                density = density,
+                widthPx = constraints.maxWidth.toFloat(),
+                heightPx = constraints.maxHeight.toFloat(),
+                area = area,
+                fontSize = fontSize
+            )
+        } else {
+            computeOverlayGeometry(
+                density = density,
+                maxWidth = maxWidth,
+                maxHeight = maxHeight,
+                area = area,
+                fontSize = fontSize
+            )
+        }
 
         val measureTextStyle = remember(geometry.effectiveFontSize) {
             textStyleFor(geometry.effectiveFontSize, Color.White)
@@ -146,6 +160,7 @@ fun DanmakuOverlay(
         val scrollTrackCountState = rememberUpdatedState(geometry.scrollTrackCount)
         val topTrackCountState = rememberUpdatedState(geometry.topTrackCount)
         val bottomTrackCountState = rememberUpdatedState(geometry.bottomTrackCount)
+        val geometryState = rememberUpdatedState(geometry)
 
         fun clearAndResetForListUpdate(mediaTimeMillis: Long, preparedStartTimesMillis: LongArray) {
             activeItems.clear()
@@ -326,6 +341,7 @@ fun DanmakuOverlay(
                 val speedValue = speedState.value.coerceIn(0.1f, 10f)
                 val durationMillis = (BASE_DURATION_AT_1X_MILLIS / speedValue).toLong().coerceAtLeast(1L)
                 val speedPxPerMs = travelXState.value / durationMillis.toFloat()
+                val geometryNow = geometryState.value
 
                 val spawnState = spawnDueDanmakus(
                     preparedItems = preparedItemsSnapshot,
@@ -345,7 +361,7 @@ fun DanmakuOverlay(
                     reverseTrackAvailableAtNanos = reverseTrackAvailableAtNanos,
                     topTrackAvailableAtNanos = topTrackAvailableAtNanos,
                     bottomTrackAvailableAtNanos = bottomTrackAvailableAtNanos,
-                    geometry = geometry,
+                    geometry = geometryNow,
                     activeItems = activeItems
                 )
 
@@ -372,7 +388,7 @@ fun DanmakuOverlay(
                     nowRealNanos = nowRealNanos,
                     deltaRealMillisF = deltaRealMillisF,
                     currentPlaybackSpeed = currentPlaybackSpeed,
-                    geometry = geometry
+                    geometry = geometryNow
                 )
             }
         }
@@ -421,6 +437,22 @@ private fun computeOverlayGeometry(
     val widthPx = with(density) { maxWidth.toPx() }
     val heightPx = with(density) { maxHeight.toPx() }
 
+    return computeOverlayGeometryFromPx(
+        density = density,
+        widthPx = widthPx,
+        heightPx = heightPx,
+        area = area,
+        fontSize = fontSize
+    )
+}
+
+private fun computeOverlayGeometryFromPx(
+    density: Density,
+    widthPx: Float,
+    heightPx: Float,
+    area: Float,
+    fontSize: Float
+): OverlayGeometry {
     val effectiveFontSize = fontSize.coerceIn(0.5f, 1.7f)
     val trackHeightPx = with(density) { (30.dp * effectiveFontSize).toPx() }
     val paddingTopPx = with(density) { 10.dp.toPx() }
